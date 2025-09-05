@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.8)
 
-set(PROJECT_NAME s6h4d_driver)
+set(PROJECT_NAME s6h4d_sdk)
 
 project(${PROJECT_NAME} LANGUAGES CXX)
 

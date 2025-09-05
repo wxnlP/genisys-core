@@ -1,4 +1,4 @@
-set(TARGET_NAME s6h4d_core)
+set(TARGET_NAME s6h4d_sdk)
 
 add_library(${TARGET_NAME} STATIC)
 

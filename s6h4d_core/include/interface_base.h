@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "common/common_inc.h"
+#include "common_inc.h"
 #include <cstddef>
 
 #define JOINT_MAX   6

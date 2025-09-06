@@ -12,6 +12,17 @@ target_sources(${TARGET_NAME} PRIVATE
     src/interface_base.cc
 )
 
+if(BUILD_EXAMPLES)
+    target_include_directories(${TARGET_NAME} PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/../example/interface/
+    )
+endif()
+
+if(BUILD_DEFAULT_SERIAL)
+    target_link_libraries(${TARGET_NAME} PUBLIC serial)
+endif()
+
+
 # 安装静态库目标
 install(TARGETS ${TARGET_NAME}
     ARCHIVE DESTINATION lib

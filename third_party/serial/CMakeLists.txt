@@ -41,9 +41,13 @@ target_sources(${PROJECT_NAME} PRIVATE
 )
 
 # add example executable
-add_executable(serial_example examples/serial_example.cc)
-target_link_libraries(serial_example PRIVATE ${PROJECT_NAME})
-
+if (BUILD_EXAMPLES)
+    add_executable(serial_example examples/serial_example.cc)
+    target_link_libraries(serial_example PRIVATE ${PROJECT_NAME})
+    install(TARGETS serial_example
+        RUNTIME DESTINATION bin 
+    )
+endif()
 
 install(DIRECTORY include/
     DESTINATION include
@@ -55,6 +59,3 @@ install(TARGETS ${PROJECT_NAME}
     RUNTIME DESTINATION bin 
 )
 
-install(TARGETS serial_example
-    RUNTIME DESTINATION bin 
-)

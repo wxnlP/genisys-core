@@ -10,3 +10,11 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_subdirectory(s6h4d_core)
+
+if(BUILD_DEFAULT_SERIAL) 
+    add_subdirectory(third_party/serial)
+endif()
+
+if(BUILD_EXAMPLES)
+    add_subdirectory(example)
+endif()

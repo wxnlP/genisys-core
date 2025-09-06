@@ -1,4 +1,4 @@
-set(TARGET_NAME example)
+set(TARGET_NAME s6h4d_sdk_example)
 
 add_executable(${TARGET_NAME})
 
@@ -17,4 +17,11 @@ target_link_libraries(${TARGET_NAME} PUBLIC
 
 install(
     DIRECTORY interface/
-    DESTINATION include/s6h4d_sdk)
+    DESTINATION include/s6h4d_sdk
+)
+
+install(TARGETS ${TARGET_NAME}
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)

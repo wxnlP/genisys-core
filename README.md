@@ -15,7 +15,7 @@ sudo apt install ros-humble-serial-driver
 # --- 0x11 --- 0x12 --- 0x21 --- 0x31 --- 0x44 ---
 #   夹爪控制  关节角度控制 混合控制 单关节控制  完整控制  
 
-ros2 topic pub --once /s6h4d/joint_angle_ctrl s6h4d_msgs/msg/S6h4dJointAngle "{cmd: 0x31, joint_index: 5, angle: [0.0, 0.0, 105.0, 0.0, 0.0, 0.0], vel: [20.0, 20.0, 20.0, 20.0, 20.0, 20.0], accel: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0], paw: 0}"
+ros2 topic pub /s6h4d/joint_cmd example_ros2/msg/S6h4dJointAngle "{cmd: 0x31, joint_index: 5, angle: [20.0, 20.0, 0.0, 0.0, 0.0, 0.0], vel: [10.0, 20.0, 20.0, 20.0, 20.0, 20.0], accel: [2.0, 2.0, 2.0, 2.0, 2.0, 2.0], paw: 0}" --once 
 
 ```
 

@@ -2,6 +2,11 @@ cmake_minimum_required(VERSION 3.8)
 
 project(s6h4d_sdk LANGUAGES C CXX)
 
+# 修改默认的库文件、存档文件的存放位置
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
+
 # 指定项目的C++版本
 set(CMAKE_CXX_STANDARD 20)
 # 强制编译器必须支持

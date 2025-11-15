@@ -1,7 +1,7 @@
 #include "kinematic.h"
 #include <cmath>
 #include <cstring>
-
+#include <iostream>
 
 
 #ifdef ARM_MATH
@@ -14,16 +14,16 @@ inline float sinf(float x)
 {
     return arm_sin_f32(x);
 }
-#else
-inline float cosf(float x)
-{
-    return std::cos(x);
-}
+// #else
+// inline float cosf(float x)
+// {
+//     return std::cos(x);
+// }
 
-inline float sinf(float x)
-{
-    return std::sin(x);
-}
+// inline float sinf(float x)
+// {
+//     return std::sin(x);
+// }
 #endif
 
 
@@ -33,11 +33,11 @@ static void Rotation2Euler(const float *R, float *euler)
 
     if (fabs(R[6]) >= 1.0f - 0.00001f) {
         if (R[6] < 0) {
-            beta = M_PI_2;
+            beta = (float)M_PI_2;
             alpha = 0.0f;
             gama = atan2f(R[1], R[4]);
         } else {
-            beta = -M_PI_2;
+            beta = -(float)M_PI_2;
             alpha = 0.0f;
             gama = -atan2f(R[1], R[4]);
         }
@@ -48,9 +48,9 @@ static void Rotation2Euler(const float *R, float *euler)
         gama = atan2f(R[7] / temp, R[8] / temp);
     }
     
-    *(euler + 0) = gama;
-    *(euler + 1) = beta;
-    *(euler + 2) = alpha;
+    euler[0] = gama;
+    euler[1] = beta;
+    euler[2] = alpha;
 }
 
 static void Euler2Rotation(const float *euler, float *R)
@@ -103,16 +103,62 @@ static void MatrixMultiply(const float *matrix1, const float *matrix2, float *ou
     }
 }
 
-KinematicSolver::KinematicSolver(float L_BS, float D_BS, float L_AM, float L_FA, float D_EW, float L_WT)
-    : mdhConfig_(MDHConfig_t{ L_BS, D_BS, L_AM, L_FA, D_EW, L_WT })
+template <typename T>
+void print_matrix(const T* data, int rows, int cols) {
+    // 检查指针是否为空
+    if (data == nullptr) {
+        std::printf("Error: Matrix data is null.\n");
+        return;
+    }
+
+    // 检查行数或列数是否合法
+    if (rows <= 0 || cols <= 0) {
+        std::printf("Error: Invalid matrix dimensions (rows: %d, cols: %d).\n", rows, cols);
+        return;
+    }
+
+    // 打印矩阵
+    std::printf("Matrix (%d x %d):\n", rows, cols);
+    for (int i = 0; i < rows; ++i) { // 遍历行
+        for (int j = 0; j < cols; ++j) { // 遍历列
+            // 计算当前元素在一维数组中的索引: index = i * cols + j
+            int index = i * cols + j;
+
+            // 打印元素
+            // 注意：printf的格式化字符串需要根据T的实际类型进行调整。
+            // 假设 T 为 int 或 float/double，并使用合适的宽度进行对齐。
+            if constexpr (std::is_integral_v<T>) {
+                std::printf("%6d ", data[index]); // 整数，使用6个字符宽度对齐
+            } else if constexpr (std::is_floating_point_v<T>) {
+                std::printf("%6.2f ", data[index]); // 浮点数，使用6个字符宽度，小数点后保留2位
+            } else {
+                // 如果是其他类型，您可能需要专门的打印逻辑，这里作为默认处理
+                std::printf("? "); 
+            }
+        }
+        // 每行结束时换行
+        std::printf("\n");
+    }
+}
+
+KinematicSolver::KinematicSolver(float L_BS, float D_BS, float L_AM, float D_EW, float L_FA, float L_WT)
+    : mdhConfig_(MDHConfig_t{ L_BS, D_BS, L_AM, D_EW, L_FA, L_WT })
 {
+
+    // std::printf("%f\n", mdhConfig_.L_BASE);
+    // std::printf("%f\n", mdhConfig_.D_BASE);
+    // std::printf("%f\n", mdhConfig_.L_UPPERARM);
+    // std::printf("%f\n", mdhConfig_.D_ELBOW);
+    // std::printf("%f\n", mdhConfig_.L_FOREARM);
+    // std::printf("%f\n", mdhConfig_.L_WRIST);
+
     float tempMdhMatrix[6][4] = {
-        {  0.0000f        , 0.00f                 , mdhConfig_.L_BASE    , 0.0f },
-        { -(float) M_PI_2 , mdhConfig_.D_BASE     , 0.00f                , 0.0f },
-        {  0.0000f        , mdhConfig_.L_UPPERARM , 0.00f                , 0.0f },
-        { -(float) M_PI_2 , mdhConfig_.D_ELBOW    , mdhConfig_.L_FOREARM , 0.0f },
-        {  (float) M_PI_2 , 0.00f                 , 0.00f                , 0.0f },
-        { -(float) M_PI_2 , 0.00f                 , mdhConfig_.L_WRIST   , 0.0f }
+        {  0.0000f        , 0.00f                 , mdhConfig_.L_BASE   , 0.0f },
+        { -(float)M_PI_2 , mdhConfig_.D_BASE     , 0.00f                , 0.0f },
+        {  0.0000f       , mdhConfig_.L_UPPERARM , 0.00f                , 0.0f },
+        { -(float)M_PI_2 , mdhConfig_.D_ELBOW    , mdhConfig_.L_FOREARM , 0.0f },
+        {  (float)M_PI_2 , 0.00f                 , 0.00f                , 0.0f },
+        { -(float)M_PI_2 , 0.00f                 , mdhConfig_.L_WRIST   , 0.0f }
     };
 
     memcpy(MDH_Matrix_, tempMdhMatrix, sizeof(tempMdhMatrix));
@@ -150,9 +196,12 @@ bool KinematicSolver::FK(const Joint6Dof_t &inputJoint, Pose6Dof_t &outputPose)
     for (int i = 0; i < 6; i++) {
         theta_in[i] = inputJoint.theta[i] / RAD_TO_DEG;
     }
-
+    
     for (int i = 0; i < 6; i++) {
+        
         theta[i] = theta_in[i] + MDH_Matrix_[i][3];
+
+        // std::printf("theta[%d]:%f\n", i, theta[i]);
 
         float st = sinf(theta[i]);
         float ct = cosf(theta[i]);
@@ -169,22 +218,56 @@ bool KinematicSolver::FK(const Joint6Dof_t &inputJoint, Pose6Dof_t &outputPose)
         R[i][7] = ct * sa;
         R[i][8] = ca;
     }
-
+    
     MatrixMultiply(R[0], R[1], R_02, 3, 3, 3);
     MatrixMultiply(R_02, R[2], R_03, 3, 3, 3);
     MatrixMultiply(R_03, R[3], R_04, 3, 3, 3);
     MatrixMultiply(R_04, R[4], R_05, 3, 3, 3);
     MatrixMultiply(R_05, R[5], R_06, 3, 3, 3);
 
+    // print_matrix(R_06, 3, 3);
+
+    // for (int i = 0; i < 3; i++) {
+    //     std::printf("%f\t", L3_Elbow_[i]);
+    // }
+    // std::printf("\n");
+
     MatrixMultiply(R[0], L0_Base_, L0_Base, 3, 3, 1);
-    MatrixMultiply(R_02, L2_Arm_, L0_Arm, 3, 3, 3);
+    MatrixMultiply(R_02, L2_Arm_, L0_Arm, 3, 3, 1);
     MatrixMultiply(R_03, L3_Elbow_, L0_Elbow, 3, 3, 1);
     MatrixMultiply(R_06, L6_Wrist_, L0_Wrist, 3, 3, 1);
+
+    // print_matrix(R_03, 3, 3);
+
+    
+    // for (int i = 0; i < 3; i++) {
+    //     std::printf("%f\t", L0_Base[i]);
+    // }
+    // std::printf("\n");
+
+    // for (int i = 0; i < 3; i++) {
+    //     std::printf("%f\t", L0_Arm[i]);
+    // }
+    // std::printf("\n");
+
+    // for (int i = 0; i < 3; i++) {
+    //     std::printf("%f\t", L0_Elbow[i]);
+    // }
+    // std::printf("\n");
+
+    // for (int i = 0; i < 3; i++) {
+    //     std::printf("%f\t", L0_Wrist[i]);
+    // }
+    // std::printf("\n");
+
 
     // position
     for (int i = 0; i < 3; i++) {
         P_06[i] = L0_Base[i] + L0_Arm[i] + L0_Elbow[i] - L0_Wrist[i];
+        // std::printf("P_06[%d]:%f\n", i, P_06[i]);
     }
+
+    
 
     // posture
     Rotation2Euler(R_06, &P_06[3]);
@@ -226,9 +309,10 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
     if (inputPose.vaildR) {
         memcpy(R_06, inputPose.R, 9 * sizeof(float));
     } else {
-        P_06[3] = inputPose.roll;
-        P_06[4] = inputPose.pitch;
-        P_06[5] = inputPose.yaw;
+        std::printf("false");
+        P_06[3] = inputPose.roll / RAD_TO_DEG;
+        P_06[4] = inputPose.pitch / RAD_TO_DEG;
+        P_06[5] = inputPose.yaw / RAD_TO_DEG;
 
         Euler2Rotation(&P_06[3], R_06);
     }
@@ -287,7 +371,7 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
 
         // position
         for (int i = 0; i < 3; i++) {
-            L_2w[i] = P_0w_r[i] + L0_Base_[i];
+            L_2w[i] = P_0w_r[i] - L0_Base_[i];
         }
 
         float c = sqrtf(L_2w[0]*L_2w[0] + L_2w[2]*L_2w[2]);
@@ -317,11 +401,11 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
             theta_23[1][0] = theta_23[0][0];
 
             if (ind_arm == 0) {
-                theta_23[0][1] = M_PI;
-                theta_23[1][1] = -M_PI;
+                theta_23[0][1] = (float)M_PI;
+                theta_23[1][1] = -(float)M_PI;
             } else {
-                theta_23[0][1] = -M_PI;
-                theta_23[1][1] = M_PI;
+                theta_23[0][1] = -(float)M_PI;
+                theta_23[1][1] = (float)M_PI;
             }
 
             if (c < fabs(a - b)) {
@@ -342,7 +426,7 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
             if (q3 >= 1.0f) {
                 beta3 = 0.0f;
             } else if (q3 <= -1.0f) {
-                beta3 = M_PI;
+                beta3 = (float)M_PI;
             } else {
                 beta3 = acosf(q3);
             }
@@ -351,7 +435,7 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
             if (q2 >= 1.0f) {
                 beta2 = 0.0f;
             } else if (q2 <= -1.0f) {
-                beta2 = M_PI;
+                beta2 = (float)M_PI;
             } else {
                 beta2 = acosf(q2);
             }
@@ -361,14 +445,14 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
 
             if (ind_arm == 0) {
                 theta_23[0][0] = alpha2 + beta2;
-                theta_23[0][1] = -(M_PI - alpha3 - beta3);
+                theta_23[0][1] = -((float)M_PI - alpha3 - beta3);
                 theta_23[1][0] = -(alpha2 + beta2);
-                theta_23[1][1] = M_PI - alpha3 - beta3;
+                theta_23[1][1] = (float)M_PI - alpha3 - beta3;
             } else {
                 theta_23[0][0] = -(alpha2 + beta2);
-                theta_23[0][1] = M_PI - alpha3 - beta3;
+                theta_23[0][1] = (float)M_PI - alpha3 - beta3;
                 theta_23[1][0] = alpha2 + beta2;
-                theta_23[1][1] = -(M_PI - alpha3 - beta3);
+                theta_23[1][1] = -((float)M_PI - alpha3 - beta3);
             }
             for (int i = 0; i < 2; i++) {
                 outputSolves.solveFlag[0 + i + 4 * ind_arm][1] = 1;
@@ -402,11 +486,11 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
             } else if (R_36[5] < -1.0f + 0.00001f) {
                 cos5 = -1.0f;
                 if (ind_arm == 0) {
-                    theta_456[0][1] = M_PI;
-                    theta_456[1][1] = -M_PI;
+                    theta_456[0][1] = (float)M_PI;
+                    theta_456[1][1] = -(float)M_PI;
                 } else {
-                    theta_456[0][1] = -M_PI;
-                    theta_456[1][1] = M_PI;
+                    theta_456[0][1] = -(float)M_PI;
+                    theta_456[1][1] = (float)M_PI;
                 }
             } else {
                 cos5 = R_36[5];
@@ -421,13 +505,13 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
             if (cos5 == 1.0f || cos5 == -1.0f) {
                 if (ind_arm == 0) {
                     theta_456[0][0] = lastJoint.theta[3];
-                    float c4 =cosf(lastJoint.theta[3] + MDH_Matrix_[3][3]);
-                    float s4 =sinf(lastJoint.theta[3] + MDH_Matrix_[3][3]);
+                    float c4 = cosf(lastJoint.theta[3] + MDH_Matrix_[3][3]);
+                    float s4 = sinf(lastJoint.theta[3] + MDH_Matrix_[3][3]);
                     theta_456[0][2] = atan2f(-s4*R_36[0] - c4*R_36[6], -s4*R_36[1] - c4*R_36[7]);
 
                     theta_456[1][2] = lastJoint.theta[5];
-                    float c6 =cosf(lastJoint.theta[5] + MDH_Matrix_[5][3]);
-                    float s6 =sinf(lastJoint.theta[5] + MDH_Matrix_[5][3]);
+                    float c6 = cosf(lastJoint.theta[5] + MDH_Matrix_[5][3]);
+                    float s6 = sinf(lastJoint.theta[5] + MDH_Matrix_[5][3]);
                     theta_456[1][0] = atan2f(-s6*R_36[0] - c6*R_36[1], -s6*R_36[6] - c6*R_36[7]);
                 } else {
                     theta_456[0][2] = lastJoint.theta[5];
@@ -456,34 +540,37 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
                     theta_456[1][2] = atan2f(-R_36[4], R_36[3]);
                     theta_456[0][2] = atan2f(R_36[4], -R_36[3]);
                 }
+                outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 0][2] = 1;
+                outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 1][2] = 1;
             }
+
             for (int ind_wrist = 0; ind_wrist < 2; ind_wrist++) {
-                while (theta_1[ind_arm] > M_PI) {
-                    theta_1[ind_arm] -= 2.0f * M_PI;
+                while (theta_1[ind_arm] > (float)M_PI) {
+                    theta_1[ind_arm] -= 2.0f * (float)M_PI;
                 }
                         
-                while (theta_1[ind_arm] <= -M_PI) {
-                    theta_1[ind_arm] += 2.0f * M_PI;
+                while (theta_1[ind_arm] <= -(float)M_PI) {
+                    theta_1[ind_arm] += 2.0f * (float)M_PI;
                 }
                 outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[0] = theta_1[ind_arm];
 
                 for(int i = 0; i < 2; i++) {
-                    while (theta_23[ind_elbow][i] > M_PI) {
-                        theta_23[ind_elbow][i] -= 2.0f * M_PI;
+                    while (theta_23[ind_elbow][i] > (float)M_PI) {
+                        theta_23[ind_elbow][i] -= 2.0f * (float)M_PI;
                     }
-                    while (theta_23[ind_elbow][i] <= -M_PI) {
-                        theta_23[ind_elbow][i] += 2.0f * M_PI;
+                    while (theta_23[ind_elbow][i] <= -(float)M_PI) {
+                        theta_23[ind_elbow][i] += 2.0f * (float)M_PI;
                     }
                     outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[1+i] = theta_23[ind_elbow][i];
 
                 }
 
                 for(int i = 0; i < 3; i++) {
-                    while (theta_456[ind_wrist][i] > M_PI) {
-                        theta_456[ind_wrist][i] -= 2.0f * M_PI;
+                    while (theta_456[ind_wrist][i] > (float)M_PI) {
+                        theta_456[ind_wrist][i] -= 2.0f * (float)M_PI;
                     }
-                    while (theta_456[ind_wrist][i] <= -M_PI) {
-                        theta_456[ind_wrist][i] += 2.0f * M_PI;
+                    while (theta_456[ind_wrist][i] <= -(float)M_PI) {
+                        theta_456[ind_wrist][i] += 2.0f * (float)M_PI;
                     }
                     outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[3+i] = theta_456[ind_wrist][i];
                 }
@@ -491,7 +578,7 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
         }
     }
     for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 8; j++) {
+        for (int j = 0; j < 6; j++) {
             outputSolves.solves[i].theta[j] *= RAD_TO_DEG;
         }
     }

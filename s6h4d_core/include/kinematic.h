@@ -19,7 +19,7 @@ public:
         Pose6Dof_t() = default;
         
         Pose6Dof_t(float X, float Y, float Z, float a, float b, float c)
-            : x(X), y(X), z(Z), roll(a), pitch(b), yaw(c),vaildR(false) {}
+            : x(X), y(Y), z(Z), roll(a), pitch(b), yaw(c),vaildR(false) {}
 
         float x{}, y{}, z{};
         float roll{}, pitch{}, yaw{};
@@ -50,8 +50,8 @@ private:
         float L_BASE;
         float D_BASE;
         float L_UPPERARM;
-        float L_FOREARM;
         float D_ELBOW;
+        float L_FOREARM;
         float L_WRIST;
     } MDHConfig_t;
 

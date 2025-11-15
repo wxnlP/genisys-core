@@ -1,8 +1,9 @@
 #include "kinematic.h"
 #include <cmath>
 #include <cstring>
+#ifdef DEBUG_MODEL
 #include <iostream>
-
+#endif
 
 #ifdef ARM_MATH
 inline float cosf(float x)
@@ -14,16 +15,6 @@ inline float sinf(float x)
 {
     return arm_sin_f32(x);
 }
-// #else
-// inline float cosf(float x)
-// {
-//     return std::cos(x);
-// }
-
-// inline float sinf(float x)
-// {
-//     return std::sin(x);
-// }
 #endif
 
 
@@ -103,8 +94,9 @@ static void MatrixMultiply(const float *matrix1, const float *matrix2, float *ou
     }
 }
 
+#ifdef DEBUG_MODEL
 template <typename T>
-void print_matrix(const T* data, int rows, int cols) {
+static void print_matrix(const T* data, int rows, int cols) {
     // 检查指针是否为空
     if (data == nullptr) {
         std::printf("Error: Matrix data is null.\n");
@@ -140,18 +132,11 @@ void print_matrix(const T* data, int rows, int cols) {
         std::printf("\n");
     }
 }
+#endif
 
 KinematicSolver::KinematicSolver(float L_BS, float D_BS, float L_AM, float D_EW, float L_FA, float L_WT)
     : mdhConfig_(MDHConfig_t{ L_BS, D_BS, L_AM, D_EW, L_FA, L_WT })
 {
-
-    // std::printf("%f\n", mdhConfig_.L_BASE);
-    // std::printf("%f\n", mdhConfig_.D_BASE);
-    // std::printf("%f\n", mdhConfig_.L_UPPERARM);
-    // std::printf("%f\n", mdhConfig_.D_ELBOW);
-    // std::printf("%f\n", mdhConfig_.L_FOREARM);
-    // std::printf("%f\n", mdhConfig_.L_WRIST);
-
     float tempMdhMatrix[6][4] = {
         {  0.0000f        , 0.00f                 , mdhConfig_.L_BASE   , 0.0f },
         { -(float)M_PI_2 , mdhConfig_.D_BASE     , 0.00f                , 0.0f },
@@ -201,8 +186,6 @@ bool KinematicSolver::FK(const Joint6Dof_t &inputJoint, Pose6Dof_t &outputPose)
         
         theta[i] = theta_in[i] + MDH_Matrix_[i][3];
 
-        // std::printf("theta[%d]:%f\n", i, theta[i]);
-
         float st = sinf(theta[i]);
         float ct = cosf(theta[i]);
         float sa = sinf(MDH_Matrix_[i][0]);
@@ -225,49 +208,15 @@ bool KinematicSolver::FK(const Joint6Dof_t &inputJoint, Pose6Dof_t &outputPose)
     MatrixMultiply(R_04, R[4], R_05, 3, 3, 3);
     MatrixMultiply(R_05, R[5], R_06, 3, 3, 3);
 
-    // print_matrix(R_06, 3, 3);
-
-    // for (int i = 0; i < 3; i++) {
-    //     std::printf("%f\t", L3_Elbow_[i]);
-    // }
-    // std::printf("\n");
-
     MatrixMultiply(R[0], L0_Base_, L0_Base, 3, 3, 1);
     MatrixMultiply(R_02, L2_Arm_, L0_Arm, 3, 3, 1);
     MatrixMultiply(R_03, L3_Elbow_, L0_Elbow, 3, 3, 1);
     MatrixMultiply(R_06, L6_Wrist_, L0_Wrist, 3, 3, 1);
 
-    // print_matrix(R_03, 3, 3);
-
-    
-    // for (int i = 0; i < 3; i++) {
-    //     std::printf("%f\t", L0_Base[i]);
-    // }
-    // std::printf("\n");
-
-    // for (int i = 0; i < 3; i++) {
-    //     std::printf("%f\t", L0_Arm[i]);
-    // }
-    // std::printf("\n");
-
-    // for (int i = 0; i < 3; i++) {
-    //     std::printf("%f\t", L0_Elbow[i]);
-    // }
-    // std::printf("\n");
-
-    // for (int i = 0; i < 3; i++) {
-    //     std::printf("%f\t", L0_Wrist[i]);
-    // }
-    // std::printf("\n");
-
-
     // position
     for (int i = 0; i < 3; i++) {
         P_06[i] = L0_Base[i] + L0_Arm[i] + L0_Elbow[i] - L0_Wrist[i];
-        // std::printf("P_06[%d]:%f\n", i, P_06[i]);
     }
-
-    
 
     // posture
     Rotation2Euler(R_06, &P_06[3]);
@@ -309,7 +258,7 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
     if (inputPose.vaildR) {
         memcpy(R_06, inputPose.R, 9 * sizeof(float));
     } else {
-        std::printf("false");
+        // deg to rad
         P_06[3] = inputPose.roll / RAD_TO_DEG;
         P_06[4] = inputPose.pitch / RAD_TO_DEG;
         P_06[5] = inputPose.yaw / RAD_TO_DEG;

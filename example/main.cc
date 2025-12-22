@@ -38,7 +38,7 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
 
     // 设定的关节角 (度)
     // C++ 结构体初始化可以直接使用列表初始化
-    KinematicSolver::Joint6Dof_t initial_theta(30.0f, -90.0f, 45.0f, 30.0f, 60.0f, 90.0f);
+    KinematicSolver::Joint6Dof_t initial_theta(10.0f, 0.0f, 1.0f, 20.0f, -20.5f, 10.9f);
     outJoint = initial_theta; // 将初始关节角存入 outJoint
 
     cout << "* 初始关节角 (Deg): [";

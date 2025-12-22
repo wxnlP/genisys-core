@@ -64,4 +64,7 @@ private:
     float L2_Arm_[3]{0};
     float L3_Elbow_[3]{0};
     float L6_Wrist_[3]{0};
+
+    // 记录机械角度偏移
+    float jointOffset_[6]{};
 };

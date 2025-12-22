@@ -157,7 +157,14 @@ KinematicSolver::KinematicSolver(float L_BS, float D_BS, float L_AM, float D_EW,
     memcpy(L2_Arm_, tempL2_Arm, sizeof(tempL2_Arm));
     memcpy(L3_Elbow_, tempL3_Elbow, sizeof(tempL3_Elbow));
     memcpy(L6_Wrist_, tempL6_Wrist, sizeof(tempL6_Wrist));
-    
+
+    jointOffset_[0] = 0.0f;
+    jointOffset_[1] = -(float)M_PI_2; 
+    // jointOffset_[1] = 0.0f;
+    jointOffset_[2] = 0.0f;
+    jointOffset_[3] = 0.0f;
+    jointOffset_[4] = 0.0f;
+    jointOffset_[5] = 0.0f;
 }
 
 
@@ -184,7 +191,7 @@ bool KinematicSolver::FK(const Joint6Dof_t &inputJoint, Pose6Dof_t &outputPose)
     
     for (int i = 0; i < 6; i++) {
         
-        theta[i] = theta_in[i] + MDH_Matrix_[i][3];
+        theta[i] = theta_in[i] + jointOffset_[i];
 
         float st = sinf(theta[i]);
         float ct = cosf(theta[i]);
@@ -267,12 +274,12 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
     }
 
     for (int i = 0; i < 2; i++) {
-        theta_1[i] = lastJoint.theta[0];
-        theta_23[i][0] = lastJoint.theta[1];
-        theta_23[i][1] = lastJoint.theta[2];
-        theta_456[i][0] = lastJoint.theta[3];
-        theta_456[i][1] = lastJoint.theta[4];
-        theta_456[i][2] = lastJoint.theta[5];
+        theta_1[i] = lastJoint.theta[0] + jointOffset_[0];
+        theta_23[i][0] = lastJoint.theta[1] + jointOffset_[1];
+        theta_23[i][1] = lastJoint.theta[2] + jointOffset_[2];
+        theta_456[i][0] = lastJoint.theta[3] + jointOffset_[3];
+        theta_456[i][1] = lastJoint.theta[4] + jointOffset_[4];
+        theta_456[i][2] = lastJoint.theta[5] + jointOffset_[5];
     }
 
     MatrixMultiply(R_06, L6_Wrist_, L0_Wrist, 3, 3, 1);
@@ -300,8 +307,8 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
 
     /* ---------------------------------J23------------------------------------- */
     for (int ind_arm = 0; ind_arm < 2; ind_arm++) {
-        float ct1 = cosf(theta_1[ind_arm] + MDH_Matrix_[0][3]);
-        float st1 = sinf(theta_1[ind_arm] + MDH_Matrix_[0][3]);
+        float ct1 = cosf(theta_1[ind_arm]);
+        float st1 = sinf(theta_1[ind_arm]);
 
         R_10[0] = ct1;
         R_10[1] = st1;
@@ -409,10 +416,10 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
             }
         }
         for (int ind_elbow = 0; ind_elbow < 2; ind_elbow++) {
-            float c2 = cosf(theta_23[ind_elbow][0] + MDH_Matrix_[1][3]);
-            float s2 = sinf(theta_23[ind_elbow][0] + MDH_Matrix_[1][3]);
-            float c3 = cosf(theta_23[ind_elbow][1] + MDH_Matrix_[2][3]);
-            float s3 = sinf(theta_23[ind_elbow][1] + MDH_Matrix_[2][3]);
+            float c2 = cosf(theta_23[ind_elbow][0]);
+            float s2 = sinf(theta_23[ind_elbow][0]);
+            float c3 = cosf(theta_23[ind_elbow][1]);
+            float s3 = sinf(theta_23[ind_elbow][1]);
 
             R_31[0] = c2 * c3 - s2 * s3;
             R_31[1] = 0.0f;
@@ -453,24 +460,24 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
             }
             if (cos5 == 1.0f || cos5 == -1.0f) {
                 if (ind_arm == 0) {
-                    theta_456[0][0] = lastJoint.theta[3];
-                    float c4 = cosf(lastJoint.theta[3] + MDH_Matrix_[3][3]);
-                    float s4 = sinf(lastJoint.theta[3] + MDH_Matrix_[3][3]);
+                    theta_456[0][0] = lastJoint.theta[3] + jointOffset_[3];
+                    float c4 = cosf(lastJoint.theta[3] + jointOffset_[3]);
+                    float s4 = sinf(lastJoint.theta[3] + jointOffset_[3]);
                     theta_456[0][2] = atan2f(-s4*R_36[0] - c4*R_36[6], -s4*R_36[1] - c4*R_36[7]);
 
-                    theta_456[1][2] = lastJoint.theta[5];
-                    float c6 = cosf(lastJoint.theta[5] + MDH_Matrix_[5][3]);
-                    float s6 = sinf(lastJoint.theta[5] + MDH_Matrix_[5][3]);
+                    theta_456[1][2] = lastJoint.theta[5] + jointOffset_[5];
+                    float c6 = cosf(lastJoint.theta[5] + jointOffset_[5]);
+                    float s6 = sinf(lastJoint.theta[5] + jointOffset_[5]);
                     theta_456[1][0] = atan2f(-s6*R_36[0] - c6*R_36[1], -s6*R_36[6] - c6*R_36[7]);
                 } else {
-                    theta_456[0][2] = lastJoint.theta[5];
-                    float c6 =cosf(lastJoint.theta[5] + MDH_Matrix_[5][3]);
-                    float s6 =sinf(lastJoint.theta[5] + MDH_Matrix_[5][3]);
+                    theta_456[0][2] = lastJoint.theta[5] + jointOffset_[5];
+                    float c6 = cosf(lastJoint.theta[5] + jointOffset_[5]);
+                    float s6 = sinf(lastJoint.theta[5] + jointOffset_[5]);
                     theta_456[0][0] = atan2f(-s6*R_36[0] - c6*R_36[1], -s6*R_36[6] - c6*R_36[7]);
 
-                    theta_456[1][0] = lastJoint.theta[3];
-                    float c4 =cosf(lastJoint.theta[3] + MDH_Matrix_[3][3]);
-                    float s4 =sinf(lastJoint.theta[3] + MDH_Matrix_[3][3]);
+                    theta_456[1][0] = lastJoint.theta[3] + jointOffset_[3];
+                    float c4 = cosf(lastJoint.theta[3] + jointOffset_[3]);
+                    float s4 = sinf(lastJoint.theta[3] + jointOffset_[3]);
                     theta_456[1][2] = atan2f(-s4*R_36[0] - c4*R_36[6], -s4*R_36[1] - c4*R_36[7]);
 
                 }
@@ -494,34 +501,37 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
             }
 
             for (int ind_wrist = 0; ind_wrist < 2; ind_wrist++) {
-                while (theta_1[ind_arm] > (float)M_PI) {
-                    theta_1[ind_arm] -= 2.0f * (float)M_PI;
+                float theta_1_ = theta_1[ind_arm] - jointOffset_[0];
+                while (theta_1_ > (float)M_PI) {
+                    theta_1_ -= 2.0f * (float)M_PI;
                 }
                         
-                while (theta_1[ind_arm] <= -(float)M_PI) {
-                    theta_1[ind_arm] += 2.0f * (float)M_PI;
+                while (theta_1_ <= -(float)M_PI) {
+                    theta_1_ += 2.0f * (float)M_PI;
                 }
-                outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[0] = theta_1[ind_arm];
+                outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[0] = theta_1_;
 
                 for(int i = 0; i < 2; i++) {
-                    while (theta_23[ind_elbow][i] > (float)M_PI) {
-                        theta_23[ind_elbow][i] -= 2.0f * (float)M_PI;
+                    float theta_23_ = theta_23[ind_elbow][i] - jointOffset_[1 + i];
+                    while (theta_23_ > (float)M_PI) {
+                        theta_23_ -= 2.0f * (float)M_PI;
                     }
-                    while (theta_23[ind_elbow][i] <= -(float)M_PI) {
-                        theta_23[ind_elbow][i] += 2.0f * (float)M_PI;
+                    while (theta_23_ <= -(float)M_PI) {
+                        theta_23_ += 2.0f * (float)M_PI;
                     }
-                    outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[1+i] = theta_23[ind_elbow][i];
+                    outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[1+i] = theta_23_;
 
                 }
 
                 for(int i = 0; i < 3; i++) {
-                    while (theta_456[ind_wrist][i] > (float)M_PI) {
-                        theta_456[ind_wrist][i] -= 2.0f * (float)M_PI;
+                    float theta_456_ = theta_456[ind_wrist][i] - jointOffset_[2 + i];
+                    while (theta_456_ > (float)M_PI) {
+                        theta_456_ -= 2.0f * (float)M_PI;
                     }
-                    while (theta_456[ind_wrist][i] <= -(float)M_PI) {
-                        theta_456[ind_wrist][i] += 2.0f * (float)M_PI;
+                    while (theta_456_ <= -(float)M_PI) {
+                        theta_456_ += 2.0f * (float)M_PI;
                     }
-                    outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[3+i] = theta_456[ind_wrist][i];
+                    outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[3+i] = theta_456_;
                 }
             }
         }

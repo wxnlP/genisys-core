@@ -3,7 +3,7 @@
 class KinematicSolver
 {
 public:
-    typedef struct Joint6Dof_t {
+    struct Joint6Dof_t {
 
         Joint6Dof_t() = default;
 
@@ -12,9 +12,9 @@ public:
 
         float theta[6];
 
-    } Joint6Dof_t;
+    };
 
-    typedef struct Pose6Dof_t {
+    struct Pose6Dof_t {
 
         Pose6Dof_t() = default;
         
@@ -28,15 +28,15 @@ public:
         // 记录R变量的旋转矩阵是否有效
         bool vaildR{};
 
-    } Pose6Dof_t;
+    };
 
 
-    typedef struct IKSolves_t {
+    struct IKSolves_t {
 
         Joint6Dof_t solves[8];
         char solveFlag[8][3];
 
-    } IKSolves_t;
+    };
 
     KinematicSolver(float L_BS, float D_BS, float L_AM, float L_FA, float D_EW, float L_WT);
 
@@ -46,14 +46,14 @@ public:
 private:
 
     // MDH params
-    typedef struct {
+    struct MDHConfig_t{
         float L_BASE;
         float D_BASE;
         float L_UPPERARM;
         float D_ELBOW;
         float L_FOREARM;
         float L_WRIST;
-    } MDHConfig_t;
+    };
 
     MDHConfig_t mdhConfig_{};
 

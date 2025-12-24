@@ -7,12 +7,12 @@
 #include <numeric>
 
 // 假设 KinematicSolver 类中的常量和结构体已被正确定义
-// const float KinematicSolver::RAD_TO_DEG = 57.295777754771045; // 假设这是类内部的常量
+// const double KinematicSolver::RAD_TO_DEG = 57.295777754771045; // 假设这是类内部的常量
 
 using namespace std;
 
-// --- 辅助函数：将 Joint6Dof_t 结构体转换为 std::vector<float>
-std::vector<float> joint_to_vector(const KinematicSolver::Joint6Dof_t& joint) {
+// --- 辅助函数：将 Joint6Dof_t 结构体转换为 std::vector<double>
+std::vector<double> joint_to_vector(const KinematicSolver::Joint6Dof_t& joint) {
     return {
         joint.theta[0], joint.theta[1], joint.theta[2],
         joint.theta[3], joint.theta[4], joint.theta[5]
@@ -20,10 +20,10 @@ std::vector<float> joint_to_vector(const KinematicSolver::Joint6Dof_t& joint) {
 }
 
 // --- 辅助函数：计算两个 Joint6Dof_t 之间的差值平方和
-float calculate_diff_sq(const KinematicSolver::Joint6Dof_t& j1, const KinematicSolver::Joint6Dof_t& j2) {
-    float sum_sq = 0.0f;
+double calculate_diff_sq(const KinematicSolver::Joint6Dof_t& j1, const KinematicSolver::Joint6Dof_t& j2) {
+    double sum_sq = 0.0f;
     for (int i = 0; i < 6; ++i) {
-        float diff = j1.theta[i] - j2.theta[i];
+        double diff = j1.theta[i] - j2.theta[i];
         sum_sq += diff * diff;
     }
     return sum_sq;
@@ -38,7 +38,7 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
 
     // 设定的关节角 (度)
     // C++ 结构体初始化可以直接使用列表初始化
-    KinematicSolver::Joint6Dof_t initial_theta(10.0f, 0.0f, 1.0f, 20.0f, -20.5f, 10.9f);
+    KinematicSolver::Joint6Dof_t initial_theta(1.88, -90.0, 33.33, 11.98, -89.9, 9.9);
     outJoint = initial_theta; // 将初始关节角存入 outJoint
 
     cout << "* 初始关节角 (Deg): [";
@@ -95,7 +95,7 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
     
     // 将上次关节角转换为弧度，用于 IK 函数（假设 KinematicSolver::RAD_TO_DEG 可访问）
     KinematicSolver::Joint6Dof_t lastJoint_rad;
-    const float RAD_TO_DEG_VAL = 57.295777754771045f; // 实际应从类中获取
+    const double RAD_TO_DEG_VAL = 57.295777754771045f; // 实际应从类中获取
     for (int i = 0; i < 6; ++i) {
         lastJoint_rad.theta[i] = lastJoint.theta[i] / RAD_TO_DEG_VAL;
     }
@@ -123,7 +123,7 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
     cout << setfill(' ');
 
     // 查找与输入关节角最接近的一组解
-    float min_diff_sq = std::numeric_limits<float>::max();
+    double min_diff_sq = std::numeric_limits<double>::max();
     int best_match_idx = -1;
 
     for (int i = 0; i < 8; ++i) {
@@ -135,13 +135,13 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
         cout << "| ";
 
         // 关节角 (度)
-        float diff_sq = 0.0f;
+        double diff_sq = 0.0f;
         for (int j = 0; j < 6; ++j) {
-            float angle_deg = outputSolves.solves[i].theta[j];
+            double angle_deg = outputSolves.solves[i].theta[j];
             cout << setw(10) << angle_deg << " ";
             
             // 计算差值平方和
-            float diff = angle_deg - lastJoint.theta[j];
+            double diff = angle_deg - lastJoint.theta[j];
             diff_sq += diff * diff;
         }
 
@@ -173,7 +173,7 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
 
 int main()
 {
-    KinematicSolver kSolver(0.23f, 0.05f, 0.30f, 0.10f, 0.35f, 0.10f);
+    KinematicSolver kSolver(0.23, 0.05, 0.30, 0.10, 0.35, 0.10);
 
     KinematicSolver::Joint6Dof_t joint;
     KinematicSolver::Pose6Dof_t pose;

@@ -2,9 +2,12 @@ set(TARGET_NAME s6h4d_sdk)
 
 add_library(${TARGET_NAME} STATIC)
 
+find_package(Eigen3 REQUIRED)
+
 # 头文件搜索路径
 target_include_directories(${TARGET_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${EIGEN3_INCLUDE_DIR}
 )
 
 # 添加源文件

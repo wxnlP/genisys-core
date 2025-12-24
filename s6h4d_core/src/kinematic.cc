@@ -79,7 +79,7 @@ public:
 };
 
 KinematicSolver::KinematicSolver(double L_BS, double D_BS, double L_AM, double D_EW, double L_FA, double L_WT)
-    : impl_(std::make_unique<Impl>(L_BS, D_BS, L_AM, L_FA, D_EW, L_WT))
+    : impl_(std::make_unique<Impl>(L_BS, D_BS, L_AM, D_EW, L_FA, L_WT))
 {
 
     jointOffset_[0] = 0.0;

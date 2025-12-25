@@ -107,7 +107,7 @@ bool KinematicSolver::FK(const Joint6Dof_t &inputJoint, Pose6Dof_t &outputPose)
 
     // deg to rad
     for (int i = 0; i < 6; i++) {
-        theta_in[i] = inputJoint.theta[i] / RAD_TO_DEG;
+        theta_in[i] = inputJoint.theta[i];
     }
     
     for (int i = 0; i < 6; i++) {
@@ -153,9 +153,9 @@ bool KinematicSolver::FK(const Joint6Dof_t &inputJoint, Pose6Dof_t &outputPose)
     outputPose.x = P_06_pos[0];
     outputPose.y = P_06_pos[1];
     outputPose.z = P_06_pos[2];
-    outputPose.roll = P_06_euler[0] * RAD_TO_DEG;
-    outputPose.pitch = P_06_euler[1] * RAD_TO_DEG;
-    outputPose.yaw = P_06_euler[2] * RAD_TO_DEG;
+    outputPose.roll = P_06_euler[0];
+    outputPose.pitch = P_06_euler[1];
+    outputPose.yaw = P_06_euler[2];
 
     memcpy(outputPose.R, R_06.data(),  9 * sizeof(double));
 
@@ -189,9 +189,9 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
         memcpy(R_06.data(), inputPose.R, 9 * sizeof(double));
     } else {
         // deg to rad
-        P_06_euler[0] = inputPose.roll / RAD_TO_DEG;
-        P_06_euler[1] = inputPose.pitch / RAD_TO_DEG;
-        P_06_euler[2] = inputPose.yaw / RAD_TO_DEG;
+        P_06_euler[0] = inputPose.roll;
+        P_06_euler[1] = inputPose.pitch;
+        P_06_euler[2] = inputPose.yaw;
 
         Euler2Rotation(P_06_euler.data(), R_06.data());
     }
@@ -473,14 +473,8 @@ bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoi
             }
         }
     }
-    for (int i = 0; i < 8; i++) {
-        for (int j = 0; j < 6; j++) {
-            outputSolves.solves[i].theta[j] *= RAD_TO_DEG;
-        }
-    }
 
     return true;
-
 }
 
 KinematicSolver::~KinematicSolver() = default; 

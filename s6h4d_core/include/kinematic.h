@@ -51,8 +51,6 @@ public:
 private:
     class Impl;
     std::unique_ptr<Impl> impl_;
-
-    const double RAD_TO_DEG = 57.295777754771045;
     // 记录机械角度偏移
     double jointOffset_[6];
 };

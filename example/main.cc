@@ -8,6 +8,8 @@
 
 // 假设 KinematicSolver 类中的常量和结构体已被正确定义
 // const double KinematicSolver::RAD_TO_DEG = 57.295777754771045; // 假设这是类内部的常量
+constexpr double DEG2RAD = M_PI / 180.0;
+constexpr double RAD2DEG = 180.0 / M_PI;
 
 using namespace std;
 
@@ -36,140 +38,99 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
 {
     cout << "## 1. 正运动学验证 (Forward Kinematics)" << endl;
 
-    // 设定的关节角 (度)
-    // C++ 结构体初始化可以直接使用列表初始化
-    KinematicSolver::Joint6Dof_t initial_theta(1.88, -90.0, 33.33, 11.98, -89.9, 9.9);
-    outJoint = initial_theta; // 将初始关节角存入 outJoint
+    // ===== 输入关节角（Deg → Rad）=====
+    KinematicSolver::Joint6Dof_t initial_theta_deg(
+        1.88, -90.0, 33.33, 11.98, -89.9, 9.9
+    );
+
+    KinematicSolver::Joint6Dof_t initial_theta_rad;
+    for (int i = 0; i < 6; ++i)
+        initial_theta_rad.theta[i] = initial_theta_deg.theta[i] * DEG2RAD;
+
+    outJoint = initial_theta_rad;
 
     cout << "* 初始关节角 (Deg): [";
-    for(int i = 0; i < 6; ++i) {
-        cout << initial_theta.theta[i] << (i < 5 ? ", " : "");
-    }
+    for (int i = 0; i < 6; ++i)
+        cout << initial_theta_deg.theta[i] << (i < 5 ? ", " : "");
     cout << "]" << endl;
 
-    // 进行正运动学解算
-    bool success = kinematic_solver.FK(initial_theta, outPose);
-
+    // ===== FK =====
+    bool success = kinematic_solver.FK(initial_theta_rad, outPose);
     if (!success) {
-        cout << "\n❌ 正运动学计算失败!" << endl;
+        cout << "❌ 正运动学计算失败!" << endl;
         return;
     }
 
-    // 结果输出
-    cout << "\n✅ 正运动学计算结果:" << endl;
-    
-    // 设置输出精度
     cout << fixed << setprecision(4);
+    cout << "\n✅ 正运动学结果:" << endl;
 
-    cout << "  - 末端位置 P(x, y, z) (m): ("
+    cout << "  - 末端位置 (m): ("
          << outPose.x << ", " << outPose.y << ", " << outPose.z << ")" << endl;
-    cout << "  - 末端姿态 Euler(roll, pitch, yaw) (Deg): ("
-         << outPose.roll << ", " << outPose.pitch << ", " << outPose.yaw << ")" << endl;
-    
-    // 假设 roll/pitch/yaw 对应 Python 中的 z/y/x 欧拉角
-    
+
+    cout << "  - 末端姿态 Euler (Deg): ("
+         << outPose.roll  * RAD2DEG << ", "
+         << outPose.pitch * RAD2DEG << ", "
+         << outPose.yaw   * RAD2DEG << ")" << endl;
+
     cout << "\n---" << endl;
 }
+
 
 // --- C++ 版本的 demo_inverse_kinematics ---
 void demo_inverse_kinematics(KinematicSolver& kinematic_solver, 
                              const KinematicSolver::Pose6Dof_t& pose, 
-                             const KinematicSolver::Joint6Dof_t& lastJoint) 
+                             const KinematicSolver::Joint6Dof_t& lastJoint_rad) 
 {
     cout << "## 2. 逆运动学验证 (Inverse Kinematics)" << endl;
-
-    // 设置输出精度
     cout << fixed << setprecision(4);
-    
-    // 输入位姿
-    cout << "* 输入末端位置 P(x, y, z) (m): ("
-         << pose.x << ", " << pose.y << ", " << pose.z << ")" << endl;
-    cout << "* 输入末端姿态 Euler(roll, pitch, yaw) (Deg): ("
-         << pose.roll << ", " << pose.pitch << ", " << pose.yaw << ")" << endl;
-    
-    cout << "* 上次关节角 (用于解的选择/奇异点处理) (Deg): [";
-    for(int i = 0; i < 6; ++i) {
-        cout << lastJoint.theta[i] << (i < 5 ? ", " : "");
-    }
-    cout << "]" << endl;
-    
-    // 将上次关节角转换为弧度，用于 IK 函数（假设 KinematicSolver::RAD_TO_DEG 可访问）
-    KinematicSolver::Joint6Dof_t lastJoint_rad;
-    const double RAD_TO_DEG_VAL = 57.295777754771045f; // 实际应从类中获取
-    for (int i = 0; i < 6; ++i) {
-        lastJoint_rad.theta[i] = lastJoint.theta[i] / RAD_TO_DEG_VAL;
-    }
 
-    // 进行逆运动学解算
+    cout << "* 输入末端位置 (m): ("
+         << pose.x << ", " << pose.y << ", " << pose.z << ")" << endl;
+
+    cout << "* 输入末端姿态 Euler (Deg): ("
+         << pose.roll  * RAD2DEG << ", "
+         << pose.pitch * RAD2DEG << ", "
+         << pose.yaw   * RAD2DEG << ")" << endl;
+
+    cout << "* 上次关节角 (Deg): [";
+    for (int i = 0; i < 6; ++i)
+        cout << lastJoint_rad.theta[i] * RAD2DEG << (i < 5 ? ", " : "");
+    cout << "]" << endl;
+
     KinematicSolver::IKSolves_t outputSolves;
     kinematic_solver.IK(pose, lastJoint_rad, outputSolves);
-    
-    cout << "\n✅ 逆运动学计算结果 (8组解):" << endl;
 
-    // 表格头
-    cout << setfill('-') << setw(115) << "" << endl;
-    cout << setfill(' ');
-    cout << setw(2) << "#" << " "
-         << setw(8) << "J1 Flag" << " "
-         << setw(8) << "J23 Flag" << " "
-         << setw(10) << "J456 Flag" << " | "
-         << setw(10) << "J1 (Deg)" << " "
-         << setw(10) << "J2 (Deg)" << " "
-         << setw(10) << "J3 (Deg)" << " "
-         << setw(10) << "J4 (Deg)" << " "
-         << setw(10) << "J5 (Deg)" << " "
-         << setw(10) << "J6 (Deg)" << endl;
-    cout << setfill('-') << setw(115) << "" << endl;
-    cout << setfill(' ');
+    cout << "\n✅ 逆运动学解 (8组):" << endl;
 
-    // 查找与输入关节角最接近的一组解
-    double min_diff_sq = std::numeric_limits<double>::max();
-    int best_match_idx = -1;
+    double min_diff = std::numeric_limits<double>::max();
+    int best_idx = -1;
 
     for (int i = 0; i < 8; ++i) {
-        // 标志位输出
-        cout << setw(2) << i + 1 << " ";
-        for (int j = 0; j < 3; ++j) {
-            cout << setw(8) << static_cast<int>(outputSolves.solveFlag[i][j]) << " ";
-        }
-        cout << "| ";
+        double diff = 0.0;
+        cout << "解 " << i + 1 << ": ";
 
-        // 关节角 (度)
-        double diff_sq = 0.0f;
         for (int j = 0; j < 6; ++j) {
-            double angle_deg = outputSolves.solves[i].theta[j];
-            cout << setw(10) << angle_deg << " ";
-            
-            // 计算差值平方和
-            double diff = angle_deg - lastJoint.theta[j];
-            diff_sq += diff * diff;
-        }
-
-        // 记录最佳匹配
-        if (diff_sq < min_diff_sq) {
-            min_diff_sq = diff_sq;
-            best_match_idx = i;
+            double deg = outputSolves.solves[i].theta[j] * RAD2DEG;
+            cout << setw(9) << deg << " ";
+            double d = outputSolves.solves[i].theta[j] - lastJoint_rad.theta[j];
+            diff += d * d;
         }
 
         cout << endl;
+
+        if (diff < min_diff) {
+            min_diff = diff;
+            best_idx = i;
+        }
     }
 
-    cout << setfill('-') << setw(115) << "" << endl;
-    cout << setfill(' ');
-    
-    if (best_match_idx != -1) {
-        cout << "\n* 最佳匹配解 (与输入关节角最接近): 第 " << best_match_idx + 1 << " 组解" << endl;
-        cout << "* 最佳解关节角 (Deg): [";
-        for(int i = 0; i < 6; ++i) {
-            cout << outputSolves.solves[best_match_idx].theta[i] << (i < 5 ? ", " : "");
-        }
-        cout << "]" << endl;
-    } else {
-        cout << "\n* 未找到有效解。" << endl;
+    if (best_idx >= 0) {
+        cout << "\n* 最优解: 第 " << best_idx + 1 << " 组" << endl;
     }
 
     cout << "\n---" << endl;
 }
+
 
 int main()
 {

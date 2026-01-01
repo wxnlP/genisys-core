@@ -13,6 +13,7 @@ target_include_directories(${TARGET_NAME} PUBLIC
 # 添加源文件
 target_sources(${TARGET_NAME} PRIVATE
     src/interface_base.cc
+    src/trajectory_planner.cc
     src/kinematic.cc
 )
 

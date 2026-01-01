@@ -7,14 +7,28 @@
 
 #pragma once
 
-#include "common_inc.h"
 #include <cstddef>
+#include <array>
+#include <cstdint>
 
 #define JOINT_MAX   6
 
 
 class InterfaceBase {
 public:
+    struct JointMsg {
+        float angle;
+        float vel;
+        float accel;
+    };
+
+    struct S6h4dTxMsg {
+        uint8_t cmd[4];
+        JointMsg joint[6];
+    };
+
+    using JointAngle = std::array<float, 6>;
+
     InterfaceBase() = default;
 
     /* 功能实现 */

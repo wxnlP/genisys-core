@@ -121,7 +121,7 @@ void InterfaceBase::ArmPosition(uint8_t jointIndex, float angle, float vel, floa
     lastJointAngle_[jointIndex] = angle;
 }
 
-JointAngle InterfaceBase::GetJointAngle()
+InterfaceBase::JointAngle InterfaceBase::GetJointAngle()
 {
     bool flag = true;
     while (flag) {

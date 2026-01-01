@@ -10,7 +10,7 @@ static void Rotation2Euler(const double *R, double *euler)
     double roll, pitch, yaw;
 
     double s_beta = -m(2, 0);
-    double c_beta = sqrtf(m(0, 0) * m(0, 0) + m(1, 0) * m(1, 0));
+    double c_beta = sqrt(m(0, 0) * m(0, 0) + m(1, 0) * m(1, 0));
 
     if (c_beta > 0.000001) {
         roll  = std::atan2(m(2, 1), m(2, 2));
@@ -92,7 +92,8 @@ KinematicSolver::KinematicSolver(double L_BS, double D_BS, double L_AM, double D
 }
 
 
-bool KinematicSolver::FK(const Joint6Dof_t &inputJoint, Pose6Dof_t &outputPose)
+bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t &inputJoint, 
+                         ArmMotion::Pose6Dof_t &outputPose)
 {
     double theta_in[6];
     double theta[6];
@@ -163,7 +164,9 @@ bool KinematicSolver::FK(const Joint6Dof_t &inputJoint, Pose6Dof_t &outputPose)
 }
 
 
-bool KinematicSolver::IK(const Pose6Dof_t &inputPose, const Joint6Dof_t &lastJoint, IKSolves_t &outputSolves)
+bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t &inputPose, 
+                         const ArmMotion::Joint6Dof_t &lastJoint, 
+                         ArmMotion::IKSolves_t &outputSolves)
 {
     double theta_1[2]{};
     double theta_23[2][2]{};

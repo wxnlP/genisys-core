@@ -7,14 +7,14 @@
 #include <numeric>
 
 // 假设 KinematicSolver 类中的常量和结构体已被正确定义
-// const double KinematicSolver::RAD_TO_DEG = 57.295777754771045; // 假设这是类内部的常量
+// const double ArmMotion::RAD_TO_DEG = 57.295777754771045; // 假设这是类内部的常量
 constexpr double DEG2RAD = M_PI / 180.0;
 constexpr double RAD2DEG = 180.0 / M_PI;
 
 using namespace std;
 
 // --- 辅助函数：将 Joint6Dof_t 结构体转换为 std::vector<double>
-std::vector<double> joint_to_vector(const KinematicSolver::Joint6Dof_t& joint) {
+std::vector<double> joint_to_vector(const ArmMotion::Joint6Dof_t& joint) {
     return {
         joint.theta[0], joint.theta[1], joint.theta[2],
         joint.theta[3], joint.theta[4], joint.theta[5]
@@ -22,7 +22,7 @@ std::vector<double> joint_to_vector(const KinematicSolver::Joint6Dof_t& joint) {
 }
 
 // --- 辅助函数：计算两个 Joint6Dof_t 之间的差值平方和
-double calculate_diff_sq(const KinematicSolver::Joint6Dof_t& j1, const KinematicSolver::Joint6Dof_t& j2) {
+double calculate_diff_sq(const ArmMotion::Joint6Dof_t& j1, const ArmMotion::Joint6Dof_t& j2) {
     double sum_sq = 0.0f;
     for (int i = 0; i < 6; ++i) {
         double diff = j1.theta[i] - j2.theta[i];
@@ -33,17 +33,17 @@ double calculate_diff_sq(const KinematicSolver::Joint6Dof_t& j1, const Kinematic
 
 // --- C++ 版本的 demo_forward_kinematics ---
 void demo_forward_kinematics(KinematicSolver& kinematic_solver, 
-                             KinematicSolver::Pose6Dof_t& outPose, 
-                             KinematicSolver::Joint6Dof_t& outJoint) 
+                             ArmMotion::Pose6Dof_t& outPose, 
+                             ArmMotion::Joint6Dof_t& outJoint) 
 {
     cout << "## 1. 正运动学验证 (Forward Kinematics)" << endl;
 
     // ===== 输入关节角（Deg → Rad）=====
-    KinematicSolver::Joint6Dof_t initial_theta_deg(
+    ArmMotion::Joint6Dof_t initial_theta_deg(
         1.88, -90.0, 33.33, 11.98, -89.9, 9.9
     );
 
-    KinematicSolver::Joint6Dof_t initial_theta_rad;
+    ArmMotion::Joint6Dof_t initial_theta_rad;
     for (int i = 0; i < 6; ++i)
         initial_theta_rad.theta[i] = initial_theta_deg.theta[i] * DEG2RAD;
 
@@ -78,8 +78,8 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
 
 // --- C++ 版本的 demo_inverse_kinematics ---
 void demo_inverse_kinematics(KinematicSolver& kinematic_solver, 
-                             const KinematicSolver::Pose6Dof_t& pose, 
-                             const KinematicSolver::Joint6Dof_t& lastJoint_rad) 
+                             const ArmMotion::Pose6Dof_t& pose, 
+                             const ArmMotion::Joint6Dof_t& lastJoint_rad) 
 {
     cout << "## 2. 逆运动学验证 (Inverse Kinematics)" << endl;
     cout << fixed << setprecision(4);
@@ -97,7 +97,7 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
         cout << lastJoint_rad.theta[i] * RAD2DEG << (i < 5 ? ", " : "");
     cout << "]" << endl;
 
-    KinematicSolver::IKSolves_t outputSolves;
+    ArmMotion::IKSolves_t outputSolves;
     kinematic_solver.IK(pose, lastJoint_rad, outputSolves);
 
     cout << "\n✅ 逆运动学解 (8组):" << endl;
@@ -136,8 +136,8 @@ int main()
 {
     KinematicSolver kSolver(0.23, 0.05, 0.30, 0.10, 0.35, 0.10);
 
-    KinematicSolver::Joint6Dof_t joint;
-    KinematicSolver::Pose6Dof_t pose;
+    ArmMotion::Joint6Dof_t joint;
+    ArmMotion::Pose6Dof_t pose;
 
     // bool ret = kSolver.FK(joint, pose);
     // double ret = sinf(1.5708f);

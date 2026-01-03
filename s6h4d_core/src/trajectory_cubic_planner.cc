@@ -1,4 +1,4 @@
-#include "trajectory_planner.h"
+#include "trajectory_cubic_planner.h"
 #include <cassert>
 
 
@@ -88,16 +88,16 @@ bool CubicTrajectoryPlanner::GenerateSegment()
     const int N = theta_.size();
     // 清理容器
     segment_.clear();
+    segment_.resize(N - 1); 
     // N-1 段三次多项式
     for (int i = 0; i < N - 1; i++) {
         double T = time_[i+1] - time_[i];
-        double a0 = theta_[i];
-        double a1 = vel_[i];
-        double a2 = 3 * (theta_[i+1] - theta_[i]) / (T * T) - 
-                    (2 * vel_[i] + vel_[i+1]) / T;
-        double a3 = -2 * (theta_[i+1] - theta_[i]) / (T * T * T) + 
-                    (vel_[i] + vel_[i+1]) / (T * T);
-        segment_.emplace_back(a0, a1, a2, a3, time_[i], time_[i+1]);
+        segment_[i].a0 = theta_[i];
+        segment_[i].a1 = vel_[i];
+        segment_[i].a2 = 3 * (theta_[i+1] - theta_[i]) / (T * T) - 
+                         (2 * vel_[i] + vel_[i+1]) / T;
+        segment_[i].a3 = -2 * (theta_[i+1] - theta_[i]) / (T * T * T) + 
+                         (vel_[i] + vel_[i+1]) / (T * T);
     }
     return true;
 }
@@ -105,8 +105,10 @@ bool CubicTrajectoryPlanner::GenerateSegment()
 bool CubicTrajectoryPlanner::Plan(const std::vector<double>& theta, 
                                   const std::vector<double>& time)
 {
-    assert(theta.size() == time.size());
-    assert(theta.size() >= 2);
+    if (theta.size() < 2 || theta.size() != time.size()) {
+        return false;
+    }
+
     theta_ = theta;
     time_ = time;
     if(!CalculateViaPointVel()) {
@@ -118,25 +120,65 @@ bool CubicTrajectoryPlanner::Plan(const std::vector<double>& theta,
     return true;
 }
 
-bool CubicTrajectoryPlanner::Sample(double t, CubicSegPoint_t& point)
+double CubicTrajectoryPlanner::GetPosition(double t) const
 {
-    if (t <= time_.front()) {
-        point.pos = theta_.front();
-        point.acc = 0.0;
-        point.vel = 0.0;
-    }
-    if (t >= time_.back()) {
-        point.pos = theta_.back();
-        point.acc = 0.0;
-        point.vel = 0.0;
-    }
-    for (const auto& seg : segment_) {
-        if (seg.InTimeSegment(t)) {
-            point.pos = seg.GetPosition(t);
-            point.acc = seg.GetAcceleration(t);
-            point.vel = seg.GetVelocity(t);
-            return true;
+    if (theta_.empty()) return 0.0;
+    if (t <= time_.front()) return theta_.front();
+    if (t >= time_.back()) return theta_.back();
+
+    const int N = theta_.size();
+    int k = 0;
+    // 找到时间位于哪一段
+    for (int i = 0; i < N-1; i++) {
+        if (t >= time_[i] && t <= time_[i+1]) {
+            double T = t - time_[i];
+            double a0 = segment_[i].a0;
+            double a1 = segment_[i].a1;
+            double a2 = segment_[i].a2;
+            double a3 = segment_[i].a3;
+            return a0 + a1 * T + a2 * (T * T) + a3 * (T * T * T);
         }
     }
-    return false;
+    return -1.0;
+}
+
+double CubicTrajectoryPlanner::GetVelocity(double t) const
+{
+    if (theta_.empty()) return 0.0;
+    if (t <= time_.front()) return theta_.front();
+    if (t >= time_.back()) return theta_.back();
+
+    const int N = theta_.size();
+    int k = 0;
+    // 找到时间位于哪一段
+    for (int i = 0; i < N-1; i++) {
+        if (t >= time_[i] && t <= time_[i+1]) {
+            double T = t - time_[i];
+            double a1 = segment_[i].a1;
+            double a2 = segment_[i].a2;
+            double a3 = segment_[i].a3;
+            return a1 + 2.0 * a2 * T + 3.0 * a3 * (T * T);
+        }
+    }
+    return -1.0;
+}
+
+double CubicTrajectoryPlanner::GetAcceleration(double t) const
+{
+    if (theta_.empty()) return 0.0;
+    if (t <= time_.front()) return theta_.front();
+    if (t >= time_.back()) return theta_.back();
+
+    const int N = theta_.size();
+    int k = 0;
+    // 找到时间位于哪一段
+    for (int i = 0; i < N-1; i++) {
+        if (t >= time_[i] && t <= time_[i+1]) {
+            double T = t - time_[i];
+            double a2 = segment_[i].a2;
+            double a3 = segment_[i].a3;
+            return 2.0 * a2 + 6.0 * a3 * T;
+        }
+    }
+    return -1.0;
 }

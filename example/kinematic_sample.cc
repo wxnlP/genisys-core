@@ -36,43 +36,66 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
                              ArmMotion::Pose6Dof_t& outPose, 
                              ArmMotion::Joint6Dof_t& outJoint) 
 {
+    cout << "======================================================" << endl;
     cout << "## 1. 正运动学验证 (Forward Kinematics)" << endl;
 
-    // ===== 输入关节角（Deg → Rad）=====
-    ArmMotion::Joint6Dof_t initial_theta_deg(
-        1.88, -90.0, 33.33, 11.98, -89.9, 9.9
-    );
+    // ===== 1. 定义并打印输入角度 =====
+    ArmMotion::Joint6Dof_t initial_theta_deg(1.88, -90.0, 33.33, 11.98, -89.9, 9.9);
 
+    cout << "[INPUT] 关节角输入 (Degree):" << endl;
+    cout << "  ";
+    for (int i = 0; i < 6; ++i) {
+        cout << "J" << i+1 << ":" << setw(8) << initial_theta_deg.theta[i] << (i < 5 ? " | " : "");
+    }
+    cout << endl;
+
+    // 转换为弧度
     ArmMotion::Joint6Dof_t initial_theta_rad;
     for (int i = 0; i < 6; ++i)
         initial_theta_rad.theta[i] = initial_theta_deg.theta[i] * DEG2RAD;
 
+    cout << "[INPUT] 关节角输入 (Radian):" << endl;
+    cout << "  ";
+    for (int i = 0; i < 6; ++i) {
+        cout << "J" << i+1 << ":" << setw(8) << initial_theta_rad.theta[i] << (i < 5 ? " | " : "");
+    }
+    cout << "\n" << endl;
+
     outJoint = initial_theta_rad;
 
-    cout << "* 初始关节角 (Deg): [";
-    for (int i = 0; i < 6; ++i)
-        cout << initial_theta_deg.theta[i] << (i < 5 ? ", " : "");
-    cout << "]" << endl;
-
-    // ===== FK =====
+    // ===== 2. 执行 FK 计算 =====
     bool success = kinematic_solver.FK(initial_theta_rad, outPose);
     if (!success) {
         cout << "❌ 正运动学计算失败!" << endl;
         return;
     }
 
-    cout << fixed << setprecision(4);
-    cout << "\n✅ 正运动学结果:" << endl;
+    // ===== 3. 打印计算结果 =====
+    cout << fixed << setprecision(6);
+    cout << "✅ 正运动学计算成功!" << endl;
+    
+    // 位置信息
+    cout << "\n[RESULT] 末端位置 (Position m):" << endl;
+    cout << "  X: " << outPose.x << "  Y: " << outPose.y << "  Z: " << outPose.z << endl;
 
-    cout << "  - 末端位置 (m): ("
-         << outPose.x << ", " << outPose.y << ", " << outPose.z << ")" << endl;
+    // 四元数信息
+    cout << "\n[RESULT] 末端姿态 (Quaternion x,y,z,w):" << endl;
+    cout << "  QX: " << outPose.qx << "  QY: " << outPose.qy 
+         << "  QZ: " << outPose.qz << "  QW: " << outPose.qw << endl;
 
-    cout << "  - 末端姿态 Euler (Deg): ("
-         << outPose.roll  * RAD2DEG << ", "
-         << outPose.pitch * RAD2DEG << ", "
-         << outPose.yaw   * RAD2DEG << ")" << endl;
+    // 旋转矩阵信息 (从 outPose.R 恢复)
+    // 注意：Eigen 默认列优先，打印时需注意对应关系
+    cout << "\n[RESULT] 旋转矩阵 (Rotation Matrix R06):" << endl;
+    for (int i = 0; i < 3; ++i) {
+        cout << "  [ ";
+        for (int j = 0; j < 3; ++j) {
+            // outPose.R 存储的是 Matrix3d.data()，默认列优先
+            cout << setw(10) << outPose.R[i + j * 3] << " "; 
+        }
+        cout << "]" << endl;
+    }
 
-    cout << "\n---" << endl;
+    cout << "======================================================" << endl;
 }
 
 
@@ -84,28 +107,28 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
     cout << "## 2. 逆运动学验证 (Inverse Kinematics)" << endl;
     cout << fixed << setprecision(4);
 
-    cout << "* 输入末端位置 (m): ("
-         << pose.x << ", " << pose.y << ", " << pose.z << ")" << endl;
+    // 关键点：创建一个副本并强制设置使用四元数进行计算
+    ArmMotion::Pose6Dof_t inputPose = pose;
+    inputPose.vaildR = false; // 告诉 IK 使用 qx, qy, qz, qw 而不是 R 矩阵
 
-    cout << "* 输入末端姿态 Euler (Deg): ("
-         << pose.roll  * RAD2DEG << ", "
-         << pose.pitch * RAD2DEG << ", "
-         << pose.yaw   * RAD2DEG << ")" << endl;
-
-    cout << "* 上次关节角 (Deg): [";
-    for (int i = 0; i < 6; ++i)
-        cout << lastJoint_rad.theta[i] * RAD2DEG << (i < 5 ? ", " : "");
-    cout << "]" << endl;
+    cout << "* 输入末端位置 (m): (" << inputPose.x << ", " << inputPose.y << ", " << inputPose.z << ")" << endl;
+    cout << "* 输入末端姿态 四元数: (" 
+         << inputPose.qx << ", " << inputPose.qy << ", " 
+         << inputPose.qz << ", " << inputPose.qw << ")" << endl;
 
     ArmMotion::IKSolves_t outputSolves;
-    kinematic_solver.IK(pose, lastJoint_rad, outputSolves);
+    
+    // 调用 IK（此时内部会执行 P_06_quat.toRotationMatrix()）
+    kinematic_solver.IK(inputPose, lastJoint_rad, outputSolves);
 
-    cout << "\n✅ 逆运动学解 (8组):" << endl;
+    cout << "\n✅ 逆运动学解 (基于四元数输入):" << endl;
 
     double min_diff = std::numeric_limits<double>::max();
     int best_idx = -1;
 
     for (int i = 0; i < 8; ++i) {
+        // 检查该索引是否有解（对应你代码中的 solveFlag）
+        // 这里简化处理，直接打印所有解并寻找最接近上一时刻的解
         double diff = 0.0;
         cout << "解 " << i + 1 << ": ";
 
@@ -115,7 +138,6 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
             double d = outputSolves.solves[i].theta[j] - lastJoint_rad.theta[j];
             diff += d * d;
         }
-
         cout << endl;
 
         if (diff < min_diff) {
@@ -125,16 +147,15 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
     }
 
     if (best_idx >= 0) {
-        cout << "\n* 最优解: 第 " << best_idx + 1 << " 组" << endl;
+        cout << "\n* 寻优结果: 最接近输入的解为第 " << best_idx + 1 << " 组" << endl;
     }
-
     cout << "\n---" << endl;
 }
 
 
 int main()
 {
-    KinematicSolver kSolver(0.23, 0.05, 0.30, 0.10, 0.35, 0.10);
+    KinematicSolver kSolver(0.123, 0.04, 0.20, 0.059, 0.2, 0.104);
 
     ArmMotion::Joint6Dof_t joint;
     ArmMotion::Pose6Dof_t pose;

@@ -99,7 +99,6 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t &inputJoint,
     double theta[6];
     Eigen::Matrix3d R[6];
     Eigen::Vector3d P_06_pos;
-    Eigen::Vector3d P_06_euler;
     Eigen::Matrix3d R_02, R_03, R_04, R_05, R_06;
     Eigen::Vector3d L0_Base;
     Eigen::Vector3d L0_Arm;
@@ -125,21 +124,12 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t &inputJoint,
                 st*sa, ct*sa, ca;
     }
     
-    // MatrixMultiply(R[0], R[1], R_02, 3, 3, 3);
-    // MatrixMultiply(R_02, R[2], R_03, 3, 3, 3);
-    // MatrixMultiply(R_03, R[3], R_04, 3, 3, 3);
-    // MatrixMultiply(R_04, R[4], R_05, 3, 3, 3);
-    // MatrixMultiply(R_05, R[5], R_06, 3, 3, 3);
     R_02 = R[0] * R[1];
     R_03 = R_02 * R[2];
     R_04 = R_03 * R[3];
     R_05 = R_04 * R[4];
     R_06 = R_05 * R[5];
 
-    // MatrixMultiply(R[0], L0_Base_, L0_Base, 3, 3, 1);
-    // MatrixMultiply(R_02, L2_Arm_, L0_Arm, 3, 3, 1);
-    // MatrixMultiply(R_03, L3_Elbow_, L0_Elbow, 3, 3, 1);
-    // MatrixMultiply(R_06, L6_Wrist_, L0_Wrist, 3, 3, 1);
     L0_Base = R[0] * impl_->L0_Base_;
     L0_Arm  = R_02 * impl_->L2_Arm_;
     L0_Elbow = R_03 * impl_->L3_Elbow_;
@@ -149,14 +139,19 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t &inputJoint,
     P_06_pos.head<3>() = L0_Base + L0_Arm + L0_Elbow - L0_Wrist;
 
     // posture
-    Rotation2Euler(R_06.data(), P_06_euler.data());
+    // Rotation2Euler(R_06.data(), P_06_euler.data());
+    Eigen::Quaterniond P_06_quat(R_06);
 
     outputPose.x = P_06_pos[0];
     outputPose.y = P_06_pos[1];
     outputPose.z = P_06_pos[2];
-    outputPose.roll = P_06_euler[0];
-    outputPose.pitch = P_06_euler[1];
-    outputPose.yaw = P_06_euler[2];
+    // outputPose.roll = P_06_euler[0];
+    // outputPose.pitch = P_06_euler[1];
+    // outputPose.yaw = P_06_euler[2];
+    outputPose.qx = P_06_quat.x();
+    outputPose.qy = P_06_quat.y();
+    outputPose.qz = P_06_quat.z();
+    outputPose.qw = P_06_quat.w();
 
     memcpy(outputPose.R, R_06.data(),  9 * sizeof(double));
 
@@ -173,7 +168,7 @@ bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t &inputPose,
     double theta_456[2][3]{};
 
     Eigen::Vector3d P_06_pos;
-    Eigen::Vector3d P_06_euler;
+    Eigen::Quaterniond P_06_quat;
     Eigen::Vector3d P_0w;
     Eigen::Vector3d L_2w;
     Eigen::Matrix3d R_10;
@@ -192,11 +187,15 @@ bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t &inputPose,
         memcpy(R_06.data(), inputPose.R, 9 * sizeof(double));
     } else {
         // deg to rad
-        P_06_euler[0] = inputPose.roll;
-        P_06_euler[1] = inputPose.pitch;
-        P_06_euler[2] = inputPose.yaw;
+        P_06_quat.x() = inputPose.qx;
+        P_06_quat.y() = inputPose.qy;
+        P_06_quat.z() = inputPose.qz;
+        P_06_quat.w() = inputPose.qw;
 
-        Euler2Rotation(P_06_euler.data(), R_06.data());
+        // quaternion to rotation
+        P_06_quat.normalize();
+        R_06 = P_06_quat.toRotationMatrix();
+        // Euler2Rotation(P_06_euler.data(), R_06.data());
     }
 
     for (int i = 0; i < 2; i++) {
@@ -208,14 +207,9 @@ bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t &inputPose,
         theta_456[i][2] = lastJoint.theta[5] + jointOffset_[5];
     }
 
-    // MatrixMultiply(R_06, L6_Wrist_, L0_Wrist, 3, 3, 1);
     L0_Wrist = R_06 * impl_->L6_Wrist_;
 
-    // for (int i = 0; i < 3; i++) {
-    //     P_0w[i] = P_06[i] + L0_Wrist[i];
-    // }
     P_0w.head<3>() = P_06_pos + L0_Wrist;
-
 
     /* ---------------------------------J1-------------------------------------- */
     if ((P_0w[0] * P_0w[0] + P_0w[1] * P_0w[1]) <= 0.000001) {
@@ -239,15 +233,6 @@ bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t &inputPose,
         double ct1 = std::cos(theta_1[ind_arm]);
         double st1 = std::sin(theta_1[ind_arm]);
 
-        // R_10[0] = ct1;
-        // R_10[1] = st1;
-        // R_10[2] = 0.0f;
-        // R_10[3] = -st1;
-        // R_10[4] = ct1;
-        // R_10[5] = 0.0f;
-        // R_10[6] = 0.0f;
-        // R_10[7] = 0.0f;
-        // R_10[8] = 1.0f;
         R_10 << ct1, st1, 0.0,
                 -st1, ct1, 0.0,
                 0.0,   0.0,   1.0;
@@ -255,13 +240,8 @@ bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t &inputPose,
         Eigen::Vector3d P_0w_r;
 
         // rotation
-        // MatrixMultiply(R_10, P_0w, P_0w_r, 3, 3, 1);
         P_0w_r = R_10 * P_0w;
 
-        // position
-        // for (int i = 0; i < 3; i++) {
-        //     L_2w[i] = P_0w_r[i] - L0_Base_[i];
-        // }
         L_2w = P_0w_r - impl_->L0_Base_;
 
         double c = sqrt(L_2w[0]*L_2w[0] + L_2w[2]*L_2w[2]);
@@ -356,21 +336,10 @@ bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t &inputPose,
             double c3 = std::cos(theta_23[ind_elbow][1]);
             double s3 = std::sin(theta_23[ind_elbow][1]);
 
-            // R_31[0] = c2 * c3 - s2 * s3;
-            // R_31[1] = 0.0f;
-            // R_31[2] = -(c2 * s3 + s2 * c3);
-            // R_31[3] = -(c2 * s3 + s2 * c3);
-            // R_31[4] = 0.0f;
-            // R_31[5] = -(c2 * c3 - s2 * s3);
-            // R_31[6] = 0.0f;
-            // R_31[7] = 1.0f;
-            // R_31[8] = 0.0f;
             R_31 << (c2 * c3 - s2 * s3), 0.0, -(c2 * s3 + s2 * c3),
                     -(c2 * s3 + s2 * c3), 0.0, -(c2 * c3 - s2 * s3),
                     0.0, 1.0, 0.0;
 
-            // MatrixMultiply(R_31, R_10, R_30, 3, 3, 3);
-            // MatrixMultiply(R_30, R_06, R_36, 3, 3, 3);
             R_30 = R_31 * R_10;
             R_36 = R_30 * R_06;
 

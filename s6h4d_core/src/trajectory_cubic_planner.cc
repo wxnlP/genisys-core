@@ -41,9 +41,12 @@ void CubicTrajectoryPlanner::SolveTridiagonal(const std::vector<double>& a,
 bool CubicTrajectoryPlanner::CalculateViaPointVel()
 {
     const int N = theta_.size();
-    vel_.resize(N, 0.0);
     if (N < 2) { return false; }
+
+    vel_.resize(N, 0.0);
+
     const int VIA_POINTS = N - 2;
+    if (VIA_POINTS < 1) { return true; }
 
     std::vector<double> a(VIA_POINTS, 0.0);
     std::vector<double> b(VIA_POINTS, 0.0);
@@ -72,7 +75,6 @@ bool CubicTrajectoryPlanner::CalculateViaPointVel()
     std::vector<double> x;
     SolveTridiagonal(a, b, c, d, x);
 
-    vel_.resize(N, 0.0);
     vel_[0] = 0.0;
     vel_[N-1] = 0.0;
     for (int j = 0; j < VIA_POINTS; j++) {
@@ -127,7 +129,7 @@ double CubicTrajectoryPlanner::GetPosition(double t) const
     if (t >= time_.back()) return theta_.back();
 
     const int N = theta_.size();
-    int k = 0;
+    
     // 找到时间位于哪一段
     for (int i = 0; i < N-1; i++) {
         if (t >= time_[i] && t <= time_[i+1]) {
@@ -145,11 +147,11 @@ double CubicTrajectoryPlanner::GetPosition(double t) const
 double CubicTrajectoryPlanner::GetVelocity(double t) const
 {
     if (theta_.empty()) return 0.0;
-    if (t <= time_.front()) return theta_.front();
-    if (t >= time_.back()) return theta_.back();
+    if (t <= time_.front()) { return vel_.front(); }
+    if (t >= time_.back()) { return vel_.back(); }
 
     const int N = theta_.size();
-    int k = 0;
+    
     // 找到时间位于哪一段
     for (int i = 0; i < N-1; i++) {
         if (t >= time_[i] && t <= time_[i+1]) {
@@ -166,11 +168,11 @@ double CubicTrajectoryPlanner::GetVelocity(double t) const
 double CubicTrajectoryPlanner::GetAcceleration(double t) const
 {
     if (theta_.empty()) return 0.0;
-    if (t <= time_.front()) return theta_.front();
-    if (t >= time_.back()) return theta_.back();
+    if (t <= time_.front()) { return 0.0; }
+    if (t >= time_.back()) { return 0.0; }
 
     const int N = theta_.size();
-    int k = 0;
+    
     // 找到时间位于哪一段
     for (int i = 0; i < N-1; i++) {
         if (t >= time_[i] && t <= time_[i+1]) {

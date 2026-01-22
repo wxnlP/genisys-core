@@ -25,8 +25,8 @@ ax_pos, ax_vel, ax_acc = axs
 
 # --- 1. Position ---
 ax_pos.plot(traj["t"], traj["pos"], color=COLOR_LINE1, lw=2, label='Trajectory')
-ax_pos.scatter(via["t_via"], via["theta_via"], 
-               marker='o', s=35, fc='white', ec=COLOR_VIA, lw=1.2, zorder=5, label='ViaPoints')
+# ax_pos.scatter(via["t_via"], via["theta_via"], 
+#                marker='o', s=35, fc='white', ec=COLOR_VIA, lw=1.2, zorder=5, label='ViaPoints')
 ax_pos.set_ylabel('Position (rad)')
 # 参考图片，将图例放在绘图区内部右下角，不遮挡起始曲线
 ax_pos.legend(loc='lower right', frameon=True, edgecolor='none', facecolor='white', framealpha=0.8)

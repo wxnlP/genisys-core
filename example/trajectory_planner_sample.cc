@@ -6,16 +6,15 @@
 
 int main()
 {
-    CubicTrajectoryPlanner planner;
-    // LinearTrajectoryPlanner planner;
+    // CubicTrajectoryPlanner planner;
+    LinearTrajectoryPlanner planner(0.05);
 
     // 用户指定的 via points
-    std::vector<double> theta = {0.0,  0.8,  0.3,  1.2,  0.6,  1.5,
+    std::vector<double> theta = {0.3,  0.8,  0.3,  1.2,  0.6,  1.5,
                                  1.0,  1.8,  1.2,  2.0,  1.6,  2.2};
     std::vector<double> time  = {0.0,  0.5,  1.5,  2.0,  3.0,  4.0,
-                                 5.0,  5.5,  6.5,  7.0,  8.0,  9.0};
+                                 5.0,  5.5,  6.5,  7.0,  8.0,  10.0};
 
-    // planner.SetAccel(2.0);
     if (!planner.Plan(theta, time)) {
         std::cerr << "Plan failed\n";
         return -1;

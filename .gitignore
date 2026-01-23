@@ -3,5 +3,7 @@ build/
 tests/
 trajectory.csv
 via_points.csv
+cartesian.csv
+joint_pos.csv
 *.png
 test*

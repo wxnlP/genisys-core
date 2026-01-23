@@ -141,6 +141,7 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t &inputJoint,
     // posture
     // Rotation2Euler(R_06.data(), P_06_euler.data());
     Eigen::Quaterniond P_06_quat(R_06);
+    P_06_quat.normalize();
 
     outputPose.x = P_06_pos[0];
     outputPose.y = P_06_pos[1];
@@ -148,10 +149,8 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t &inputJoint,
     // outputPose.roll = P_06_euler[0];
     // outputPose.pitch = P_06_euler[1];
     // outputPose.yaw = P_06_euler[2];
-    outputPose.qx = P_06_quat.x();
-    outputPose.qy = P_06_quat.y();
-    outputPose.qz = P_06_quat.z();
-    outputPose.qw = P_06_quat.w();
+    outputPose.quat = ArmMotion::Quaternion_t(
+        P_06_quat.w(), P_06_quat.x(), P_06_quat.y(), P_06_quat.z());
 
     memcpy(outputPose.R, R_06.data(),  9 * sizeof(double));
 
@@ -187,7 +186,10 @@ bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t &inputPose,
         memcpy(R_06.data(), inputPose.R, 9 * sizeof(double));
     } else {
         // deg to rad
-        P_06_quat = Eigen::Quaterniond(inputPose.qw, inputPose.qx, inputPose.qy, inputPose.qz);
+        P_06_quat = Eigen::Quaterniond(inputPose.quat.w, 
+                                       inputPose.quat.x, 
+                                       inputPose.quat.y, 
+                                       inputPose.quat.z);
         // P_06_quat.x() = inputPose.qx;
         // P_06_quat.y() = inputPose.qy;
         // P_06_quat.z() = inputPose.qz;

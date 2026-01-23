@@ -80,8 +80,8 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
 
     // 四元数信息
     cout << "\n[RESULT] 末端姿态 (Quaternion x,y,z,w):" << endl;
-    cout << "  QX: " << outPose.qx << "  QY: " << outPose.qy 
-         << "  QZ: " << outPose.qz << "  QW: " << outPose.qw << endl;
+    cout << "  QX: " << outPose.quat.x << "  QY: " << outPose.quat.y 
+         << "  QZ: " << outPose.quat.z << "  QW: " << outPose.quat.w << endl;
 
     // 旋转矩阵信息 (从 outPose.R 恢复)
     // 注意：Eigen 默认列优先，打印时需注意对应关系
@@ -113,8 +113,8 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
 
     cout << "* 输入末端位置 (m): (" << inputPose.x << ", " << inputPose.y << ", " << inputPose.z << ")" << endl;
     cout << "* 输入末端姿态 四元数: (" 
-         << inputPose.qx << ", " << inputPose.qy << ", " 
-         << inputPose.qz << ", " << inputPose.qw << ")" << endl;
+         << inputPose.quat.x << ", " << inputPose.quat.y << ", " 
+         << inputPose.quat.z << ", " << inputPose.quat.w << ")" << endl;
 
     ArmMotion::IKSolves_t outputSolves;
     

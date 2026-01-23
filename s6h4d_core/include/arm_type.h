@@ -1,6 +1,14 @@
 #pragma once
 
 namespace ArmMotion {
+    struct Quaternion_t {
+        Quaternion_t() = default;
+        Quaternion_t(double W, double X, double Y, double Z)
+            : x(X), y(Y), z(Z), w(W) {}
+
+        double x{0.0}, y{0.0}, z{0.0}, w{1.0};
+    };
+
     struct Joint6Dof_t {
 
         Joint6Dof_t() = default;
@@ -15,12 +23,12 @@ namespace ArmMotion {
 
         Pose6Dof_t() = default;
         
-        Pose6Dof_t(double X, double Y, double Z, double q1, double q2, double q3, double q4)
-            : x(X), y(Y), z(Z), qx(q1), qy(q2), qz(q3), qw(q4),vaildR(false) {}
+        Pose6Dof_t(double X, double Y, double Z, double qw, double qx, double qy, double qz)
+            : x(X), y(Y), z(Z), quat{ qw, qx, qy, qz}, vaildR(false) {}
 
         double x{}, y{}, z{};
-        // double roll{}, pitch{}, yaw{};
-        double qx{}, qy{}, qz{}, qw{};
+        
+        Quaternion_t quat{};
         double R[9]{};  // 列优先
 
         // 记录R变量的旋转矩阵是否有效

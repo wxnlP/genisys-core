@@ -19,7 +19,7 @@ bool CartesianTrajectoryPlanner::Plan(
         p[1].push_back(pose.y);
         p[2].push_back(pose.z);
 
-        Eigen::Quaterniond q(pose.qw, pose.qx, pose.qy, pose.qz);
+        Eigen::Quaterniond q(pose.quat.w, pose.quat.x, pose.quat.y, pose.quat.z);
         if (!quat.empty()) {
             if (quat.back().dot(q) < 0.0) {
                 q.coeffs() = -q.coeffs(); // 确保选择最短路径
@@ -57,10 +57,10 @@ bool CartesianTrajectoryPlanner::Sample(double t, CartesianPoint_t& point)
         point.z.pos = path_.front().z;
         point.z.vel = 0.0;
         point.z.acc = 0.0;
-        point.qw = path_.front().qw;
-        point.qx = path_.front().qx;
-        point.qy = path_.front().qy;
-        point.qz = path_.front().qz;
+        point.qw = path_.front().quat.w;
+        point.qx = path_.front().quat.x;
+        point.qy = path_.front().quat.y;
+        point.qz = path_.front().quat.z;
         return true;
     }
     if (t >= time_.back()) {
@@ -73,10 +73,10 @@ bool CartesianTrajectoryPlanner::Sample(double t, CartesianPoint_t& point)
         point.z.pos = path_.back().z;
         point.z.vel = 0.0;
         point.z.acc = 0.0;
-        point.qw = path_.back().qw;
-        point.qx = path_.back().qx;
-        point.qy = path_.back().qy;
-        point.qz = path_.back().qz;
+        point.qw = path_.back().quat.w;
+        point.qx = path_.back().quat.x;
+        point.qy = path_.back().quat.y;
+        point.qz = path_.back().quat.z;
         return true;
     }
 

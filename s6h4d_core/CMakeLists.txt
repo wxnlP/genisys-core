@@ -15,6 +15,7 @@ target_sources(${TARGET_NAME} PRIVATE
     src/interface_base.cc
     src/trajectory_cubic_planner.cc
     src/trajectory_linear_planner.cc
+    src/trajectory_cartesian_planner.cc
     src/kinematic.cc
 )
 

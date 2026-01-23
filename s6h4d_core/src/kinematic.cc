@@ -187,10 +187,11 @@ bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t &inputPose,
         memcpy(R_06.data(), inputPose.R, 9 * sizeof(double));
     } else {
         // deg to rad
-        P_06_quat.x() = inputPose.qx;
-        P_06_quat.y() = inputPose.qy;
-        P_06_quat.z() = inputPose.qz;
-        P_06_quat.w() = inputPose.qw;
+        P_06_quat = Eigen::Quaterniond(inputPose.qw, inputPose.qx, inputPose.qy, inputPose.qz);
+        // P_06_quat.x() = inputPose.qx;
+        // P_06_quat.y() = inputPose.qy;
+        // P_06_quat.z() = inputPose.qz;
+        // P_06_quat.w() = inputPose.qw;
 
         // quaternion to rotation
         P_06_quat.normalize();
@@ -411,35 +412,35 @@ bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t &inputPose,
 
             for (int ind_wrist = 0; ind_wrist < 2; ind_wrist++) {
                 double theta_1_ = theta_1[ind_arm] - jointOffset_[0];
-                while (theta_1_ > (double)M_PI) {
-                    theta_1_ -= 2.0 * (double)M_PI;
-                }
+                // while (theta_1_ > (double)M_PI) {
+                //     theta_1_ -= 2.0 * (double)M_PI;
+                // }
                         
-                while (theta_1_ <= -(double)M_PI) {
-                    theta_1_ += 2.0 * (double)M_PI;
-                }
+                // while (theta_1_ <= -(double)M_PI) {
+                //     theta_1_ += 2.0 * (double)M_PI;
+                // }
                 outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[0] = theta_1_;
 
                 for(int i = 0; i < 2; i++) {
                     double theta_23_ = theta_23[ind_elbow][i] - jointOffset_[1 + i];
-                    while (theta_23_ > (double)M_PI) {
-                        theta_23_ -= 2.0 * (double)M_PI;
-                    }
-                    while (theta_23_ <= -(double)M_PI) {
-                        theta_23_ += 2.0 * (double)M_PI;
-                    }
+                    // while (theta_23_ > (double)M_PI) {
+                    //     theta_23_ -= 2.0 * (double)M_PI;
+                    // }
+                    // while (theta_23_ <= -(double)M_PI) {
+                    //     theta_23_ += 2.0 * (double)M_PI;
+                    // }
                     outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[1+i] = theta_23_;
 
                 }
 
                 for(int i = 0; i < 3; i++) {
                     double theta_456_ = theta_456[ind_wrist][i] - jointOffset_[2 + i];
-                    while (theta_456_ > (double)M_PI) {
-                        theta_456_ -= 2.0 * (double)M_PI;
-                    }
-                    while (theta_456_ <= -(double)M_PI) {
-                        theta_456_ += 2.0 * (double)M_PI;
-                    }
+                    // while (theta_456_ > (double)M_PI) {
+                    //     theta_456_ -= 2.0 * (double)M_PI;
+                    // }
+                    // while (theta_456_ <= -(double)M_PI) {
+                    //     theta_456_ += 2.0 * (double)M_PI;
+                    // }
                     outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[3+i] = theta_456_;
                 }
             }

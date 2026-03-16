@@ -1,12 +1,26 @@
 #pragma once
 
 namespace ArmMotion {
+    
+    struct MDHConfig_t{
+        double L_BASE;
+        double D_BASE;
+        double L_UPPERARM;
+        double D_ELBOW;
+        double L_FOREARM;
+        double L_WRIST;
+    };
+
     struct Quaternion_t {
         Quaternion_t() = default;
         Quaternion_t(double W, double X, double Y, double Z)
             : x(X), y(Y), z(Z), w(W) {}
 
         double x{0.0}, y{0.0}, z{0.0}, w{1.0};
+    };
+
+    struct Vector3d {
+        double x, y, z;
     };
 
     struct Joint6Dof_t {

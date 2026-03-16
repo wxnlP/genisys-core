@@ -57,10 +57,10 @@ bool CartesianTrajectoryPlanner::Sample(double t, CartesianPoint_t& point)
         point.z.pos = path_.front().z;
         point.z.vel = 0.0;
         point.z.acc = 0.0;
-        point.qw = path_.front().quat.w;
-        point.qx = path_.front().quat.x;
-        point.qy = path_.front().quat.y;
-        point.qz = path_.front().quat.z;
+        point.q.w = path_.front().quat.w;
+        point.q.x = path_.front().quat.x;
+        point.q.y = path_.front().quat.y;
+        point.q.z = path_.front().quat.z;
         return true;
     }
     if (t >= time_.back()) {
@@ -73,10 +73,10 @@ bool CartesianTrajectoryPlanner::Sample(double t, CartesianPoint_t& point)
         point.z.pos = path_.back().z;
         point.z.vel = 0.0;
         point.z.acc = 0.0;
-        point.qw = path_.back().quat.w;
-        point.qx = path_.back().quat.x;
-        point.qy = path_.back().quat.y;
-        point.qz = path_.back().quat.z;
+        point.q.w = path_.back().quat.w;
+        point.q.x = path_.back().quat.x;
+        point.q.y = path_.back().quat.y;
+        point.q.z = path_.back().quat.z;
         return true;
     }
 
@@ -99,12 +99,16 @@ bool CartesianTrajectoryPlanner::Sample(double t, CartesianPoint_t& point)
     point.z.vel = p.vel;
     point.z.acc = p.acc;
 
-    if (!quat_planner_.Sample(t, q)) {
+    Eigen::Vector3d omega;
+    if (!quat_planner_.Sample(t, q, omega)) {
         return false;
     }
-    point.qw = q.w();
-    point.qx = q.x();
-    point.qy = q.y();
-    point.qz = q.z();
+    point.q.w = q.w();
+    point.q.x = q.x();
+    point.q.y = q.y();
+    point.q.z = q.z();
+    point.omega.x = omega[0];
+    point.omega.y = omega[1];
+    point.omega.z = omega[2];
     return true;
 }

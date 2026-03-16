@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <Eigen/Dense>
+#include "arm_type.h"
 
 class QuaternionTrajectoryPlanner
 {
@@ -30,7 +31,7 @@ public:
         return true;
     }
 
-    bool Sample(double t, Eigen::Quaterniond& q) const {
+    bool Sample(double t, Eigen::Quaterniond& q, Eigen::Vector3d& omega) const {
         if (q_.empty()) {
             return false;
         }
@@ -55,9 +56,25 @@ public:
 
         double t0 = time_[index];
         double t1 = time_[index+1];
-        double alpha = (t - t0) / (t1 - t0);
-        q = q_[index].slerp(alpha, q_[index+1]);
+        double dt = t1 - t0;
+
+        double alpha = (t - t0) / dt;
+
+        const Eigen::Quaterniond& q_start = q_[index];
+        const Eigen::Quaterniond& q_end   = q_[index + 1];
+
+        q = q_[index].slerp(alpha, q_end);
         q.normalize();
+
+        Eigen::Quaterniond q_rel = q_start.inverse() * q_end;
+        Eigen::AngleAxisd angle_axis(q_rel);
+
+        double total_angle = angle_axis.angle();
+        Eigen::Vector3d axis_local = angle_axis.axis();
+        double omega_mag = total_angle / dt;
+
+        omega = q_start * (axis_local * omega_mag);
+
         return true;
     }
 private:

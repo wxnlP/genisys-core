@@ -43,16 +43,7 @@ class KinematicSolver::Impl
 {
 public:
     // MDH params
-    struct MDHConfig_t{
-        double L_BASE;
-        double D_BASE;
-        double L_UPPERARM;
-        double D_ELBOW;
-        double L_FOREARM;
-        double L_WRIST;
-    };
-
-    MDHConfig_t mdhConfig_{};
+    ArmMotion::MDHConfig_t mdhConfig_{};
 
     Eigen::Matrix<double, 6, 4> MDH_Matrix_;
 
@@ -61,7 +52,7 @@ public:
     Eigen::Vector3d L3_Elbow_;
     Eigen::Vector3d L6_Wrist_;
     Impl(double L_BS, double D_BS, double L_AM, double D_EW, double L_FA, double L_WT)
-        : mdhConfig_(MDHConfig_t{ L_BS, D_BS, L_AM, D_EW, L_FA, L_WT })
+        : mdhConfig_(ArmMotion::MDHConfig_t{ L_BS, D_BS, L_AM, D_EW, L_FA, L_WT })
     {
         MDH_Matrix_ <<
             0.0000          , 0.00                  , mdhConfig_.L_BASE    , 0.0 ,

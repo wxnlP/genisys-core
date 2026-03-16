@@ -13,7 +13,8 @@ public:
         TrajectoryPoint_t x;
         TrajectoryPoint_t y;
         TrajectoryPoint_t z;
-        double qw, qx, qy, qz;
+        ArmMotion::Quaternion_t q;
+        ArmMotion::Vector3d omega;
     };
 
     CartesianTrajectoryPlanner(double linear_tb) 

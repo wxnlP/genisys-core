@@ -20,7 +20,10 @@ namespace ArmMotion {
     };
 
     struct Vector3d {
-        double x, y, z;
+        Vector3d() = default;
+        Vector3d(double X, double Y, double Z) : x(X), y(Y), z(Z) {}
+
+        double x{0.0}, y{0.0}, z{0.0};
     };
 
     struct Joint6Dof_t {
@@ -30,7 +33,7 @@ namespace ArmMotion {
         Joint6Dof_t(double a1, double a2, double a3, double a4, double a5, double a6) 
             : theta{ a1, a2, a3, a4, a5, a6 } {}
 
-        double theta[6];
+        double theta[6]{};
     };
     
     struct Pose6Dof_t {
@@ -54,5 +57,30 @@ namespace ArmMotion {
         Joint6Dof_t solves[8];
         char solveFlag[8][3];
 
+    };
+
+    struct CartesianTwist_t {
+        Vector3d linear;
+        Vector3d angular;
+    };
+
+    struct JointTrajectoryPoint_t {
+        double t{0.0};
+        double s{0.0};
+        double sd{0.0};
+        double sdd{0.0};
+        Joint6Dof_t position;
+        Joint6Dof_t velocity;
+        Joint6Dof_t acceleration;
+    };
+
+    struct CartesianTrajectoryPoint_t {
+        double t{0.0};
+        double s{0.0};
+        double sd{0.0};
+        double sdd{0.0};
+        Pose6Dof_t pose;
+        CartesianTwist_t velocity;
+        CartesianTwist_t acceleration;
     };
 }

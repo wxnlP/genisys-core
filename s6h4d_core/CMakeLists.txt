@@ -12,12 +12,14 @@ target_include_directories(${TARGET_NAME} PUBLIC
 
 # 添加源文件
 target_sources(${TARGET_NAME} PRIVATE
-    src/interface_base.cc
-    src/trajectory_cubic_planner.cc
-    src/trajectory_linear_planner.cc
-    src/trajectory_cartesian_planner.cc
     src/kinematic.cc
     src/jacobian.cc
+    src/cubic_time_scaler.cc
+    src/lspb_time_scaler.cc
+    src/cartesian_linear_path.cc
+    src/joint_path.cc
+    src/cartesian_trajectory.cc
+    src/joint_trajectory.cc
 )
 
 if(BUILD_EXAMPLES)

@@ -1,25 +1,20 @@
 set(KINEMATIC_TARGET_NAME kinematic_example)
-set(TRAJECTORY_PLANNER_TARGET_NAME trajectory_planner_example)
-set(TRAJECTORY_CARTESIAN_TARGET_NAME trajectory_cartesian_example)
 set(JACOBIAN_TARGET_NAME jacobian_example)
+set(TRAJECTORY_TARGET_NAME trajectory_example)
 
 
 add_executable(${KINEMATIC_TARGET_NAME} kinematic_sample.cc)
-add_executable(${TRAJECTORY_PLANNER_TARGET_NAME} trajectory_planner_sample.cc)
-add_executable(${TRAJECTORY_CARTESIAN_TARGET_NAME} trajectory_cartesian_sample.cc)
 add_executable(${JACOBIAN_TARGET_NAME} jacobian_sample.cc)
+add_executable(${TRAJECTORY_TARGET_NAME} trajectory_sample.cc)
 
 
 target_link_libraries(${KINEMATIC_TARGET_NAME} PRIVATE
     s6h4d_sdk
 )
-target_link_libraries(${TRAJECTORY_PLANNER_TARGET_NAME} PRIVATE
-    s6h4d_sdk
-)
-target_link_libraries(${TRAJECTORY_CARTESIAN_TARGET_NAME} PRIVATE
-    s6h4d_sdk
-)
 target_link_libraries(${JACOBIAN_TARGET_NAME} PRIVATE
+    s6h4d_sdk
+)
+target_link_libraries(${TRAJECTORY_TARGET_NAME} PRIVATE
     s6h4d_sdk
 )
 
@@ -34,7 +29,7 @@ install(TARGETS ${KINEMATIC_TARGET_NAME}
     RUNTIME DESTINATION bin
 )
 
-install(TARGETS ${TRAJECTORY_PLANNER_TARGET_NAME}
+install(TARGETS ${TRAJECTORY_TARGET_NAME}
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin

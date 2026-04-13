@@ -11,7 +11,7 @@ public:
     ~JointPath() override = default;
 
     void EvaluatePos(double s, ArmMotion::Joint6Dof_t& point) const override;
-    void EvaluateTangent(double s, ArmMotion::Joint6Dof_t& tangent) const override;
+    void EvaluateTangent(ArmMotion::Joint6Dof_t& tangent) const override;
 private:
     ArmMotion::Joint6Dof_t joint_start_;
     ArmMotion::Joint6Dof_t joint_target_;

@@ -14,7 +14,7 @@ bool JointTrajectory::Sample(double t,
 
   ArmMotion::Joint6Dof_t tangent;
   path_.EvaluatePos(state.s, point.position);
-  path_.EvaluateTangent(state.s, tangent);
+  path_.EvaluateTangent(tangent);
 
   for (int i = 0; i < 6; ++i) {
     point.velocity.theta[i] = tangent.theta[i] * state.sd;

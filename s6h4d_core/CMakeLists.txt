@@ -7,8 +7,9 @@ find_package(Eigen3 REQUIRED)
 # 头文件搜索路径
 target_include_directories(${TARGET_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
-    ${EIGEN3_INCLUDE_DIR}
 )
+
+target_link_libraries(${TARGET_NAME} PUBLIC Eigen3::Eigen)
 
 # 添加源文件
 target_sources(${TARGET_NAME} PRIVATE

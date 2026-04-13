@@ -9,7 +9,7 @@ public:
     ~CartesianLinearPath() override = default;
 
     void EvaluatePos(double s, ArmMotion::Pose6Dof_t& point) const override;
-    void EvaluateTangent(double s, ArmMotion::Vector3d& pos, ArmMotion::Vector3d& omega) const override;
+    void EvaluateTangent(ArmMotion::Vector3d& pos, ArmMotion::Vector3d& omega) const override;
 
 private:
     // 位置

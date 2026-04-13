@@ -36,7 +36,7 @@ void CartesianLinearPath::EvaluatePos(double s, ArmMotion::Pose6Dof_t& path) con
     path.quat.z = q_s.z();
 }
 
-void CartesianLinearPath::EvaluateTangent(double s, ArmMotion::Vector3d& pos, ArmMotion::Vector3d& omega) const
+void CartesianLinearPath::EvaluateTangent(ArmMotion::Vector3d& pos, ArmMotion::Vector3d& omega) const
 {
     // 1. 位置切线（常数）
     Eigen::Vector3d dp_ds = p_target_ - p_start_;

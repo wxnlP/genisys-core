@@ -15,7 +15,7 @@ bool CartesianTrajectory::Sample(
   ArmMotion::Vector3d linear_tangent;
   ArmMotion::Vector3d angular_tangent;
   path_.EvaluatePos(state.s, point.pose);
-  path_.EvaluateTangent(state.s, linear_tangent, angular_tangent);
+  path_.EvaluateTangent(linear_tangent, angular_tangent);
 
   point.velocity.linear.x = linear_tangent.x * state.sd;
   point.velocity.linear.y = linear_tangent.y * state.sd;

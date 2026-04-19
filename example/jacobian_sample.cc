@@ -1,68 +1,155 @@
-#include <iostream>
-#include <iomanip>
+#include <array>
 #include <cmath>
-#include "jacobian.h"
-#include <Eigen/Dense>
+#include <iomanip>
+#include <iostream>
 
-// 辅助函数：计算两个向量的欧氏距离误差
-double calculateError(const std::array<double, 6>& v1, const Eigen::Matrix<double, 6, 1>& v2) {
-    double err = 0;
-    for(int i=0; i<6; ++i) {
-        err += std::pow(v1[i] - v2[i], 2);
-    }
-    return std::sqrt(err);
+#include "jacobian.h"
+
+namespace {
+
+std::array<double, 6> ToArray(const ArmMotion::Joint6Dof_t& joint) {
+  return {joint.theta[0], joint.theta[1], joint.theta[2],
+          joint.theta[3], joint.theta[4], joint.theta[5]};
 }
 
+std::array<double, 6> ToArray(const ArmMotion::CartesianTwist_t& twist) {
+  return {twist.linear.x,  twist.linear.y,  twist.linear.z,
+          twist.angular.x, twist.angular.y, twist.angular.z};
+}
+
+double CalculateError(const std::array<double, 6>& lhs,
+                      const std::array<double, 6>& rhs) {
+  double squared_sum = 0.0;
+  for (int i = 0; i < 6; ++i) {
+    const double diff = lhs[i] - rhs[i];
+    squared_sum += diff * diff;
+  }
+  return std::sqrt(squared_sum);
+}
+
+ArmMotion::Joint6Dof_t IntegratePosition(const ArmMotion::Joint6Dof_t& q,
+                                         const ArmMotion::Joint6Dof_t& dq,
+                                         const ArmMotion::Joint6Dof_t& ddq,
+                                         double dt) {
+  ArmMotion::Joint6Dof_t q_next;
+  for (int i = 0; i < 6; ++i) {
+    q_next.theta[i] =
+        q.theta[i] + dq.theta[i] * dt + 0.5 * ddq.theta[i] * dt * dt;
+  }
+  return q_next;
+}
+
+ArmMotion::Joint6Dof_t IntegrateVelocity(const ArmMotion::Joint6Dof_t& dq,
+                                         const ArmMotion::Joint6Dof_t& ddq,
+                                         double dt) {
+  ArmMotion::Joint6Dof_t dq_next;
+  for (int i = 0; i < 6; ++i) {
+    dq_next.theta[i] = dq.theta[i] + ddq.theta[i] * dt;
+  }
+  return dq_next;
+}
+
+ArmMotion::CartesianTwist_t DifferentiateTwist(
+    const ArmMotion::CartesianTwist_t& current,
+    const ArmMotion::CartesianTwist_t& previous, double dt) {
+  return ArmMotion::CartesianTwist_t(
+      (current.linear.x - previous.linear.x) / dt,
+      (current.linear.y - previous.linear.y) / dt,
+      (current.linear.z - previous.linear.z) / dt,
+      (current.angular.x - previous.angular.x) / dt,
+      (current.angular.y - previous.angular.y) / dt,
+      (current.angular.z - previous.angular.z) / dt);
+}
+
+void PrintTwist(const char* label, const ArmMotion::CartesianTwist_t& twist) {
+  std::cout << label << " linear = [" << twist.linear.x << ", "
+            << twist.linear.y << ", " << twist.linear.z << "]"
+            << ", angular = [" << twist.angular.x << ", " << twist.angular.y
+            << ", " << twist.angular.z << "]" << std::endl;
+}
+
+void PrintJoint(const char* label, const ArmMotion::Joint6Dof_t& joint) {
+  std::cout << label << " [" << joint.theta[0] << ", " << joint.theta[1] << ", "
+            << joint.theta[2] << ", " << joint.theta[3] << ", "
+            << joint.theta[4] << ", " << joint.theta[5] << "]" << std::endl;
+}
+
+}  // namespace
+
 int main() {
-    // 1. 初始化对象 (给定一些合理的连杆长度)
-    // L_BS, D_BS, L_AM, L_FA, D_EW, L_WT
-    Jacobian6Dof jac(0.2, 0.1, 0.4, 0.35, 0.05, 0.1);
+  constexpr double kDt = 1e-3;
+  constexpr double kDamping = 1e-6;
+  constexpr double kVelocityErrorThreshold = 1e-6;
+  constexpr double kAccelInverseErrorThreshold = 1e-5;
+  constexpr double kAccelFiniteDiffErrorThreshold = 5e-3;
 
-    // 2. 构造一个随机但合理的关节角度 q (弧度)
-    ArmMotion::Joint6Dof_t q_current;
-    q_current.theta[0] = 0.0;   // 约 28度
-    q_current.theta[1] = -0.0;  // 避开直立奇异点
-    q_current.theta[2] = 0;
-    q_current.theta[3] = 0.0;
-    q_current.theta[4] = 0;
-    q_current.theta[5] = 0.0;
+  Jacobian6Dof jac(0.2, 0.1, 0.4, 0.35, 0.05, 0.1);
 
-    // 3. 构造一个极小的关节速度 dq (单位: rad/s)
-    // 设 dt = 0.001s，那么我们可以模拟 1ms 内的位移
-    Jacobian6Dof::JointVel dq(1, -0.0, 0.0, 0.0, 0.0, -0.0);
-    double dt = 0.001;
+  const ArmMotion::Joint6Dof_t q_current{0.35, -0.65, 0.90, -0.40, 0.55, 0.25};
+  const ArmMotion::Joint6Dof_t dq{0.40, -0.25, 0.18, 0.12, -0.08, 0.15};
+  const ArmMotion::Joint6Dof_t ddq{0.30, -0.18, 0.12, -0.10, 0.06, 0.08};
 
-    // 4. 更新雅可比矩阵
-    jac.Update(q_current);
+  jac.Update(q_current, 0.0);
 
-    // 5. 使用雅可比计算预测的末端速度 v = J * dq
-    Jacobian6Dof::CartesianVel v_predicted(0,0,0,0,0,0);
-    jac.ForwardVelocity(dq, v_predicted);
+  ArmMotion::CartesianTwist_t v_current;
+  jac.ForwardVelocity(dq, v_current);
 
-    // 6. 验证：通过数值法（FK差分）验证
-    // 我们需要计算 q_next = q + dq * dt 时的末端位置
-    ArmMotion::Joint6Dof_t q_next;
-    for(int i=0; i<6; ++i) q_next.theta[i] = q_current.theta[i] + dq.qv[i] * dt;
+  ArmMotion::Joint6Dof_t dq_reconstructed;
+  jac.InverseVelocity(v_current, dq_reconstructed, kDamping);
 
-    // 这里需要你 Jacobian6Dof 内部能暴露 FK 结果，或者我们手动算一下
-    // 为了演示，我们假设 Update 执行后，内部存储了末端位置 pe
-    // 如果你的 pe 在 Update 后没有存，建议在 Impl 里加一个 getEndEffectorPos()
-    
-    std::cout << "--- 雅可比速度映射测试 ---" << std::endl;
-    std::cout << std::fixed << std::setprecision(6);
-    std::cout << "预测末端线速度 vx, vy, vz: " 
-              << v_predicted.v[0] << ", " << v_predicted.v[1] << ", " << v_predicted.v[2] << std::endl;
-    std::cout << "预测末端角速度 wx, wy, wz: " 
-              << v_predicted.w[0] << ", " << v_predicted.w[1] << ", " << v_predicted.w[2] << std::endl;
+  const ArmMotion::Joint6Dof_t q_next =
+      IntegratePosition(q_current, dq, ddq, kDt);
+  const ArmMotion::Joint6Dof_t dq_next = IntegrateVelocity(dq, ddq, kDt);
 
-    // 7. 逆映射验证 (DLS)
-    // 理论上 dq_reconstructed 应该接近我们初始的 dq
-    Jacobian6Dof::JointVel dq_reconstructed(0,0,0,0,0,0);
-    jac.InverseVelocity(v_predicted, dq_reconstructed, 0.01);
+  jac.Update(q_next, kDt);
 
-    std::cout << "\n--- 逆雅可比映射验证 (DLS) ---" << std::endl;
-    std::cout << "原始 dq[0-2]: " << dq.qv[0] << ", " << dq.qv[1] << ", " << dq.qv[2] << std::endl;
-    std::cout << "逆算 dq[0-2]: " << dq_reconstructed.qv[0] << ", " << dq_reconstructed.qv[1] << ", " << dq_reconstructed.qv[2] << std::endl;
+  ArmMotion::CartesianTwist_t v_next;
+  jac.ForwardVelocity(dq_next, v_next);
 
-    return 0;
+  ArmMotion::CartesianTwist_t a_predicted;
+  jac.ForwardAccel(ddq, a_predicted);
+
+  ArmMotion::Joint6Dof_t ddq_reconstructed;
+  jac.InverseAccel(a_predicted, ddq_reconstructed, kDamping);
+
+  const ArmMotion::CartesianTwist_t a_finite_diff =
+      DifferentiateTwist(v_next, v_current, kDt);
+
+  const double velocity_inverse_error =
+      CalculateError(ToArray(dq), ToArray(dq_reconstructed));
+  const double accel_inverse_error =
+      CalculateError(ToArray(ddq), ToArray(ddq_reconstructed));
+  const double accel_finite_diff_error =
+      CalculateError(ToArray(a_predicted), ToArray(a_finite_diff));
+
+  std::cout << std::fixed << std::setprecision(6);
+  std::cout << "--- Jacobian velocity test ---" << std::endl;
+  PrintJoint("input dq      =", dq);
+  PrintTwist("J * dq        =", v_current);
+  PrintJoint("J^-1 * (Jdq)  =", dq_reconstructed);
+  std::cout << "velocity inverse error = " << velocity_inverse_error
+            << std::endl;
+
+  std::cout << "\n--- Jacobian acceleration test ---" << std::endl;
+  PrintJoint("input ddq     =", ddq);
+  PrintTwist("J*ddq+Jdot*dq =", a_predicted);
+  PrintTwist("finite diff   =", a_finite_diff);
+  PrintJoint("J^-1 * accel  =", ddq_reconstructed);
+  std::cout << "accel inverse error    = " << accel_inverse_error << std::endl;
+  std::cout << "accel finite diff error = " << accel_finite_diff_error
+            << std::endl;
+
+  const bool velocity_ok = velocity_inverse_error < kVelocityErrorThreshold;
+  const bool accel_inverse_ok =
+      accel_inverse_error < kAccelInverseErrorThreshold;
+  const bool accel_finite_diff_ok =
+      accel_finite_diff_error < kAccelFiniteDiffErrorThreshold;
+
+  std::cout << "\nresult: "
+            << ((velocity_ok && accel_inverse_ok && accel_finite_diff_ok)
+                    ? "PASS"
+                    : "FAIL")
+            << std::endl;
+
+  return (velocity_ok && accel_inverse_ok && accel_finite_diff_ok) ? 0 : 1;
 }

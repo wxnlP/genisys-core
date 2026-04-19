@@ -60,8 +60,11 @@ namespace ArmMotion {
     };
 
     struct CartesianTwist_t {
-        Vector3d linear;
-        Vector3d angular;
+        CartesianTwist_t() = default;
+        CartesianTwist_t(double vx, double vy, double vz, double wx, double wy, double wz)
+            : linear{ vx, vy, vz }, angular{ wx, wy, wz } {}
+        Vector3d linear{};
+        Vector3d angular{};
     };
 
     struct JointTrajectoryPoint_t {
@@ -69,9 +72,9 @@ namespace ArmMotion {
         double s{0.0};
         double sd{0.0};
         double sdd{0.0};
-        Joint6Dof_t position;
-        Joint6Dof_t velocity;
-        Joint6Dof_t acceleration;
+        Joint6Dof_t position{};
+        Joint6Dof_t velocity{};
+        Joint6Dof_t acceleration{};
     };
 
     struct CartesianTrajectoryPoint_t {
@@ -79,8 +82,8 @@ namespace ArmMotion {
         double s{0.0};
         double sd{0.0};
         double sdd{0.0};
-        Pose6Dof_t pose;
-        CartesianTwist_t velocity;
-        CartesianTwist_t acceleration;
+        Pose6Dof_t pose{};
+        CartesianTwist_t velocity{};
+        CartesianTwist_t acceleration{};
     };
 }

@@ -1,4 +1,3 @@
-#include "s6h4d_interface.h"
 #include "kinematic.h"
 #include <iostream>
 #include <iomanip>

@@ -86,4 +86,11 @@ namespace ArmMotion {
         CartesianTwist_t velocity{};
         CartesianTwist_t acceleration{};
     };
+
+    struct JointState_t {
+        Joint6Dof_t position{};
+        Joint6Dof_t velocity{};
+        Joint6Dof_t accel{};
+        Joint6Dof_t effort{};
+    };
 }

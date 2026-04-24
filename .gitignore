@@ -7,3 +7,5 @@ cartesian.csv
 joint_pos.csv
 *.png
 test*
+abandonded/
+mcu/

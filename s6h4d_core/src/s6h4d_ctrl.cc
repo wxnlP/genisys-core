@@ -57,7 +57,7 @@ bool S6h4dCtrl::SetJointState(const ArmMotion::JointState_t& joint_cmd) {
   return bytes_written == sizeof(buffer);
 }
 
-bool S6h4dCtrl::GetJointState(ArmMotion::Joint6Dof_t& joint_state) {
+bool S6h4dCtrl::GetJointState(ArmMotion::JointState_t& joint_state) {
   uint8_t frame[36]{};
 
   // 对齐帧头，避免串口缓冲区存在残留导致错位解析
@@ -81,8 +81,8 @@ bool S6h4dCtrl::GetJointState(ArmMotion::Joint6Dof_t& joint_state) {
       continue;
     }
 
-    joint_state = ArmMotion::Joint6Dof_t{};
-    Bytes2Float(frame, joint_state);
+    joint_state = ArmMotion::JointState_t{};
+    Bytes2Float(frame, joint_state.position);
     return true;
   }
 

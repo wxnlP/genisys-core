@@ -83,7 +83,8 @@ int main() {
   constexpr double kAccelInverseErrorThreshold = 1e-5;
   constexpr double kAccelFiniteDiffErrorThreshold = 5e-3;
 
-  Jacobian6Dof jac(0.2, 0.1, 0.4, 0.35, 0.05, 0.1);
+  const ArmMotion::MDHConfig_t mdh_config{0.2, 0.1, 0.4, 0.35, 0.05, 0.1};
+  Jacobian6Dof jac(mdh_config);
 
   const ArmMotion::Joint6Dof_t q_current{0.35, -0.65, 0.90, -0.40, 0.55, 0.25};
   const ArmMotion::Joint6Dof_t dq{0.40, -0.25, 0.18, 0.12, -0.08, 0.15};

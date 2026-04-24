@@ -18,10 +18,6 @@ target_link_libraries(${TRAJECTORY_TARGET_NAME} PRIVATE
     s6h4d_sdk
 )
 
-install(
-    DIRECTORY interface/
-    DESTINATION include/s6h4d_sdk/example
-)
 
 install(TARGETS ${KINEMATIC_TARGET_NAME}
     ARCHIVE DESTINATION lib

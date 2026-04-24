@@ -11,7 +11,7 @@ class S6h4dCtrl : public ArmCtrlBase {
 
   bool Init() override;
   bool SetJointState(const ArmMotion::JointState_t& joint_cmd) override;
-  bool GetJointState(ArmMotion::Joint6Dof_t& joint_state) override;
+  bool GetJointState(ArmMotion::JointState_t& joint_state) override;
 
  private:
   void Float2Bytes(const ArmMotion::JointState_t& joint, uint8_t* buffer);

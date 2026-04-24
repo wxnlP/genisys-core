@@ -22,6 +22,7 @@ target_sources(${TARGET_NAME} PRIVATE
     src/cartesian_trajectory.cc
     src/joint_trajectory.cc
     src/s6h4d_ctrl.cc
+    src/s6h4d_instance.cc
 )
 
 if(BUILD_EXAMPLES)

@@ -23,14 +23,7 @@ target_sources(${TARGET_NAME} PRIVATE
     src/joint_trajectory.cc
     src/s6h4d_ctrl.cc
     src/s6h4d_instance.cc
-    src/mujoco_sim_ctrl.cc
 )
-
-if(BUILD_EXAMPLES)
-    target_include_directories(${TARGET_NAME} PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/../example/interface/
-    )
-endif()
 
 if(BUILD_DEFAULT_SERIAL)
     target_link_libraries(${TARGET_NAME} PUBLIC serial)

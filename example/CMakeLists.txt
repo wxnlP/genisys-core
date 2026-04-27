@@ -9,7 +9,7 @@ set(HTTP_CLIENT_TARGET_NAME http_client_example)
 add_executable(${KINEMATIC_TARGET_NAME} kinematic_sample.cc)
 add_executable(${JACOBIAN_TARGET_NAME} jacobian_sample.cc)
 add_executable(${TRAJECTORY_TARGET_NAME} trajectory_sample.cc)
-add_executable(${MUJOCO_SIM_CTRL_TARGET_NAME} mujoco_sim_ctrl_sample.cc)
+# add_executable(${MUJOCO_SIM_CTRL_TARGET_NAME} mujoco_sim_ctrl_sample.cc)
 add_executable(${HTTP_SERVER_TARGET_NAME} http_server_sample.cc)
 add_executable(${HTTP_CLIENT_TARGET_NAME} http_client_sample.cc)
 
@@ -23,9 +23,9 @@ target_link_libraries(${JACOBIAN_TARGET_NAME} PRIVATE
 target_link_libraries(${TRAJECTORY_TARGET_NAME} PRIVATE
     s6h4d_sdk
 )
-target_link_libraries(${MUJOCO_SIM_CTRL_TARGET_NAME} PRIVATE
-    s6h4d_sdk
-)
+# target_link_libraries(${MUJOCO_SIM_CTRL_TARGET_NAME} PRIVATE
+#     s6h4d_sdk
+# )
 
 
 install(TARGETS ${KINEMATIC_TARGET_NAME}

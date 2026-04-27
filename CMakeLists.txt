@@ -32,6 +32,6 @@ if(BUILD_EXAMPLES)
     add_subdirectory(example)
 endif()
 
-if(BUILD_MUJOCO_SIM)
-    add_subdirectory(mujoco_sim)
+if(BUILD_SIM_PROXY)
+    add_subdirectory(simulation/sim_proxy)
 endif()

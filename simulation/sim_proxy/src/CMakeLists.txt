@@ -1,13 +1,13 @@
 # Set namespace
-set_root_namespace("mujoco_sim")
+set_root_namespace("sim_proxy")
 
 
 
 # module
-add_subdirectory(module/ctrl_module)
+add_subdirectory(module/proxy_module)
 
 # pkg
-add_subdirectory(pkg/sim_mujoco_pkg)
+add_subdirectory(pkg/sim_proxy_pkg)
 
 # install
 if(CMAKE_SYSTEM_NAME MATCHES "Linux")
@@ -25,9 +25,9 @@ install(
 
 # build all
 add_custom_target(
-  mujoco_sim_build_all ALL
+  sim_proxy_build_all ALL
   COMMAND ${CMAKE_COMMAND} -E copy_directory ${CUR_INSTALL_SOURCE_DIR}/bin ${CMAKE_BINARY_DIR}
   DEPENDS aimrt::runtime::main
-          mujoco_sim::sim_mujoco_pkg)
+          sim_proxy::sim_proxy_pkg)
 
 

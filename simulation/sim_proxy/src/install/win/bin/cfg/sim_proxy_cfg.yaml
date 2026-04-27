@@ -5,10 +5,10 @@ aimrt:
       - type: console
   module:
     pkgs:
-      - path: ./sim_mujoco_pkg.dll
+      - path: ./sim_proxy_pkg.dll
         disable_modules: []
     modules:
-      - name: CtrlModule
+      - name: ProxyModule
         log_lvl: INFO
 
 # Module custom configuration

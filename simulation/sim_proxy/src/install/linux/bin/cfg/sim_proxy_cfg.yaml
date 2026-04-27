@@ -7,16 +7,20 @@ aimrt:
     pkgs:
       - path: ./libmujoco_sim_pkg.so # 官方仿真组件
         disable_modules: []
+      - path: ./libsim_proxy_pkg.so
+        disable_modules: []
     modules:
       - name: MujocoSimModule # 官方仿真组件
+        log_lvl: INFO
+      - name: ProxyModule
         log_lvl: INFO
   plugin:
     plugins:
       - name: echo_plugin
-        path: ./libsensor_pb_ts.so
+        path: ./libaimrt_echo_plugin.so 
         options:
           type_support_pkgs:
-            - path: ./libhardware_type_supprot_pkg.so      
+            - path: ./libsensor_pb_ts.so
           topic_meta_list:
             - topic_name: /mujoco/joint_state
               msg_type: pb:aimrt.protocols.sensor.JointStateArray

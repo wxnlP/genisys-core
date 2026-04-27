@@ -1,5 +1,5 @@
 base_info:
-  project_name: mujoco_sim
+  project_name: sim_proxy
   build_mode_tags: []
   aimrt_import_options:
     AIMRT_BUILD_TESTS: "OFF"
@@ -11,41 +11,32 @@ base_info:
     AIMRT_BUILD_WITH_PROTOBUF: "ON"
     AIMRT_USE_LOCAL_PROTOC_COMPILER: "OFF"
     AIMRT_USE_PROTOC_PYTHON_PLUGIN: "OFF"
-    AIMRT_BUILD_WITH_ROS2: "OFF"
-    AIMRT_BUILD_NET_PLUGIN: "OFF"
-    AIMRT_BUILD_ROS2_PLUGIN: "OFF"
+    AIMRT_BUILD_WITH_ROS2: "ON"
+    AIMRT_BUILD_NET_PLUGIN: "ON"
+    AIMRT_BUILD_ROS2_PLUGIN: "ON"
     AIMRT_BUILD_MQTT_PLUGIN: "OFF"
     AIMRT_BUILD_ZENOH_PLUGIN: "OFF"
     AIMRT_BUILD_ICEORYX_PLUGIN: "OFF"
     
 # Module
 modules:
-  - name: ctrl_module
+  - name: proxy_module
 
 # pkg 
 pkgs:
-#   - name: sim_rviz_pkg
-#     modules:
-#       - name: rviz_module
-#         namespace: local
-  - name: sim_mujoco_pkg
+  - name: sim_proxy_pkg
     modules:
-      - name: ctrl_module
+      - name: proxy_module
         namespace: local
 
 # 部署（.yaml，名称为[name]_[deploy_ins[name]]_cfg.yaml）
 # 例如下面pb部署模块的文件为：pb_rpc_cfg.yaml   
 deploy_modes:
-  # - name: sim
-  #   deploy_ins:
-  #     - name: rviz
-  #       pkgs:
-  #         - name: sim_rviz_pkg
   - name: sim
     deploy_ins:
-      - name: mujoco
+      - name: proxy
         pkgs:
-          - name: sim_mujoco_pkg
+          - name: sim_proxy_pkg
 
 # 协议
 # protocols:

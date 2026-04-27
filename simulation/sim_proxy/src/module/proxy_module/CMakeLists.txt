@@ -37,6 +37,6 @@ target_link_libraries(
          aimrt::protocols::sensor_pb_gencode)
 
 # Set test of target
-if(MUJOCO_SIM_BUILD_TESTS AND test_files)
+if(SIM_PROXY_BUILD_TESTS AND test_files)
   add_gtest_target(TEST_TARGET ${CUR_TARGET_NAME} TEST_SRC ${test_files})
 endif()

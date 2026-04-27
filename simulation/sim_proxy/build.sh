@@ -7,7 +7,7 @@ set -ex
 cmake -B build \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX=./build/install \
-    -DMUJOCO_SIM_BUILD_TESTS=OFF \
+    -DSIM_PROXY_BUILD_TESTS=OFF \
     $@
 
 if [ -d ./build/install ]; then

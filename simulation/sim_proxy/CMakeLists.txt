@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(mujoco_sim LANGUAGES C CXX)
+project(sim_proxy LANGUAGES C CXX)
 
 # Set cmake path
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
@@ -26,7 +26,7 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
   set(BUILD_SHARED_LIBS OFF)
 
   if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    if(MUJOCO_SIM_BUILD_TESTS)
+    if(SIM_PROXY_BUILD_TESTS)
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
       set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} --coverage")
     endif()
@@ -49,9 +49,8 @@ endif()
 
 # Include cmake module
 include(NamespaceTool)
-include(GetAimRTMujocoSim)
 
-if(MUJOCO_SIM_BUILD_TESTS)
+if(SIM_PROXY_BUILD_TESTS)
   include(GetGTest)
   enable_testing()
 endif()

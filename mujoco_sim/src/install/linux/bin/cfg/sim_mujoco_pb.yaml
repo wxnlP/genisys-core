@@ -1,0 +1,104 @@
+aimrt:
+  log:
+    core_lvl: INFO # Trace/Debug/Info/Warn/Error/Fatal/Off
+    backends:
+      - type: console
+  module:
+    pkgs:
+      - path: ./libmujoco_sim_pkg.so # 官方仿真组件
+        disable_modules: []
+    modules:
+      - name: MujocoSimModule # 官方仿真组件
+        log_lvl: INFO
+  plugin:
+    plugins:
+      - name: echo_plugin
+        path: ./libsensor_pb_ts.so
+        options:
+          type_support_pkgs:
+            - path: ./libhardware_type_supprot_pkg.so      
+          topic_meta_list:
+            - topic_name: /mujoco/joint_state
+              msg_type: pb:aimrt.protocols.sensor.JointStateArray
+              echo_type: json
+      
+      - name: net_plugin
+        path: ./libaimrt_net_plugin.so
+        options:
+          thread_num: 4
+          http_options:
+            listen_ip: 127.0.0.1
+            listen_port: 50080
+
+  executor:
+    executors:
+      - name: gui_executor
+        type: simple_thread
+      - name: work_executor
+        type: asio_thread
+        options:
+          thread_num: 4
+
+  channel:
+    backends:
+      - type: local # 官方支持local后端
+        options:
+          subscriber_use_inline_executor: false
+          subscriber_executor: work_executor
+      - type: http
+        options:
+          pub_topics_options:
+            - topic_name: "(.*)"
+              server_url_list: ["127.0.0.1:50081"]
+
+    pub_topics_options:
+      - topic_name: "(.*)" # 正则表达式
+        enable_backends: [local, http]
+        enable_filters: []
+    sub_topics_options:
+      - topic_name: "(.*)" # 正则表达式
+        enable_backends: [local, http]
+        enable_filters: []
+
+
+# Module custom configuration
+MujocoSimModule:
+  simulation_model_path: ./cfg/model/GeniArm.xml
+  sim_executor: work_executor
+  gui_executor: gui_executor
+  subscriber_options:
+    - topic: /s6h4d/joint_cmd
+      type: joint_actuator
+      options:
+        joints:
+          - name: shoulder_actuator
+            bind_joint: shoulder_joint
+          - name: upper_arm_actuator
+            bind_joint: upper_arm_joint
+          - name: elbow_actuator
+            bind_joint: elbow_joint
+          - name: wrist1_actuator
+            bind_joint: wrist1_joint
+          - name: wrist2_actuator
+            bind_joint: wrist2_joint
+          - name: wrist3_actuator
+            bind_joint: wrist3_joint
+  publisher_options:
+    - topic: /mujoco/joint_state
+      frequency: 1
+      executor: work_executor
+      type: joint_sensor
+      options:
+        joints:
+          - name: shoulder_sensor
+            bind_joint: shoulder_joint
+          - name: upper_arm_sensor
+            bind_joint: upper_arm_joint
+          - name: elbow_sensor
+            bind_joint: elbow_joint
+          - name: wrist1_sensor
+            bind_joint: wrist1_joint
+          - name: wrist2_sensor
+            bind_joint: wrist2_joint
+          - name: wrist3_sensor
+            bind_joint: wrist3_joint

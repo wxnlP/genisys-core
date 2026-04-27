@@ -31,3 +31,7 @@ endif()
 if(BUILD_EXAMPLES)
     add_subdirectory(example)
 endif()
+
+if(BUILD_MUJOCO_SIM)
+    add_subdirectory(mujoco_sim)
+endif()

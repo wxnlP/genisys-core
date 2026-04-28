@@ -10,21 +10,19 @@
 // 打印 JointState_t 的各字段
 // ──────────────────────────────────────────────
 static void PrintJointState(const char* label,
-                             const ArmMotion::JointState_t& s) {
+                            const ArmMotion::JointState_t& s) {
   const char* kJointNames[6] = {"shoulder", "upper_arm", "elbow",
-                                 "wrist1",   "wrist2",    "wrist3"};
+                                "wrist1",   "wrist2",    "wrist3"};
 
   std::cout << "=== " << label << " ===\n";
   std::cout << std::fixed << std::setprecision(4);
-  std::cout << std::left << std::setw(12) << "joint"
-            << std::setw(12) << "pos(rad)"
-            << std::setw(12) << "vel(rad/s)"
-            << std::setw(12) << "effort(Nm)" << "\n";
+  std::cout << std::left << std::setw(12) << "joint" << std::setw(12)
+            << "pos(rad)" << std::setw(12) << "vel(rad/s)" << std::setw(12)
+            << "effort(Nm)" << "\n";
   std::cout << std::string(48, '-') << "\n";
   for (int i = 0; i < 6; ++i) {
-    std::cout << std::left << std::setw(12) << kJointNames[i]
-              << std::setw(12) << s.position.theta[i]
-              << std::setw(12) << s.velocity.theta[i]
+    std::cout << std::left << std::setw(12) << kJointNames[i] << std::setw(12)
+              << s.position.theta[i] << std::setw(12) << s.velocity.theta[i]
               << std::setw(12) << s.effort.theta[i] << "\n";
   }
   std::cout << "\n";
@@ -32,62 +30,41 @@ static void PrintJointState(const char* label,
 
 int main() {
   MujocoSimCtrl ctrl;
-
-  // ── 初始化 ──────────────────────────────────
   if (!ctrl.Init()) {
     std::cerr << "[ERROR] MujocoSimCtrl::Init() failed\n";
     return 1;
   }
-  std::cout << "[INFO] MujocoSimCtrl initialized\n\n";
 
-  // ── 测试 SetJointState ──────────────────────
-  // 构造一个测试指令：各关节角度逐步递增
-  ArmMotion::JointState_t cmd{};
-  cmd.position = {0.0, 0.0, -1.88, 0.0, 0.0, 0.0};  // 与 send_joint_cmd.sh 默认值一致
-  cmd.velocity = {};
-  cmd.effort   = {};
+  constexpr int kIntervalMs = 200;
+  constexpr int kPoints = 10;
+  constexpr double kPi = 3.14159265358979323846;
+  constexpr double kDegToRad = kPi / 180.0;
 
-  PrintJointState("SetJointState command", cmd);
+  // 小幅动作基准点。
+  const double base[6] = {0.0, 0.1, -1.4, 0.1, -0.1, 0.0};
+  const double amp[6] = {8.0 * kDegToRad, 10.0 * kDegToRad, 12.0 * kDegToRad,
+                         9.0 * kDegToRad, 7.0 * kDegToRad,  6.0 * kDegToRad};
+  const double phase[6] = {0.0, 0.5, 1.0, 1.5, 2.0, 2.5};
 
-  bool ok_set = ctrl.SetJointState(cmd);
-  if (ok_set) {
-    std::cout << "[INFO] SetJointState: OK (HTTP 200)\n\n";
-  } else {
-    std::cerr << "[WARN] SetJointState: FAILED (check if simulator is running "
-                 "at http://127.0.0.1:50080)\n\n";
-  }
+  std::cout << "[INFO] Send demo: publish " << kPoints << " points\n";
 
-  // 等待仿真响应稳定
-  std::this_thread::sleep_for(std::chrono::milliseconds(500));
+  for (int i = 0; i < kPoints; ++i) {
+    const double t = static_cast<double>(i) / static_cast<double>(kPoints - 1);
 
-  // ── 测试 GetJointState ──────────────────────
-  ArmMotion::JointState_t state{};
-  bool ok_get = ctrl.GetJointState(state);
-  if (ok_get) {
-    PrintJointState("GetJointState response", state);
-  } else {
-    std::cerr << "[WARN] GetJointState: FAILED (check if /mujoco/joint_state "
-                 "channel is publishing)\n\n";
-  }
-
-  // ── 简单往返测试：发送 → 读取 × 3 次 ──────
-  std::cout << "[INFO] Round-trip test (3 iterations)...\n";
-  for (int iter = 0; iter < 3; ++iter) {
-    // 每次改变 elbow 角度（0.5rad 步进）
-    cmd.position.theta[2] = -1.88 + iter * 0.5;
-    PrintJointState(("Send #" + std::to_string(iter + 1)).c_str(), cmd);
-
-    ok_set = ctrl.SetJointState(cmd);
-    std::cout << "  SetJointState: " << (ok_set ? "OK" : "FAILED") << "\n";
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(300));
-
-    ok_get = ctrl.GetJointState(state);
-    if (ok_get) {
-      PrintJointState(("Recv #" + std::to_string(iter + 1)).c_str(), state);
-    } else {
-      std::cout << "  GetJointState: FAILED\n\n";
+    ArmMotion::JointState_t cmd{};
+    for (int j = 0; j < 6; ++j) {
+      cmd.position.theta[j] =
+          base[j] + amp[j] * std::sin(2.0 * kPi * t + phase[j]);
+      cmd.velocity.theta[j] = 0.0;
+      cmd.effort.theta[j] = 0.0;
     }
+
+    PrintJointState(("Send #" + std::to_string(i + 1)).c_str(), cmd);
+
+    const bool ok = ctrl.SetJointState(cmd);
+    std::cout << "  SetJointState: " << (ok ? "OK" : "FAILED") << "\n\n";
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(kIntervalMs));
   }
 
   return 0;

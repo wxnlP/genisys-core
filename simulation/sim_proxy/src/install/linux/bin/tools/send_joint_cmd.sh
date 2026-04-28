@@ -74,5 +74,5 @@ EOF
 
 curl -i \
   -H 'content-type:application/json' \
-  -X POST 'http://127.0.0.1:50080/channel/%2Fs6h4d%2Fjoint_cmd/pb%3Aaimrt.protocols.sensor.JointCommandArray' \
+  -X POST 'http://127.0.0.1:50080/channel/%2Fmujoco%2Fjoint_cmd/pb%3Aaimrt.protocols.sensor.JointCommandArray' \
   -d "$JSON_DATA"

@@ -71,7 +71,7 @@ MujocoSimModule:
   sim_executor: work_executor
   gui_executor: gui_executor
   subscriber_options:
-    - topic: /s6h4d/joint_cmd
+    - topic: /mujoco/joint_cmd
       type: joint_actuator
       options:
         joints:
@@ -106,3 +106,7 @@ MujocoSimModule:
             bind_joint: wrist2_joint
           - name: wrist3_sensor
             bind_joint: wrist3_joint
+ProxyModule:
+  mujoco_joint_state_topic: /mujoco/joint_state
+  proxy_http_joint_state_topic: /sim/joint_state
+  http_server_executor: work_executor

@@ -50,9 +50,18 @@ bool MujocoSimCtrl::GetHttpResponse(ArmMotion::JointState_t& joint_state) {
   cli.set_write_timeout(2, 0);
 
   auto res = cli.Post(sub_channel_url_, json_request.dump(), "application/json");
-  if (res->status != 200) { return false; }
+  if (!res || res->status != 200) { return false; }
 
-  auto json_response = nlohmann::json::parse(res->body);
+  nlohmann::json json_response;
+  try {
+    json_response = nlohmann::json::parse(res->body);
+  } catch (const std::exception&) {
+    return false;
+  }
+
+  if (!json_response.contains("joints") || !json_response["joints"].is_array()) {
+    return false;
+  }
 
   for (const auto& joint : json_response["joints"]) {
     const std::string& name = joint["name"];
@@ -89,7 +98,7 @@ bool MujocoSimCtrl::GetHttpResponse(ArmMotion::JointState_t& joint_state) {
   return true;
 }
 
-bool MujocoSimCtrl::Init() {}
+bool MujocoSimCtrl::Init() { return true; }
 
 bool MujocoSimCtrl::SetJointState(const ArmMotion::JointState_t& joint_cmd) {
   return SendHttpRequest(joint_cmd);

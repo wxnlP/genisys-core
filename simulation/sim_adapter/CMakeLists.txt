@@ -10,7 +10,7 @@ target_include_directories(${SIM_ADAPTER_TARGET_NAME} PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(${SIM_ADAPTER_TARGET_NAME} PRIVATE
+target_link_libraries(${SIM_ADAPTER_TARGET_NAME} PUBLIC
   s6h4d_sdk
   sim_common_header
 )

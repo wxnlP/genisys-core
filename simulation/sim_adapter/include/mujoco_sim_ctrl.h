@@ -17,14 +17,12 @@ class MujocoSimCtrl : public ArmCtrlBase {
   bool GetHttpResponse(ArmMotion::JointState_t& joint_state);
 
   std::string http_host_{"127.0.0.1"};
-  int subscriber_port_{50081};
+  int subscriber_port_{8080};
   int publisher_port_{50080};
   const std::string pub_channel_url_{
-      "/channel/%2Fs6h4d%2Fjoint_cmd/"
+      "/channel/%2Fmujoco%2Fjoint_cmd/"
       "pb%3Aaimrt.protocols.sensor.JointCommandArray"};
-  const std::string sub_channel_url_{
-      "/channel/%2Fmujoco%2Fjoint_state/"
-      "pb%3Aaimrt.protocols.sensor.JointStateArray"};
+  const std::string sub_channel_url_{"/sim/joint_state"};
 
   ArmMotion::JointState_t current_joint_state_{};
 };

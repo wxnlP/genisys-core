@@ -1,0 +1,19 @@
+set(SIM_COMMON_HEADER_TARGET_NAME sim_common_header)
+
+add_library(${SIM_COMMON_HEADER_TARGET_NAME} INTERFACE) 
+
+target_include_directories(${SIM_COMMON_HEADER_TARGET_NAME} INTERFACE
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
+
+# 安装静态库目标
+install(TARGETS ${SIM_COMMON_HEADER_TARGET_NAME}
+    ARCHIVE DESTINATION lib
+    LIBRARY DESTINATION lib
+    RUNTIME DESTINATION bin
+)
+
+# 安装头文件
+install(DIRECTORY include/
+    DESTINATION include/${SIM_COMMON_HEADER_TARGET_NAME}
+)

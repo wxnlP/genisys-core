@@ -1,129 +1,9 @@
 #include "mujoco_sim_ctrl.h"
 
-#include <array>
-#include <cctype>
+#include "nlohmann_json.hpp"
 #include <string>
 
-#include "json.hpp"
-
-namespace {
-
-std::string NormalizeJointName(std::string name) {
-  constexpr char kActuatorSuffix[] = "_actuator";
-
-  if (name.size() > sizeof(kActuatorSuffix) - 1 &&
-      name.compare(name.size() - (sizeof(kActuatorSuffix) - 1),
-                   sizeof(kActuatorSuffix) - 1, kActuatorSuffix) == 0) {
-    name.erase(name.size() - (sizeof(kActuatorSuffix) - 1));
-  }
-
-  for (char& ch : name) {
-    ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
-  }
-
-  return name;
-}
-
-bool TryGetJointIndex(const std::string& name, std::size_t& index) {
-  const std::string normalized = NormalizeJointName(name);
-
-  if (normalized == "shoulder") {
-    index = 0;
-    return true;
-  }
-  if (normalized == "upper_arm") {
-    index = 1;
-    return true;
-  }
-  if (normalized == "elbow") {
-    index = 2;
-    return true;
-  }
-  if (normalized == "wrist1") {
-    index = 3;
-    return true;
-  }
-  if (normalized == "wrist2") {
-    index = 4;
-    return true;
-  }
-  if (normalized == "wrist3") {
-    index = 5;
-    return true;
-  }
-
-  return false;
-}
-
-bool ParseJointStateJson(const nlohmann::json& json_resp,
-                         ArmMotion::JointState_t& parsed_state) {
-  if (!json_resp.contains("joints") || !json_resp["joints"].is_array()) {
-    return false;
-  }
-
-  ArmMotion::JointState_t tmp{};
-  std::array<bool, 6> assigned{false, false, false, false, false, false};
-  std::size_t fallback_index = 0;
-
-  for (const auto& joint_json : json_resp["joints"]) {
-    if (!joint_json.is_object()) continue;
-
-    std::size_t idx = 0;
-    bool has_named_index = false;
-    if (joint_json.contains("name") && joint_json["name"].is_string()) {
-      has_named_index =
-          TryGetJointIndex(joint_json["name"].get<std::string>(), idx);
-    }
-
-    if (!has_named_index) {
-      while (fallback_index < 6 && assigned[fallback_index]) {
-        ++fallback_index;
-      }
-      if (fallback_index >= 6) continue;
-      idx = fallback_index;
-    }
-
-    if (joint_json.contains("position") && joint_json["position"].is_number()) {
-      tmp.position.theta[idx] = joint_json["position"].get<double>();
-    }
-    if (joint_json.contains("velocity") && joint_json["velocity"].is_number()) {
-      tmp.velocity.theta[idx] = joint_json["velocity"].get<double>();
-    }
-    if (joint_json.contains("effort") && joint_json["effort"].is_number()) {
-      tmp.effort.theta[idx] = joint_json["effort"].get<double>();
-    }
-
-    if (joint_json.contains("accel") && joint_json["accel"].is_number()) {
-      tmp.accel.theta[idx] = joint_json["accel"].get<double>();
-    } else if (joint_json.contains("acceleration") &&
-               joint_json["acceleration"].is_number()) {
-      tmp.accel.theta[idx] = joint_json["acceleration"].get<double>();
-    }
-
-    assigned[idx] = true;
-  }
-
-  for (bool ok : assigned) {
-    if (!ok) return false;
-  }
-
-  parsed_state = tmp;
-  return true;
-}
-
-}  // namespace
-
-MujocoSimCtrl::~MujocoSimCtrl() {
-  if (receiver_started_) {
-    svr_.stop();
-    if (receiver_thread_.joinable()) {
-      receiver_thread_.join();
-    }
-  }
-}
-
 bool MujocoSimCtrl::SendHttpRequest(const ArmMotion::JointState_t& joint_cmd) {
-  // Convert joint_cmd to JSON
   nlohmann::json json_cmd;
   json_cmd["joints"] = nlohmann::json::array();
 
@@ -137,7 +17,6 @@ bool MujocoSimCtrl::SendHttpRequest(const ArmMotion::JointState_t& joint_cmd) {
                                   {"damping", 0.0}});
   };
 
-  // Keep names aligned with mujoco install tools and XML actuator names.
   add_joint("shoulder_actuator", joint_cmd.position.theta[0],
             joint_cmd.velocity.theta[0], joint_cmd.effort.theta[0]);
   add_joint("upper_arm_actuator", joint_cmd.position.theta[1],
@@ -151,66 +30,66 @@ bool MujocoSimCtrl::SendHttpRequest(const ArmMotion::JointState_t& joint_cmd) {
   add_joint("wrist3_actuator", joint_cmd.position.theta[5],
             joint_cmd.velocity.theta[5], joint_cmd.effort.theta[5]);
 
-  httplib::Client cli(client_host_);
+  httplib::Client cli(http_host_, publisher_port_);
   cli.set_connection_timeout(2, 0);
   cli.set_read_timeout(2, 0);
   cli.set_write_timeout(2, 0);
 
-  auto res =
-      cli.Post(pub_channel_url_.c_str(), json_cmd.dump(), "application/json");
+  auto res = cli.Post(pub_channel_url_, json_cmd.dump(), "application/json");
 
   return res && res->status == 200;
 }
 
 bool MujocoSimCtrl::GetHttpResponse(ArmMotion::JointState_t& joint_state) {
-  std::lock_guard<std::mutex> lk(state_mtx_);
-  if (!has_state_) {
-    return false;
+  nlohmann::json json_request;
+
+  json_request["joints"] = 6;
+  httplib::Client cli(http_host_, subscriber_port_);
+  cli.set_connection_timeout(2, 0);
+  cli.set_read_timeout(2, 0);
+  cli.set_write_timeout(2, 0);
+
+  auto res = cli.Post(sub_channel_url_, json_request.dump(), "application/json");
+  if (res->status != 200) { return false; }
+
+  auto json_response = nlohmann::json::parse(res->body);
+
+  for (const auto& joint : json_response["joints"]) {
+    const std::string& name = joint["name"];
+    double position = joint["position"];
+    double velocity = joint["velocity"];
+    double effort = joint["effort"];
+
+    if (name == "shoulder_sensor") {
+      joint_state.position.theta[0] = position;
+      joint_state.velocity.theta[0] = velocity;
+      joint_state.effort.theta[0] = effort;
+    } else if (name == "upper_arm_sensor") {
+      joint_state.position.theta[1] = position;
+      joint_state.velocity.theta[1] = velocity;
+      joint_state.effort.theta[1] = effort;
+    } else if (name == "elbow_sensor") {
+      joint_state.position.theta[2] = position;
+      joint_state.velocity.theta[2] = velocity;
+      joint_state.effort.theta[2] = effort;
+    } else if (name == "wrist1_sensor") {
+      joint_state.position.theta[3] = position;
+      joint_state.velocity.theta[3] = velocity;
+      joint_state.effort.theta[3] = effort;
+    } else if (name == "wrist2_sensor") {
+      joint_state.position.theta[4] = position;
+      joint_state.velocity.theta[4] = velocity;
+      joint_state.effort.theta[4] = effort;
+    } else if (name == "wrist3_sensor") {
+      joint_state.position.theta[5] = position;
+      joint_state.velocity.theta[5] = velocity;
+      joint_state.effort.theta[5] = effort;
+    }
   }
-  joint_state = current_joint_state_;
   return true;
 }
 
-bool MujocoSimCtrl::StartStateReceiver() {
-  if (receiver_started_) {
-    return true;
-  }
-
-  svr_.Post(sub_channel_url_.c_str(),
-            [this](const httplib::Request& req, httplib::Response& res) {
-              nlohmann::json json_resp;
-              try {
-                json_resp = nlohmann::json::parse(req.body);
-              } catch (...) {
-                res.status = 400;
-                return;
-              }
-
-              ArmMotion::JointState_t parsed_state{};
-              if (!ParseJointStateJson(json_resp, parsed_state)) {
-                res.status = 400;
-                return;
-              }
-
-              {
-                std::lock_guard<std::mutex> lk(state_mtx_);
-                current_joint_state_ = parsed_state;
-                has_state_ = true;
-              }
-              res.status = 200;
-            });
-
-  if (!svr_.bind_to_port(server_listen_ip_.c_str(), server_listen_port_)) {
-    return false;
-  }
-
-  receiver_thread_ = std::thread([this]() { svr_.listen_after_bind(); });
-
-  receiver_started_ = true;
-  return true;
-}
-
-bool MujocoSimCtrl::Init() { return StartStateReceiver(); }
+bool MujocoSimCtrl::Init() {}
 
 bool MujocoSimCtrl::SetJointState(const ArmMotion::JointState_t& joint_cmd) {
   return SendHttpRequest(joint_cmd);

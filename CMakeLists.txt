@@ -33,5 +33,7 @@ if(BUILD_EXAMPLES)
 endif()
 
 if(BUILD_SIM_PROXY)
+    add_subdirectory(simulation/common_header)
     add_subdirectory(simulation/sim_proxy)
+    add_subdirectory(simulation/sim_adapter)
 endif()

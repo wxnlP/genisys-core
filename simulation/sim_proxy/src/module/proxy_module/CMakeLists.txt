@@ -34,7 +34,8 @@ target_link_libraries(
   PUBLIC aimrt::interface::aimrt_module_cpp_interface
          aimrt::interface::aimrt_module_protobuf_interface
          aimrt::protocols::actuator_pb_gencode
-         aimrt::protocols::sensor_pb_gencode)
+         aimrt::protocols::sensor_pb_gencode
+         sim_common_header)
 
 # Set test of target
 if(SIM_PROXY_BUILD_TESTS AND test_files)

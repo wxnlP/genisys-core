@@ -57,7 +57,7 @@ aimrt:
 
     pub_topics_options:
       - topic_name: "(.*)" # 正则表达式
-        enable_backends: [local, http]
+        enable_backends: [local]
         enable_filters: []
     sub_topics_options:
       - topic_name: "(.*)" # 正则表达式

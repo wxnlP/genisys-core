@@ -57,6 +57,7 @@ endif()
 
 set(YAML_CPP_INSTALL ON)
 include(GetAimRT)
+include(GetMujocoSim)
 
 # find_package(rclcpp REQUIRED)
 

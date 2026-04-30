@@ -4,6 +4,7 @@
 #include <iostream>
 #include <thread>
 
+#include "arm_logger.h"
 #include "mujoco_sim_ctrl.h"
 
 // ──────────────────────────────────────────────
@@ -31,7 +32,7 @@ static void PrintJointState(const char* label,
 int main() {
   MujocoSimCtrl ctrl;
   if (!ctrl.Init()) {
-    std::cerr << "[ERROR] MujocoSimCtrl::Init() failed\n";
+    ARM_LOG_ERROR("MujocoSimCtrl::Init() failed");
     return 1;
   }
 
@@ -46,7 +47,7 @@ int main() {
                          9.0 * kDegToRad, 7.0 * kDegToRad,  6.0 * kDegToRad};
   const double phase[6] = {0.0, 0.5, 1.0, 1.5, 2.0, 2.5};
 
-  std::cout << "[INFO] Send demo: publish " << kPoints << " points\n";
+  ARM_LOG_INFO("Send demo: publish {} points", kPoints);
 
   for (int i = 0; i < kPoints; ++i) {
     const double t = static_cast<double>(i) / static_cast<double>(kPoints - 1);
@@ -62,7 +63,7 @@ int main() {
     PrintJointState(("Send #" + std::to_string(i + 1)).c_str(), cmd);
 
     const bool ok = ctrl.SetJointState(cmd);
-    std::cout << "  SetJointState: " << (ok ? "OK" : "FAILED") << "\n\n";
+    ARM_LOG_INFO("SetJointState: {}", ok ? "OK" : "FAILED");
 
     std::this_thread::sleep_for(std::chrono::milliseconds(kIntervalMs));
   }

@@ -12,22 +12,24 @@
 #include "kinematic.h"
 #include "lspb_time_scaler.h"
 
-class S6h4dInstance {
+class ArmInstance {
  public:
   // 切换真机与仿真时，构造函数传入的arm_ctrl对象不同
-  S6h4dInstance(ArmCtrlBase& arm_ctrl, ArmMotion::MDHConfig_t& mdh_config)
+  ArmInstance(ArmCtrlBase& arm_ctrl, ArmMotion::MDHConfig_t& mdh_config)
       : arm_ctrl_(arm_ctrl) {
     kinematic_solver_ = std::make_unique<KinematicSolver>(mdh_config);
     jacobian_ = std::make_unique<Jacobian6Dof>(mdh_config);
     arm_ctrl_.Init();
   }
-  ~S6h4dInstance() = default;
+  ~ArmInstance() = default;
 
   void Enable();
   void Disable();
 
   int MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a, double t);
   int MoveJ(ArmMotion::Joint6Dof_t target_joint, double v, double a, double t);
+  int GetCurrentPose(ArmMotion::Pose6Dof_t& current_pose);
+  int GetCurrentJoint(ArmMotion::Joint6Dof_t& current_joint);
 
  private:
   bool SelectBestIKSolve(const ArmMotion::IKSolves_t& ik_solves,
@@ -41,4 +43,7 @@ class S6h4dInstance {
 
   ArmCtrlBase& arm_ctrl_;
   const double dt_ = 0.01;
+  // 关节限位（弧度）
+  double joint_min_[6]{-3.1416, -1.570, -1.5708, -3.1416, -1.5708, -3.14};
+  double joint_max_[6]{3.1416, 2.6, 1.5708, 3.1416, 1.5708, 3.14};
 };

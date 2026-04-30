@@ -4,6 +4,7 @@
 #include <iostream>
 #include <thread>
 
+#include "arm_logger.h"
 #include "mujoco_sim_ctrl.h"
 
 static void PrintJointState(const char* label,
@@ -35,14 +36,14 @@ void SignalHandler(int /*signum*/) { g_running = 0; }
 int main() {
   MujocoSimCtrl ctrl;
   if (!ctrl.Init()) {
-    std::cerr << "[ERROR] MujocoSimCtrl::Init() failed\n";
+    ARM_LOG_ERROR("MujocoSimCtrl::Init() failed");
     return 1;
   }
 
   constexpr int kIntervalMs = 100;
   std::signal(SIGINT, SignalHandler);
 
-  std::cout << "[INFO] Read demo started, press Ctrl+C to stop.\n\n";
+  ARM_LOG_INFO("Read demo started, press Ctrl+C to stop.");
 
   int iter = 0;
   while (g_running) {
@@ -52,12 +53,12 @@ int main() {
     if (ok) {
       PrintJointState(("Read #" + std::to_string(++iter)).c_str(), state);
     } else {
-      std::cerr << "[WARN] GetJointState failed\n\n";
+      ARM_LOG_WARN("GetJointState failed");
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(kIntervalMs));
   }
 
-  std::cout << "\n[INFO] Read demo stopped.\n";
+  ARM_LOG_INFO("Read demo stopped.");
   return 0;
 }

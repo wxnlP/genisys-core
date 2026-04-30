@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <iostream>
 
+#include "arm_logger.h"
 #include "cartesian_linear_path.h"
 #include "cartesian_trajectory.h"
 #include "cubic_time_scaler.h"
@@ -105,7 +106,7 @@ int main() {
   TimeScalerBase::PlanConfig joint_config;
   joint_config.T = 2.0;
   if (!joint_scaler.Plan(joint_config)) {
-    std::cerr << "joint time scaler plan failed\n";
+    ARM_LOG_ERROR("joint time scaler plan failed");
     return 1;
   }
 
@@ -132,7 +133,7 @@ int main() {
   cartesian_config.v_max = 0.75;
   cartesian_config.a_max = 1.0;
   if (!cartesian_scaler.Plan(cartesian_config)) {
-    std::cerr << "cartesian time scaler plan failed\n";
+    ARM_LOG_ERROR("cartesian time scaler plan failed");
     return 1;
   }
 
@@ -144,7 +145,7 @@ int main() {
   double last_sample_time = 0.0;
 
   if (!joint_csv.is_open() || !cartesian_csv.is_open()) {
-    std::cerr << "failed to open csv output files\n";
+    ARM_LOG_ERROR("failed to open csv output files");
     return 1;
   }
 
@@ -158,11 +159,11 @@ int main() {
     ArmMotion::CartesianTrajectoryPoint_t cartesian_point;
 
     if (!SampleJointPoint(joint_trajectory, t, joint_point)) {
-      std::cerr << "joint trajectory sample failed at t=" << t << '\n';
+      ARM_LOG_ERROR("joint trajectory sample failed at t={}", t);
       return 1;
     }
     if (!SampleCartesianPoint(cartesian_trajectory, t, cartesian_point)) {
-      std::cerr << "cartesian trajectory sample failed at t=" << t << '\n';
+      ARM_LOG_ERROR("cartesian trajectory sample failed at t={}", t);
       return 1;
     }
 
@@ -174,29 +175,28 @@ int main() {
   const std::array<double, 3> sample_times{0.0, total_duration * 0.5,
                                            last_sample_time};
 
-  std::cout << "Joint trajectory key samples\n";
+  ARM_LOG_INFO("Joint trajectory key samples");
   for (double t : sample_times) {
     ArmMotion::JointTrajectoryPoint_t point;
     if (!SampleJointPoint(joint_trajectory, t, point)) {
-      std::cerr << "joint trajectory sample failed at t=" << t << '\n';
+      ARM_LOG_ERROR("joint trajectory sample failed at t={}", t);
       return 1;
     }
     PrintJointPoint(point);
   }
 
-  std::cout << "\nCartesian trajectory samples\n";
+  ARM_LOG_INFO("Cartesian trajectory samples");
   for (double t : sample_times) {
     ArmMotion::CartesianTrajectoryPoint_t point;
     if (!SampleCartesianPoint(cartesian_trajectory, t, point)) {
-      std::cerr << "cartesian trajectory sample failed at t=" << t << '\n';
+      ARM_LOG_ERROR("cartesian trajectory sample failed at t={}", t);
       return 1;
     }
     PrintCartesianPoint(point);
   }
 
-  std::cout << "\nCSV exported: joint_pos.csv, cartesian.csv\n";
-  std::cout << "Sampling step: " << dt << " s, duration: " << total_duration
-            << " s\n";
+  ARM_LOG_INFO("CSV exported: joint_pos.csv, cartesian.csv");
+  ARM_LOG_INFO("Sampling step: {} s, duration: {} s", dt, total_duration);
 
   return 0;
 }

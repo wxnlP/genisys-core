@@ -1,38 +1,18 @@
-#include "s6h4d_instance.h"
+#include "arm_instance.h"
 
 #include <cmath>
 #include <limits>
 #include <thread>
 
-namespace {
+#include "arm_logger.h"
 
-double WrapToPi(double angle) {
-  constexpr double kTwoPi = 2.0 * M_PI;
-  while (angle > M_PI) {
-    angle -= kTwoPi;
-  }
-  while (angle <= -M_PI) {
-    angle += kTwoPi;
-  }
-  return angle;
-}
-
-double JointDistanceSq(const ArmMotion::Joint6Dof_t& lhs,
-                       const ArmMotion::Joint6Dof_t& rhs) {
-  double dist_sq = 0.0;
-  for (int i = 0; i < 6; ++i) {
-    const double diff = WrapToPi(lhs.theta[i] - rhs.theta[i]);
-    dist_sq += diff * diff;
-  }
-  return dist_sq;
-}
-
-}  // namespace
-
-bool S6h4dInstance::SelectBestIKSolve(
+bool ArmInstance::SelectBestIKSolve(
     const ArmMotion::IKSolves_t& ik_solves,
     const ArmMotion::Joint6Dof_t& reference_joint,
     ArmMotion::Joint6Dof_t& selected_joint) const {
+  constexpr double kPi = M_PI;
+  constexpr double kTwoPi = 2.0 * kPi;
+
   double best_score = std::numeric_limits<double>::infinity();
   bool found_valid_solve = false;
 
@@ -46,7 +26,17 @@ bool S6h4dInstance::SelectBestIKSolve(
       continue;
     }
 
-    double score = JointDistanceSq(ik_solves.solves[i], reference_joint);
+    double score = 0.0;
+    for (int j = 0; j < 6; ++j) {
+      double diff = ik_solves.solves[i].theta[j] - reference_joint.theta[j];
+      while (diff > kPi) {
+        diff -= kTwoPi;
+      }
+      while (diff <= -kPi) {
+        diff += kTwoPi;
+      }
+      score += diff * diff;
+    }
 
     // 对奇异位形解加入轻微惩罚，优先选择常规可逆解。
     if (j1_flag < 0) {
@@ -69,17 +59,19 @@ bool S6h4dInstance::SelectBestIKSolve(
   return found_valid_solve;
 }
 
-int S6h4dInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
+int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
                          double t) {
   // 获取当前关节状态作为起始位置
   ArmMotion::JointState_t current_state;
   if (!arm_ctrl_.GetJointState(current_state)) {
+    ARM_LOG_ERROR("[MoveL] failed: GetJointState at start");
     return -1;
   }
 
   // 通过正运动学获取当前笛卡尔位置
   ArmMotion::Pose6Dof_t current_pose;
   if (!kinematic_solver_->FK(current_state.position, current_pose)) {
+    ARM_LOG_ERROR("[MoveL] failed: FK at start");
     return -1;
   }
 
@@ -95,19 +87,23 @@ int S6h4dInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
 
   if (!time_scaler.Plan(config)) {
     // 处理规划失败的情况
+    ARM_LOG_ERROR("[MoveL] failed: time scaler plan");
     return -1;
   }
 
   // 创建笛卡尔轨迹
-  cartesian_trajectory_ =
-      std::make_unique<CartesianTrajectory>(path, time_scaler);
+  cartesian_trajectory_ = std::make_unique<CartesianTrajectory>(path, time_scaler);
   double duration = cartesian_trajectory_->GetDuration();
 
   double current_time = 0.0;
   while (current_time <= (duration + 1e-7)) {
+    if (current_time > duration) {
+      current_time = duration;
+    }
     ArmMotion::CartesianTrajectoryPoint_t cart_point;
     if (!cartesian_trajectory_->Sample(current_time, cart_point)) {
       // 处理采样失败的情况
+      ARM_LOG_ERROR("[MoveL] failed: Sample at t={}", current_time);
       return -1;
     }
 
@@ -115,13 +111,16 @@ int S6h4dInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
     ArmMotion::IKSolves_t ik_solves;
     if (!kinematic_solver_->IK(cart_point.pose, current_state.position,
                                ik_solves)) {
-      // 处理逆解失败的情况
+      ARM_LOG_ERROR("[MoveL] failed: IK at t={}, pose=({}, {}, {})",
+                    current_time, cart_point.pose.x, cart_point.pose.y,
+                    cart_point.pose.z);
       return -1;
     }
 
     // 选择最优逆解：过滤不可达解并优先选与当前姿态最接近的解。
     ArmMotion::Joint6Dof_t target_joint;
     if (!SelectBestIKSolve(ik_solves, current_state.position, target_joint)) {
+      ARM_LOG_ERROR("[MoveL] failed: no valid IK solve at t={}", current_time);
       return -1;
     }
 
@@ -137,7 +136,10 @@ int S6h4dInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
     // 发送控制命令到机械臂
     ArmMotion::JointState_t joint_cmd{
         .position = target_joint, .velocity = joint_vel, .accel = joint_acc};
-    arm_ctrl_.SetJointState(joint_cmd);
+    if (!arm_ctrl_.SetJointState(joint_cmd)) {
+      ARM_LOG_ERROR("[MoveL] failed: SetJointState at t={}", current_time);
+      return -1;
+    }
 
     // 更新当前关节状态用于下一步的逆解初值
     current_state.position = target_joint;
@@ -149,16 +151,30 @@ int S6h4dInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
   return 0;
 }
 
-int S6h4dInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
+int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
                          double a, double t) {
-  ArmMotion::Joint6Dof_t start_joint;
+  for (int i = 0; i < 6; i++) {
+    if (target_joint.theta[i] < joint_min_[i] || target_joint.theta[i] > joint_max_[i]) {
+      ARM_LOG_ERROR("[MoveJ] target joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
+                    i, target_joint.theta[i], joint_min_[i], joint_max_[i]);
+      return -1;
+    }
+  }
+  
+  ArmMotion::JointState_t current_state;
+  if (!arm_ctrl_.GetJointState(current_state)) {
+    ARM_LOG_ERROR("[MoveJ] failed: GetJointState at start");
+    return -1;
+  }
+
+  ArmMotion::Joint6Dof_t start_joint = current_state.position;
   JointPath path(start_joint, target_joint);
   CubicTimeScaler time_scaler;
   CubicTimeScaler::PlanConfig config;
   config.T = t;
 
   if (!time_scaler.Plan(config)) {
-    // 处理规划失败的情况
+    ARM_LOG_ERROR("[MoveJ] failed: time scaler plan");
     return -1;
   }
 
@@ -167,17 +183,34 @@ int S6h4dInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
 
   double current_time = 0.0;
   while (current_time <= (duration + 1e-7)) {
+    if (current_time > duration) {
+      current_time = duration;
+    }
     ArmMotion::JointTrajectoryPoint_t point;
     if (!joint_trajectory_->Sample(current_time, point)) {
-      // 处理采样失败的情况
+      ARM_LOG_ERROR("[MoveJ] failed: Sample at t={}", current_time);
       return -1;
     }
 
-    // 发送控制命令到机械臂
     ArmMotion::JointState_t joint_cmd{.position = point.position,
                                       .velocity = point.velocity,
                                       .accel = point.acceleration};
-    arm_ctrl_.SetJointState(joint_cmd);
+    if (!arm_ctrl_.SetJointState(joint_cmd)) {
+      ARM_LOG_ERROR(
+          "[MoveJ] failed: SetJointState at t={}, q0={}, q1={}, q2={}",
+          current_time, point.position.theta[0], point.position.theta[1],
+          point.position.theta[2]);
+      return -1;
+    }
+
+    // 采样后
+    for (int i = 0; i < 6; ++i) {
+      if (point.position.theta[i] < joint_min_[i] || point.position.theta[i] > joint_max_[i]) {
+        ARM_LOG_WARN("[MoveJ] trajectory point joint[{}]={:.4f} out of limit at t={}",
+                    i, point.position.theta[i], current_time);
+        return -1;
+      }
+    }
 
     // 等待下一次循环，确保按照 dt_ 的频率执行
     std::this_thread::sleep_for(std::chrono::duration<double>(dt_));

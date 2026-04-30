@@ -67,7 +67,7 @@ aimrt:
 
 # Module custom configuration
 MujocoSimModule:
-  simulation_model_path: ./cfg/model/GeniArm.xml
+  simulation_model_path: ./cfg/model/GeniArm_with_table.xml
   sim_executor: work_executor
   gui_executor: gui_executor
   subscriber_options:

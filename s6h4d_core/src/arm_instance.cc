@@ -218,3 +218,26 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
   }
   return 0;
 }
+
+int ArmInstance::GetCurrentPose(ArmMotion::Pose6Dof_t &current_pose) {
+  ArmMotion::JointState_t current_state;
+  if (!arm_ctrl_.GetJointState(current_state)) {
+    ARM_LOG_ERROR("[GetCurrentPose] failed: GetJointState");
+    return -1;
+  }
+  if (!kinematic_solver_->FK(current_state.position, current_pose)) {
+    ARM_LOG_ERROR("[GetCurrentPose] failed: FK");
+    return -1;
+  }
+  return 0;
+}
+
+int ArmInstance::GetCurrentJoint(ArmMotion::Joint6Dof_t &current_joint) {
+  ArmMotion::JointState_t current_state;
+  if (!arm_ctrl_.GetJointState(current_state)) {
+    ARM_LOG_ERROR("[GetCurrentJoint] failed: GetJointState");
+    return -1;
+  }
+  current_joint = current_state.position;
+  return 0;
+}

@@ -6,6 +6,44 @@
 
 #include "arm_logger.h"
 
+namespace {
+
+double JointPathLength(const ArmMotion::Joint6Dof_t& q0,
+                       const ArmMotion::Joint6Dof_t& q1) {
+  double sum = 0.0;
+  for (int i = 0; i < 6; ++i) {
+    const double d = q1.theta[i] - q0.theta[i];
+    sum += d * d;
+  }
+  return std::sqrt(sum);
+}
+
+double CartesianPosDistance(const ArmMotion::Pose6Dof_t& p0,
+                            const ArmMotion::Pose6Dof_t& p1) {
+  const double dx = p1.x - p0.x;
+  const double dy = p1.y - p0.y;
+  const double dz = p1.z - p0.z;
+  return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+bool BuildLspbConfigFromPhysicalVA(double path_length, double v_phys,
+                                   double a_phys, double t,
+                                   TimeScalerBase::PlanConfig& config) {
+  constexpr double kEps = 1e-9;
+  if (path_length <= kEps || v_phys <= 0.0 || a_phys <= 0.0) {
+    return false;
+  }
+
+  // 将物理单位速度/加速度换算为归一化路径参数速度/加速度。
+  // s ∈ [0,1], path = p(s), 其中 ds/dt = sd。
+  config.T = t;
+  config.v_max = v_phys / path_length;
+  config.a_max = a_phys / path_length;
+  return true;
+}
+
+}  // namespace
+
 bool ArmInstance::SelectBestIKSolve(
     const ArmMotion::IKSolves_t& ik_solves,
     const ArmMotion::Joint6Dof_t& reference_joint,
@@ -52,6 +90,17 @@ bool ArmInstance::SelectBestIKSolve(
     if (score < best_score) {
       best_score = score;
       selected_joint = ik_solves.solves[i];
+      // 将候选解展开到 reference_joint 邻域，避免 ±2pi 等价角导致的突跳。
+      for (int j = 0; j < 6; ++j) {
+        double d = selected_joint.theta[j] - reference_joint.theta[j];
+        while (d > kPi) {
+          d -= kTwoPi;
+        }
+        while (d <= -kPi) {
+          d += kTwoPi;
+        }
+        selected_joint.theta[j] = reference_joint.theta[j] + d;
+      }
       found_valid_solve = true;
     }
   }
@@ -60,7 +109,7 @@ bool ArmInstance::SelectBestIKSolve(
 }
 
 int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
-                         double t) {
+                       double t) {
   // 获取当前关节状态作为起始位置
   ArmMotion::JointState_t current_state;
   if (!arm_ctrl_.GetJointState(current_state)) {
@@ -78,12 +127,20 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
   // 创建笛卡尔路径（直线路径）
   CartesianLinearPath path(current_pose, target_pose);
 
+  const double path_length = CartesianPosDistance(current_pose, target_pose);
+  if (path_length <= 1e-9) {
+    ARM_LOG_WARN("[MoveL] skip: path length too small");
+    return 0;
+  }
+
   // 创建 LSPB 时间缩放器用于速度加速度约束
   LSPBTimeScaler time_scaler;
   TimeScalerBase::PlanConfig config;
-  config.T = t;
-  config.v_max = v;
-  config.a_max = a;
+  if (!BuildLspbConfigFromPhysicalVA(path_length, v, a, t, config)) {
+    ARM_LOG_ERROR("[MoveL] failed: invalid args (path_length={}, v={}, a={})",
+                  path_length, v, a);
+    return -1;
+  }
 
   if (!time_scaler.Plan(config)) {
     // 处理规划失败的情况
@@ -152,7 +209,7 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
 }
 
 int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
-                         double a, double t) {
+                       double a, double t) {
   for (int i = 0; i < 6; i++) {
     if (target_joint.theta[i] < joint_min_[i] || target_joint.theta[i] > joint_max_[i]) {
       ARM_LOG_ERROR("[MoveJ] target joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
@@ -160,7 +217,7 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
       return -1;
     }
   }
-  
+
   ArmMotion::JointState_t current_state;
   if (!arm_ctrl_.GetJointState(current_state)) {
     ARM_LOG_ERROR("[MoveJ] failed: GetJointState at start");
@@ -168,10 +225,20 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
   }
 
   ArmMotion::Joint6Dof_t start_joint = current_state.position;
+  const double path_length = JointPathLength(start_joint, target_joint);
+  if (path_length <= 1e-9) {
+    ARM_LOG_WARN("[MoveJ] skip: path length too small");
+    return 0;
+  }
+
   JointPath path(start_joint, target_joint);
-  CubicTimeScaler time_scaler;
-  CubicTimeScaler::PlanConfig config;
-  config.T = t;
+  LSPBTimeScaler time_scaler;
+  TimeScalerBase::PlanConfig config;
+  if (!BuildLspbConfigFromPhysicalVA(path_length, v, a, t, config)) {
+    ARM_LOG_ERROR("[MoveJ] failed: invalid args (path_length={}, v={}, a={})",
+                  path_length, v, a);
+    return -1;
+  }
 
   if (!time_scaler.Plan(config)) {
     ARM_LOG_ERROR("[MoveJ] failed: time scaler plan");
@@ -207,7 +274,7 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
     for (int i = 0; i < 6; ++i) {
       if (point.position.theta[i] < joint_min_[i] || point.position.theta[i] > joint_max_[i]) {
         ARM_LOG_WARN("[MoveJ] trajectory point joint[{}]={:.4f} out of limit at t={}",
-                    i, point.position.theta[i], current_time);
+                     i, point.position.theta[i], current_time);
         return -1;
       }
     }
@@ -219,7 +286,190 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
   return 0;
 }
 
-int ArmInstance::GetCurrentPose(ArmMotion::Pose6Dof_t &current_pose) {
+int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
+                            double r, double v, double a, double t) {
+  if (points.size() < 2) {
+    ARM_LOG_ERROR("[MoveJMulti] failed: points size {} < 2", points.size());
+    return -1;
+  }
+
+  // 检查输入点关节限位
+  for (size_t p = 0; p < points.size(); ++p) {
+    for (int i = 0; i < 6; ++i) {
+      if (points[p].theta[i] < joint_min_[i] || points[p].theta[i] > joint_max_[i]) {
+        ARM_LOG_ERROR(
+            "[MoveJMulti] input point {} joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
+            p, i, points[p].theta[i], joint_min_[i], joint_max_[i]);
+        return -1;
+      }
+    }
+  }
+
+  ArmMotion::JointState_t current_state;
+  if (!arm_ctrl_.GetJointState(current_state)) {
+    ARM_LOG_ERROR("[MoveJMulti] failed: GetJointState at start");
+    return -1;
+  }
+
+  std::vector<ArmMotion::Joint6Dof_t> path_points;
+  path_points.reserve(points.size() + 1);
+  path_points.push_back(current_state.position);
+  path_points.insert(path_points.end(), points.begin(), points.end());
+
+  MultiPointJointPath path(std::move(path_points), r);
+  const double path_length = path.GetTotalLength();
+  if (path_length <= 1e-9) {
+    ARM_LOG_ERROR("[MoveJMulti] failed: invalid path total length");
+    return -1;
+  }
+
+  LSPBTimeScaler time_scaler;
+  TimeScalerBase::PlanConfig config;
+  if (!BuildLspbConfigFromPhysicalVA(path_length, v, a, t, config)) {
+    ARM_LOG_ERROR(
+        "[MoveJMulti] failed: invalid args (path_length={}, v={}, a={})",
+        path_length, v, a);
+    return -1;
+  }
+  if (!time_scaler.Plan(config)) {
+    ARM_LOG_ERROR("[MoveJMulti] failed: time scaler plan");
+    return -1;
+  }
+
+  JointTrajectory trajectory(path, time_scaler);
+  double duration = trajectory.GetDuration();
+
+  double current_time = 0.0;
+  while (current_time <= (duration + 1e-7)) {
+    if (current_time > duration) {
+      current_time = duration;
+    }
+
+    ArmMotion::JointTrajectoryPoint_t point;
+    if (!trajectory.Sample(current_time, point)) {
+      ARM_LOG_ERROR("[MoveJMulti] failed: Sample at t={}", current_time);
+      return -1;
+    }
+
+    // 轨迹点限位保护
+    for (int i = 0; i < 6; ++i) {
+      if (point.position.theta[i] < joint_min_[i] || point.position.theta[i] > joint_max_[i]) {
+        ARM_LOG_ERROR("[MoveJMulti] failed: sampled joint[{}]={:.4f} out of limit at t={}",
+                      i, point.position.theta[i], current_time);
+        return -1;
+      }
+    }
+
+    ArmMotion::JointState_t joint_cmd{.position = point.position,
+                                      .velocity = point.velocity,
+                                      .accel = point.acceleration};
+    if (!arm_ctrl_.SetJointState(joint_cmd)) {
+      ARM_LOG_ERROR("[MoveJMulti] failed: SetJointState at t={}", current_time);
+      return -1;
+    }
+
+    std::this_thread::sleep_for(std::chrono::duration<double>(dt_));
+    current_time += dt_;
+  }
+  return 0;
+}
+
+int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points,
+                            double r, double v, double a, double t) {
+  if (points.size() < 1) {
+    ARM_LOG_ERROR("[MoveLMulti] failed: points size {} < 1", points.size());
+    return -1;
+  }
+
+  ArmMotion::JointState_t current_state;
+  if (!arm_ctrl_.GetJointState(current_state)) {
+    ARM_LOG_ERROR("[MoveLMulti] failed: GetJointState at start");
+    return -1;
+  }
+
+  ArmMotion::Pose6Dof_t current_pose;
+  if (!kinematic_solver_->FK(current_state.position, current_pose)) {
+    ARM_LOG_ERROR("[MoveLMulti] failed: FK at start");
+    return -1;
+  }
+
+  std::vector<ArmMotion::Pose6Dof_t> path_points;
+  path_points.reserve(points.size() + 1);
+  path_points.push_back(current_pose);
+  path_points.insert(path_points.end(), points.begin(), points.end());
+
+  CartesianMultiPointPath path(std::move(path_points), r);
+  const double path_length = path.GetTotalLength();
+  if (path_length <= 1e-9) {
+    ARM_LOG_ERROR("[MoveLMulti] failed: invalid path total length");
+    return -1;
+  }
+
+  LSPBTimeScaler time_scaler;
+  TimeScalerBase::PlanConfig config;
+  if (!BuildLspbConfigFromPhysicalVA(path_length, v, a, t, config)) {
+    ARM_LOG_ERROR(
+        "[MoveLMulti] failed: invalid args (path_length={}, v={}, a={})",
+        path_length, v, a);
+    return -1;
+  }
+  if (!time_scaler.Plan(config)) {
+    ARM_LOG_ERROR("[MoveLMulti] failed: time scaler plan");
+    return -1;
+  }
+
+  CartesianTrajectory trajectory(path, time_scaler);
+  double duration = trajectory.GetDuration();
+
+  double current_time = 0.0;
+  while (current_time <= (duration + 1e-7)) {
+    if (current_time > duration) {
+      current_time = duration;
+    }
+
+    ArmMotion::CartesianTrajectoryPoint_t cart_point;
+    if (!trajectory.Sample(current_time, cart_point)) {
+      ARM_LOG_ERROR("[MoveLMulti] failed: Sample at t={}", current_time);
+      return -1;
+    }
+
+    ArmMotion::IKSolves_t ik_solves;
+    if (!kinematic_solver_->IK(cart_point.pose, current_state.position, ik_solves)) {
+      ARM_LOG_ERROR("[MoveLMulti] failed: IK at t={}, pose=({}, {}, {})",
+                    current_time, cart_point.pose.x, cart_point.pose.y, cart_point.pose.z);
+      return -1;
+    }
+
+    ArmMotion::Joint6Dof_t target_joint;
+    if (!SelectBestIKSolve(ik_solves, current_state.position, target_joint)) {
+      ARM_LOG_ERROR("[MoveLMulti] failed: no valid IK solve at t={}", current_time);
+      return -1;
+    }
+
+    jacobian_->Update(target_joint, dt_);
+
+    ArmMotion::Joint6Dof_t joint_vel;
+    jacobian_->InverseVelocity(cart_point.velocity, joint_vel, 1e-6);
+
+    ArmMotion::Joint6Dof_t joint_acc;
+    jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6);
+
+    ArmMotion::JointState_t joint_cmd{
+        .position = target_joint, .velocity = joint_vel, .accel = joint_acc};
+    if (!arm_ctrl_.SetJointState(joint_cmd)) {
+      ARM_LOG_ERROR("[MoveLMulti] failed: SetJointState at t={}", current_time);
+      return -1;
+    }
+
+    current_state.position = target_joint;
+
+    std::this_thread::sleep_for(std::chrono::duration<double>(dt_));
+    current_time += dt_;
+  }
+  return 0;
+}
+
+int ArmInstance::GetCurrentPose(ArmMotion::Pose6Dof_t& current_pose) {
   ArmMotion::JointState_t current_state;
   if (!arm_ctrl_.GetJointState(current_state)) {
     ARM_LOG_ERROR("[GetCurrentPose] failed: GetJointState");
@@ -232,7 +482,7 @@ int ArmInstance::GetCurrentPose(ArmMotion::Pose6Dof_t &current_pose) {
   return 0;
 }
 
-int ArmInstance::GetCurrentJoint(ArmMotion::Joint6Dof_t &current_joint) {
+int ArmInstance::GetCurrentJoint(ArmMotion::Joint6Dof_t& current_joint) {
   ArmMotion::JointState_t current_state;
   if (!arm_ctrl_.GetJointState(current_state)) {
     ARM_LOG_ERROR("[GetCurrentJoint] failed: GetJointState");

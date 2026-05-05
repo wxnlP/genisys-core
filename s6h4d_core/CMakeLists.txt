@@ -23,6 +23,8 @@ target_sources(${TARGET_NAME} PRIVATE
     src/joint_trajectory.cc
     src/s6h4d_ctrl.cc
     src/arm_instance.cc
+    src/joint_multi_point_path.cc
+    src/cartesian_multi_point_path.cc
 )
 
 if(BUILD_DEFAULT_SERIAL)

@@ -9,7 +9,11 @@ bool LSPBTimeScaler::Plan(const PlanConfig& config) {
 
   if (duration_ <= 0.0) {
       // 使用v和a计算T
-      if (std::pow(v_, 2) / a_ >= 1) {return false;}
+      // 若 v²/a >= 1，无法形成梯形剖面，改为三角形剖面：自动降低峰值速度
+      if (std::pow(v_, 2) / a_ >= 1) {
+        // 三角形剖面：v_peak = sqrt(a)，tb = sqrt(1/a)，duration = 2*tb
+        v_ = std::sqrt(a_) * (1.0 - 1e-9);
+      }
       duration_ = (a_ + std::pow(v_, 2)) / (v_ * a_);
   } else if (duration_ > 0.0) {
       // 使用T和v计算a

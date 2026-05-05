@@ -3,16 +3,16 @@
 #include <iostream>
 #include <thread>
 
+#include "arm_instance.h"
 #include "arm_logger.h"
 #include "kinematic.h"
 #include "mujoco_sim_ctrl.h"
-#include "arm_instance.h"
 
 namespace {
 
 void PrintJointState(const char* label, const ArmMotion::JointState_t& s) {
   const char* kJointNames[6] = {"shoulder", "upper_arm", "elbow",
-                                "wrist1",   "wrist2",    "wrist3"};
+                                "wrist1", "wrist2", "wrist3"};
 
   std::cout << "\n=== " << label << " ===\n";
   std::cout << std::fixed << std::setprecision(4);
@@ -57,7 +57,7 @@ int main() {
 
   ArmMotion::Joint6Dof_t joint_target1(0.0, -0.840, 0.840, 0.0, 0.00, 0.00);
   ARM_LOG_INFO("MoveJ to drawing start pose");
-  if (robot.MoveJ(joint_target1, 0.8, 1.2, 2.0) != 0) {
+  if (robot.MoveJ(joint_target1, 2, 3, 0.0) != 0) {
     ARM_LOG_ERROR("MoveJ to drawing start pose failed");
     return 1;
   }
@@ -83,25 +83,25 @@ int main() {
   lateral_pose.y -= 0.12;
 
   ARM_LOG_INFO("MoveL side translation (-Y 0.12m)");
-  if (robot.MoveL(lateral_pose, 0.50, 0.40, 0.0) != 0) {
+  if (robot.MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
     ARM_LOG_ERROR("MoveL side translation failed");
     return 1;
   }
   lateral_pose.z -= 0.12;
   ARM_LOG_INFO("MoveL side translation (-Z 0.12m)");
-  if (robot.MoveL(lateral_pose, 0.50, 0.40, 0.0) != 0) {
+  if (robot.MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
     ARM_LOG_ERROR("MoveL side translation failed");
     return 1;
   }
   lateral_pose.y += 0.12;
   ARM_LOG_INFO("MoveL side translation (+Y 0.12m)");
-  if (robot.MoveL(lateral_pose, 0.50, 0.40, 0.0) != 0) {
+  if (robot.MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
     ARM_LOG_ERROR("MoveL side translation failed");
     return 1;
   }
   lateral_pose.z += 0.12;
   ARM_LOG_INFO("MoveL side translation (+Z 0.12m)");
-  if (robot.MoveL(lateral_pose, 0.50, 0.40, 0.0) != 0) {
+  if (robot.MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
     ARM_LOG_ERROR("MoveL side translation failed");
     return 1;
   }
@@ -113,7 +113,7 @@ int main() {
 
   ArmMotion::Joint6Dof_t joint_origin(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
   ARM_LOG_INFO("MoveJ back to joint origin");
-  if (robot.MoveJ(joint_origin, 0.8, 1.2, 2.5) != 0) {
+  if (robot.MoveJ(joint_origin, 2, 3, 0.0) != 0) {
     ARM_LOG_ERROR("MoveJ back to joint origin failed");
     return 1;
   }

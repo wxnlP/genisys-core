@@ -64,12 +64,11 @@ int main() {
   joint_points.emplace_back(0.00, -0.70, 0.75, 0.00, 0.10, 0.00);
 
   ARM_LOG_INFO("MoveJMulti demo: 4 waypoints, blend radius=0.08 rad, v=0.5 rad/s");
-  if (robot.MoveJMulti(joint_points, 0.08, 0.5, 1.0, 0.0) != 0) {
+  if (robot.MoveJMulti(joint_points, 0.08, 2.0, 3.0, 0.0) != 0) {
     ARM_LOG_ERROR("MoveJMulti failed");
     return 1;
   }
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(1000));
   if (!PrintCurrentState(ctrl, "After MoveJMulti")) {
     return 1;
   }

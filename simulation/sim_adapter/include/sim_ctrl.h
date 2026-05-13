@@ -3,10 +3,10 @@
 #include "arm_ctrl_base.h"
 #include "httplib.h"
 
-class MujocoSimCtrl : public ArmCtrlBase {
+class SimCtrl : public ArmCtrlBase {
  public:
-  MujocoSimCtrl() = default;
-  ~MujocoSimCtrl() override = default;
+  SimCtrl() = default;
+  ~SimCtrl() override = default;
 
   bool Init() override;
   bool SetJointState(const ArmMotion::JointState_t& joint_cmd) override;

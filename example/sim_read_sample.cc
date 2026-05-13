@@ -5,12 +5,12 @@
 #include <thread>
 
 #include "arm_logger.h"
-#include "mujoco_sim_ctrl.h"
+#include "sim_ctrl.h"
 
 static void PrintJointState(const char* label,
                             const ArmMotion::JointState_t& s) {
   const char* kJointNames[6] = {"shoulder", "upper_arm", "elbow",
-                                "wrist1",   "wrist2",    "wrist3"};
+                                "wrist1", "wrist2", "wrist3"};
 
   std::cout << "=== " << label << " ===\n";
   std::cout << std::fixed << std::setprecision(4);
@@ -34,9 +34,9 @@ void SignalHandler(int /*signum*/) { g_running = 0; }
 }  // namespace
 
 int main() {
-  MujocoSimCtrl ctrl;
+  SimCtrl ctrl;
   if (!ctrl.Init()) {
-    ARM_LOG_ERROR("MujocoSimCtrl::Init() failed");
+    ARM_LOG_ERROR("SimCtrl::Init() failed");
     return 1;
   }
 

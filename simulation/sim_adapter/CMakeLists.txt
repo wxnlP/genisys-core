@@ -3,7 +3,7 @@ set(SIM_ADAPTER_TARGET_NAME sim_adapter)
 add_library(${SIM_ADAPTER_TARGET_NAME} STATIC)
 
 target_sources(${SIM_ADAPTER_TARGET_NAME} PRIVATE
-  src/mujoco_sim_ctrl.cc
+  src/sim_ctrl.cc
 )
 
 target_include_directories(${SIM_ADAPTER_TARGET_NAME} PUBLIC

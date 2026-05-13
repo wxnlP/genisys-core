@@ -7,7 +7,7 @@
 #include "arm_instance.h"
 #include "arm_logger.h"
 #include "kinematic.h"
-#include "mujoco_sim_ctrl.h"
+#include "sim_ctrl.h"
 
 namespace {
 
@@ -29,7 +29,7 @@ void PrintJointState(const char* label, const ArmMotion::JointState_t& s) {
   }
 }
 
-bool PrintCurrentState(MujocoSimCtrl& ctrl, const char* title) {
+bool PrintCurrentState(SimCtrl& ctrl, const char* title) {
   ArmMotion::JointState_t state{};
   if (!ctrl.GetJointState(state)) {
     ARM_LOG_ERROR("GetJointState failed: {}", title);
@@ -42,9 +42,9 @@ bool PrintCurrentState(MujocoSimCtrl& ctrl, const char* title) {
 }  // namespace
 
 int main() {
-  MujocoSimCtrl ctrl;
+  SimCtrl ctrl;
   if (!ctrl.Init()) {
-    ARM_LOG_ERROR("MujocoSimCtrl::Init() failed");
+    ARM_LOG_ERROR("SimCtrl::Init() failed");
     return 1;
   }
 

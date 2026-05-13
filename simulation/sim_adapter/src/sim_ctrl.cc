@@ -1,9 +1,9 @@
-#include "mujoco_sim_ctrl.h"
+#include "sim_ctrl.h"
 
 #include "nlohmann_json.hpp"
 #include <string>
 
-bool MujocoSimCtrl::SendHttpRequest(const ArmMotion::JointState_t& joint_cmd) {
+bool SimCtrl::SendHttpRequest(const ArmMotion::JointState_t& joint_cmd) {
   nlohmann::json json_cmd;
   json_cmd["joints"] = nlohmann::json::array();
 
@@ -40,7 +40,7 @@ bool MujocoSimCtrl::SendHttpRequest(const ArmMotion::JointState_t& joint_cmd) {
   return res && res->status == 200;
 }
 
-bool MujocoSimCtrl::GetHttpResponse(ArmMotion::JointState_t& joint_state) {
+bool SimCtrl::GetHttpResponse(ArmMotion::JointState_t& joint_state) {
   nlohmann::json json_request;
 
   json_request["joints"] = 6;
@@ -69,27 +69,27 @@ bool MujocoSimCtrl::GetHttpResponse(ArmMotion::JointState_t& joint_state) {
     double velocity = joint["velocity"];
     double effort = joint["effort"];
 
-    if (name == "shoulder_sensor") {
+    if (name == "shoulder_joint") {
       joint_state.position.theta[0] = position;
       joint_state.velocity.theta[0] = velocity;
       joint_state.effort.theta[0] = effort;
-    } else if (name == "upper_arm_sensor") {
+    } else if (name == "upper_arm_joint") {
       joint_state.position.theta[1] = position;
       joint_state.velocity.theta[1] = velocity;
       joint_state.effort.theta[1] = effort;
-    } else if (name == "elbow_sensor") {
+    } else if (name == "elbow_joint") {
       joint_state.position.theta[2] = position;
       joint_state.velocity.theta[2] = velocity;
       joint_state.effort.theta[2] = effort;
-    } else if (name == "wrist1_sensor") {
+    } else if (name == "wrist1_joint") {
       joint_state.position.theta[3] = position;
       joint_state.velocity.theta[3] = velocity;
       joint_state.effort.theta[3] = effort;
-    } else if (name == "wrist2_sensor") {
+    } else if (name == "wrist2_joint") {
       joint_state.position.theta[4] = position;
       joint_state.velocity.theta[4] = velocity;
       joint_state.effort.theta[4] = effort;
-    } else if (name == "wrist3_sensor") {
+    } else if (name == "wrist3_joint") {
       joint_state.position.theta[5] = position;
       joint_state.velocity.theta[5] = velocity;
       joint_state.effort.theta[5] = effort;
@@ -98,12 +98,12 @@ bool MujocoSimCtrl::GetHttpResponse(ArmMotion::JointState_t& joint_state) {
   return true;
 }
 
-bool MujocoSimCtrl::Init() { return true; }
+bool SimCtrl::Init() { return true; }
 
-bool MujocoSimCtrl::SetJointState(const ArmMotion::JointState_t& joint_cmd) {
+bool SimCtrl::SetJointState(const ArmMotion::JointState_t& joint_cmd) {
   return SendHttpRequest(joint_cmd);
 }
 
-bool MujocoSimCtrl::GetJointState(ArmMotion::JointState_t& joint_state) {
+bool SimCtrl::GetJointState(ArmMotion::JointState_t& joint_state) {
   return GetHttpResponse(joint_state);
 }

@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "arm_logger.h"
-#include "mujoco_sim_ctrl.h"
+#include "sim_ctrl.h"
 
 // ──────────────────────────────────────────────
 // 打印 JointState_t 的各字段
@@ -13,7 +13,7 @@
 static void PrintJointState(const char* label,
                             const ArmMotion::JointState_t& s) {
   const char* kJointNames[6] = {"shoulder", "upper_arm", "elbow",
-                                "wrist1",   "wrist2",    "wrist3"};
+                                "wrist1", "wrist2", "wrist3"};
 
   std::cout << "=== " << label << " ===\n";
   std::cout << std::fixed << std::setprecision(4);
@@ -30,9 +30,9 @@ static void PrintJointState(const char* label,
 }
 
 int main() {
-  MujocoSimCtrl ctrl;
+  SimCtrl ctrl;
   if (!ctrl.Init()) {
-    ARM_LOG_ERROR("MujocoSimCtrl::Init() failed");
+    ARM_LOG_ERROR("SimCtrl::Init() failed");
     return 1;
   }
 
@@ -44,7 +44,7 @@ int main() {
   // 小幅动作基准点。
   const double base[6] = {0.0, 0.1, -1.4, 0.1, -0.1, 0.0};
   const double amp[6] = {8.0 * kDegToRad, 10.0 * kDegToRad, 12.0 * kDegToRad,
-                         9.0 * kDegToRad, 7.0 * kDegToRad,  6.0 * kDegToRad};
+                         9.0 * kDegToRad, 7.0 * kDegToRad, 6.0 * kDegToRad};
   const double phase[6] = {0.0, 0.5, 1.0, 1.5, 2.0, 2.5};
 
   ARM_LOG_INFO("Send demo: publish {} points", kPoints);

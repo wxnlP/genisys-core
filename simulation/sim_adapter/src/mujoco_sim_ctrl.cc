@@ -17,17 +17,17 @@ bool MujocoSimCtrl::SendHttpRequest(const ArmMotion::JointState_t& joint_cmd) {
                                   {"damping", 0.0}});
   };
 
-  add_joint("shoulder_actuator", joint_cmd.position.theta[0],
+  add_joint("shoulder_joint", joint_cmd.position.theta[0],
             joint_cmd.velocity.theta[0], joint_cmd.effort.theta[0]);
-  add_joint("upper_arm_actuator", joint_cmd.position.theta[1],
+  add_joint("upper_arm_joint", joint_cmd.position.theta[1],
             joint_cmd.velocity.theta[1], joint_cmd.effort.theta[1]);
-  add_joint("elbow_actuator", joint_cmd.position.theta[2],
+  add_joint("elbow_joint", joint_cmd.position.theta[2],
             joint_cmd.velocity.theta[2], joint_cmd.effort.theta[2]);
-  add_joint("wrist1_actuator", joint_cmd.position.theta[3],
+  add_joint("wrist1_joint", joint_cmd.position.theta[3],
             joint_cmd.velocity.theta[3], joint_cmd.effort.theta[3]);
-  add_joint("wrist2_actuator", joint_cmd.position.theta[4],
+  add_joint("wrist2_joint", joint_cmd.position.theta[4],
             joint_cmd.velocity.theta[4], joint_cmd.effort.theta[4]);
-  add_joint("wrist3_actuator", joint_cmd.position.theta[5],
+  add_joint("wrist3_joint", joint_cmd.position.theta[5],
             joint_cmd.velocity.theta[5], joint_cmd.effort.theta[5]);
 
   httplib::Client cli(http_host_, publisher_port_);

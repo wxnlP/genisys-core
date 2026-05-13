@@ -21,6 +21,7 @@ option(BUILD_DEFAULT_SERIAL "Build the default serial library" ON)
 
 # 是否构建示例
 option(BUILD_EXAMPLES "Build examples" ON)
+option(BUILD_SIM_PROXY "Build sim proxy" ON)
 
 
 add_subdirectory(s6h4d_core)

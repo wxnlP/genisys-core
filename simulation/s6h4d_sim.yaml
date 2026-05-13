@@ -21,6 +21,8 @@ base_info:
 # Module
 modules:
   - name: proxy_module
+  - name: mujoco_module
+  - name: rviz_module
 
 # pkg 
 pkgs:
@@ -28,13 +30,22 @@ pkgs:
     modules:
       - name: proxy_module
         namespace: local
+      - name: mujoco_module
+        namespace: local
+      - name: rviz_module
+        namespace: local
 
 # 部署（.yaml，名称为[name]_[deploy_ins[name]]_cfg.yaml）
 # 例如下面pb部署模块的文件为：pb_rpc_cfg.yaml   
 deploy_modes:
-  - name: sim
+  - name: mujoco
     deploy_ins:
-      - name: proxy
+      - name: sim
+        pkgs:
+          - name: sim_proxy_pkg
+  - name: rviz
+    deploy_ins:
+      - name: sim
         pkgs:
           - name: sim_proxy_pkg
 

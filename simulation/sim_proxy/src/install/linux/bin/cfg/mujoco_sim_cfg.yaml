@@ -14,25 +14,25 @@ aimrt:
         log_lvl: INFO
       - name: ProxyModule
         log_lvl: INFO
+      - name: RvizModule
+        log_lvl: INFO
   plugin:
     plugins:
-      - name: echo_plugin
-        path: ./libaimrt_echo_plugin.so 
+      - name: ros2_plugin
+        path: ./libaimrt_ros2_plugin.so
         options:
-          type_support_pkgs:
-            - path: ./libsensor_pb_ts.so
-          topic_meta_list:
-            - topic_name: /mujoco/joint_state
-              msg_type: pb:aimrt.protocols.sensor.JointStateArray
-              echo_type: json
-      
-      - name: net_plugin
-        path: ./libaimrt_net_plugin.so
-        options:
-          thread_num: 4
-          http_options:
-            listen_ip: 127.0.0.1
-            listen_port: 50080
+          node_name: sim_proxy_node
+          executor_type: MultiThreaded
+          executor_thread_num: 2
+      # - name: echo_plugin
+      #   path: ./libaimrt_echo_plugin.so 
+      #   options:
+      #     type_support_pkgs:
+      #       - path: ./libsensor_pb_ts.so
+      #     topic_meta_list:
+      #       - topic_name: /sim/joint_state
+      #         msg_type: pb:aimrt.protocols.sensor.JointStateArray
+      #         echo_type: json
 
   executor:
     executors:
@@ -41,7 +41,7 @@ aimrt:
       - name: work_executor
         type: asio_thread
         options:
-          thread_num: 4
+          thread_num: 5
 
   channel:
     backends:
@@ -49,19 +49,15 @@ aimrt:
         options:
           subscriber_use_inline_executor: false
           subscriber_executor: work_executor
-      - type: http
-        options:
-          pub_topics_options:
-            - topic_name: "(.*)"
-              server_url_list: ["127.0.0.1:50081"]
+      - type: ros2
 
     pub_topics_options:
       - topic_name: "(.*)" # 正则表达式
-        enable_backends: [local]
+        enable_backends: [local, ros2]
         enable_filters: []
     sub_topics_options:
       - topic_name: "(.*)" # 正则表达式
-        enable_backends: [local, http]
+        enable_backends: [local]
         enable_filters: []
 
 
@@ -71,42 +67,46 @@ MujocoSimModule:
   sim_executor: work_executor
   gui_executor: gui_executor
   subscriber_options:
-    - topic: /mujoco/joint_cmd
+    - topic: /sim/joint_cmd
       type: joint_actuator
       options:
         joints:
-          - name: shoulder_actuator
+          - name: shoulder_joint
             bind_joint: shoulder_joint
-          - name: upper_arm_actuator
+          - name: upper_arm_joint
             bind_joint: upper_arm_joint
-          - name: elbow_actuator
+          - name: elbow_joint
             bind_joint: elbow_joint
-          - name: wrist1_actuator
+          - name: wrist1_joint
             bind_joint: wrist1_joint
-          - name: wrist2_actuator
+          - name: wrist2_joint
             bind_joint: wrist2_joint
-          - name: wrist3_actuator
+          - name: wrist3_joint
             bind_joint: wrist3_joint
   publisher_options:
-    - topic: /mujoco/joint_state
-      frequency: 1
+    - topic: /sim/joint_state
+      frequency: 100
       executor: work_executor
       type: joint_sensor
       options:
         joints:
-          - name: shoulder_sensor
+          - name: shoulder_joint
             bind_joint: shoulder_joint
-          - name: upper_arm_sensor
+          - name: upper_arm_joint
             bind_joint: upper_arm_joint
-          - name: elbow_sensor
+          - name: elbow_joint
             bind_joint: elbow_joint
-          - name: wrist1_sensor
+          - name: wrist1_joint
             bind_joint: wrist1_joint
-          - name: wrist2_sensor
+          - name: wrist2_joint
             bind_joint: wrist2_joint
-          - name: wrist3_sensor
+          - name: wrist3_joint
             bind_joint: wrist3_joint
 ProxyModule:
-  mujoco_joint_state_topic: /mujoco/joint_state
-  proxy_http_joint_state_topic: /sim/joint_state
   http_server_executor: work_executor
+  sdk_http_joint_state_topic: /sdk/joint_state
+  sdk_http_joint_cmd_topic: /sdk/joint_cmd
+  proxy_joint_state_topic: /sim/joint_state
+  proxy_joint_cmd_topic: /sim/joint_cmd
+RvizModule:
+  proxy_joint_state_topic: /sim/joint_state

@@ -2,9 +2,9 @@
 set_root_namespace("sim_proxy")
 
 
-
 # module
 add_subdirectory(module/proxy_module)
+add_subdirectory(module/rviz_module)
 
 # pkg
 add_subdirectory(pkg/sim_proxy_pkg)

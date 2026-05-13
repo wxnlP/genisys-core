@@ -18,11 +18,9 @@ class MujocoSimCtrl : public ArmCtrlBase {
 
   std::string http_host_{"127.0.0.1"};
   int subscriber_port_{8080};
-  int publisher_port_{50080};
-  const std::string pub_channel_url_{
-      "/channel/%2Fmujoco%2Fjoint_cmd/"
-      "pb%3Aaimrt.protocols.sensor.JointCommandArray"};
-  const std::string sub_channel_url_{"/sim/joint_state"};
+  int publisher_port_{8080};
+  const std::string pub_channel_url_{"/sdk/joint_cmd"};
+  const std::string sub_channel_url_{"/sdk/joint_state"};
 
   ArmMotion::JointState_t current_joint_state_{};
 };

@@ -1,5 +1,6 @@
 #include "proxy_module/proxy_module.h"
 #include "aimrt_module_protobuf_interface/channel/protobuf_channel.h"
+#include "aimrt_module_protobuf_interface/util/protobuf_tools.h"
 #include "yaml-cpp/yaml.h"
 #include "nlohmann_json.hpp"
 
@@ -14,21 +15,31 @@ bool ProxyModule::Initialize(aimrt::CoreRef core) {
     auto file_path = core_.GetConfigurator().GetConfigFilePath();
     if (!file_path.empty()) {
       YAML::Node cfg_node = YAML::LoadFile(std::string(file_path));
-      proxy_http_joint_state_topic_ = cfg_node["proxy_http_joint_state_topic"].as<std::string>();
-      mujoco_joint_state_topic_ = cfg_node["mujoco_joint_state_topic"].as<std::string>();
-      http_ececutor_name_ = cfg_node["http_server_executor"].as<std::string>();
+      sdk_http_joint_state_topic_ = cfg_node["sdk_http_joint_state_topic"].as<std::string>();
+      sdk_http_joint_cmd_topic_ = cfg_node["sdk_http_joint_cmd_topic"].as<std::string>();
+      proxy_joint_state_topic_ = cfg_node["proxy_joint_state_topic"].as<std::string>();
+      proxy_joint_cmd_topic_ = cfg_node["proxy_joint_cmd_topic"].as<std::string>();
+      http_executor_name_ = cfg_node["http_server_executor"].as<std::string>();
     }
 
-    joint_state_sub_ = core_.GetChannelHandle().GetSubscriber(mujoco_joint_state_topic_);
-    AIMRT_CHECK_ERROR(joint_state_sub_, "Failed to get channel subscriber for topic: {}",
-                      mujoco_joint_state_topic_);
-    http_server_executor_ = core_.GetExecutorManager().GetExecutor(http_ececutor_name_);
-    AIMRT_CHECK_ERROR(http_server_executor_, "Failed to get executor: {}", http_ececutor_name_);
+    http_server_executor_ = core_.GetExecutorManager().GetExecutor(http_executor_name_);
+    AIMRT_CHECK_ERROR(http_server_executor_, "Failed to get executor: {}", http_executor_name_);
+
+    proxy_joint_state_sub_ = core_.GetChannelHandle().GetSubscriber(proxy_joint_state_topic_);
+    AIMRT_CHECK_ERROR(proxy_joint_state_sub_, "Failed to get channel subscriber for topic: {}",
+                      proxy_joint_state_topic_);
+
+    proxy_joint_cmd_pub_ = core_.GetChannelHandle().GetPublisher(proxy_joint_cmd_topic_);
+    AIMRT_CHECK_ERROR(proxy_joint_cmd_pub_, "Failed to get channel publisher for topic: {}",
+                      proxy_joint_cmd_topic_);
 
     bool ret = aimrt::channel::Subscribe<JointStateArray>(
-        joint_state_sub_,
-        std::bind(&ProxyModule::MujocoJointStateCallback, this, std::placeholders::_1));
-    AIMRT_CHECK_ERROR(ret, "Failed to subscribe to topic: {}", mujoco_joint_state_topic_);
+        proxy_joint_state_sub_,
+        std::bind(&ProxyModule::SubProxyJointState, this, std::placeholders::_1));
+    AIMRT_CHECK_ERROR(ret, "Failed to subscribe to topic: {}", proxy_joint_state_topic_);
+
+    ret = aimrt::channel::RegisterPublishType<JointCommandArray>(proxy_joint_cmd_pub_);
+    AIMRT_CHECK_ERROR(ret, "Failed to register publish type for topic: {}", proxy_joint_cmd_topic_);
 
   } catch (const std::exception& e) {
     AIMRT_ERROR("Init failed, {}", e.what());
@@ -66,7 +77,7 @@ void ProxyModule::Shutdown() {
 void ProxyModule::HttpServerThread() {
   AIMRT_INFO("HTTP server thread started.");
   // Post1: SDK请求获取仿真数据
-  http_server_.Post(proxy_http_joint_state_topic_, [this](const httplib::Request& req, httplib::Response& res) {
+  http_server_.Post(sdk_http_joint_state_topic_, [this](const httplib::Request& req, httplib::Response& res) {
     try {
       AIMRT_DEBUG("Received HTTP request for mujoco joint state.");
       nlohmann::json req_json = nlohmann::json::parse(req.body);
@@ -99,6 +110,47 @@ void ProxyModule::HttpServerThread() {
       return;
     }
   });
+
+  // Post2: SDK发起控制仿真
+  http_server_.Post(sdk_http_joint_cmd_topic_, [this](const httplib::Request& req, httplib::Response& res) {
+    try {
+      AIMRT_DEBUG("Received HTTP request for mujoco joint command.");
+      nlohmann::json req_json = nlohmann::json::parse(req.body);
+      nlohmann::json res_json;
+      AIMRT_INFO("Request msg: ", req_json["joints"].dump());
+
+      if (req_json.contains("joints")) {
+        JointCommandArray joint_cmd_array;
+        for (const auto& joint_json : req_json["joints"]) {
+          auto* joint_cmd = joint_cmd_array.add_joints();
+          joint_cmd->set_name(joint_json["name"].get<std::string>());
+          joint_cmd->set_position(joint_json["position"].get<double>());
+          joint_cmd->set_velocity(joint_json["velocity"].get<double>());
+          joint_cmd->set_effort(joint_json["effort"].get<double>());
+          joint_cmd->set_damping(joint_json["damping"].get<double>());
+          joint_cmd->set_stiffness(joint_json["stiffness"].get<double>());
+        }
+
+        auto now = std::chrono::system_clock::now();
+        auto duration = now.time_since_epoch();
+        auto total_nanoseconds = std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+        joint_cmd_array.mutable_header()->set_time_stamp(static_cast<uint64_t>(total_nanoseconds));
+        aimrt::channel::Publish(proxy_joint_cmd_pub_, joint_cmd_array);
+
+        res.status = 200;
+        res.set_content("Joint command published successfully", "application/json");
+      } else {
+        res.status = 400; 
+        res.set_content("Invalid JSON format", "application/json");
+        return;
+      }
+    } catch (const std::exception& e) {
+      AIMRT_WARN("Failed to parse HTTP request body: {}", e.what());
+      res.status = 400; 
+      res.set_content("Invalid JSON format", "application/json");
+      return;
+    }
+  });
   
   if (!http_server_.listen("127.0.0.1", 8080)) {
     AIMRT_ERROR("Failed to start HTTP server.");
@@ -107,9 +159,8 @@ void ProxyModule::HttpServerThread() {
   AIMRT_INFO("HTTP server thread stopped.");
 }
 
-void ProxyModule::MujocoJointStateCallback(const std::shared_ptr<const JointStateArray>& joint_state_array) {
-  // 将接收到的关节状态数据保存到成员变量中，供后续使用
-  UpdateCurrentJointState(*joint_state_array);
+void ProxyModule::SubProxyJointState(const std::shared_ptr<const JointStateArray>& msg) {
+  UpdateCurrentJointState(*msg);
   AIMRT_DEBUG("Received joint state array with {} joints.", current_joint_state_.joints_size());
 }
 

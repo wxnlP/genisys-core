@@ -42,25 +42,76 @@ class KinematicSolver::Impl {
  public:
   // MDH params
   ArmMotion::MDHConfig_t mdhConfig_{};
+  ArmMotion::MDHParams mdhParams_{};
 
   Eigen::Matrix<double, 6, 4> MDH_Matrix_;
 
+  // 旧版本变量
   Eigen::Vector3d L0_Base_;
   Eigen::Vector3d L2_Arm_;
   Eigen::Vector3d L3_Elbow_;
   Eigen::Vector3d L6_Wrist_;
+
+  // 新版本变量
+  Eigen::Vector3d P_02;
+  Eigen::Vector3d P_23;
+  Eigen::Vector3d P_34;
+  Eigen::Vector3d P_64;
+
   explicit Impl(const ArmMotion::MDHConfig_t& mdh_config)
       : mdhConfig_(mdh_config) {
-    MDH_Matrix_ << 0.0000, 0.00, mdhConfig_.L_BASE, 0.0, -(double)M_PI_2,
-        mdhConfig_.D_BASE, 0.00, 0.0, 0.0000, mdhConfig_.L_UPPERARM, 0.00, 0.0,
+    // 备份
+    // MDH_Matrix_ <<
+    //     0.0000,           0.00,                   mdhConfig_.L_BASE,    0.0,
+    //     -(double)M_PI_2,  mdhConfig_.D_BASE,      0.00,                 0.0,
+    //     0.0000,           mdhConfig_.L_UPPERARM,  0.00,                 0.0,
+    //     -(double)M_PI_2,  mdhConfig_.D_ELBOW,     mdhConfig_.L_FOREARM, 0.0,
+    //     (double)M_PI_2,   0.00,                   0.00,                 0.0,
+    //     -(double)M_PI_2,  0.00,                   mdhConfig_.L_WRIST,   0.0;
+    MDH_Matrix_ << 0.0000, 0.00, mdhConfig_.L_BASE, 0.0,
+        -(double)M_PI_2, mdhConfig_.D_BASE, 0.00, 0.0,
+        0.0000, mdhConfig_.L_UPPERARM, 0.00, 0.0,
         -(double)M_PI_2, mdhConfig_.D_ELBOW, mdhConfig_.L_FOREARM, 0.0,
-        (double)M_PI_2, 0.00, 0.00, 0.0, -(double)M_PI_2, 0.00,
-        mdhConfig_.L_WRIST, 0.0;
+        (double)M_PI_2, 0.00, 0.00, 0.0,
+        -(double)M_PI_2, 0.00, mdhConfig_.L_WRIST, 0.0;
 
+    // 备份
+    // MDH_Matrix_ <<
+    //     0.0000,           0.00,                   mdhConfig_.L_BASE,    0.0,
+    //     -(double)M_PI_2,  mdhConfig_.D_BASE,      0.00,                 0.0,
+    //     0.0000,           mdhConfig_.L_UPPERARM,  0.00,                 0.0,
+    //     0.0000,           mdhConfig_.D_ELBOW,     mdhConfig_.L_FOREARM, 0.0,
+    //     -(double)M_PI_2,  0.00,                   0.00,                 0.0,
+    //     (double)M_PI_2,   0.00,                   mdhConfig_.L_WRIST,   0.0;
+
+    // 参考坐标系是向量起点坐标系
     L0_Base_ = Eigen::Vector3d(mdhConfig_.D_BASE, 0.0, mdhConfig_.L_BASE);
     L2_Arm_ = Eigen::Vector3d(mdhConfig_.L_UPPERARM, 0.0, 0.0);
     L3_Elbow_ = Eigen::Vector3d(mdhConfig_.D_ELBOW, mdhConfig_.L_FOREARM, 0.0);
     L6_Wrist_ = Eigen::Vector3d(0.0, 0.0, -mdhConfig_.L_WRIST);
+  }
+
+  explicit Impl(const ArmMotion::MDHParams& mdh_params)
+      : mdhParams_(mdh_params) {
+    // 备份
+    // MDH_Matrix_ <<
+    //     mdh_params.alpha[0], mdh_params.a[0], mdh_params.d[0], mdh_params.theta[0],
+    //     mdh_params.alpha[1], mdh_params.a[1], mdh_params.d[1], mdh_params.theta[1],
+    //     mdh_params.alpha[2], mdh_params.a[2], mdh_params.d[2], mdh_params.theta[2],
+    //     mdh_params.alpha[3], mdh_params.a[3], mdh_params.d[3], mdh_params.theta[3],
+    //     mdh_params.alpha[4], mdh_params.a[4], mdh_params.d[4], mdh_params.theta[4],
+    //     mdh_params.alpha[5], mdh_params.a[5], mdh_params.d[5], mdh_params.theta[5];
+    MDH_Matrix_ << mdh_params.alpha[0], mdh_params.a[0], mdh_params.d[0], mdh_params.theta[0],
+        mdh_params.alpha[1], mdh_params.a[1], mdh_params.d[1], mdh_params.theta[1],
+        mdh_params.alpha[2], mdh_params.a[2], mdh_params.d[2], mdh_params.theta[2],
+        mdh_params.alpha[3], mdh_params.a[3], mdh_params.d[3], mdh_params.theta[3],
+        mdh_params.alpha[4], mdh_params.a[4], mdh_params.d[4], mdh_params.theta[4],
+        mdh_params.alpha[5], mdh_params.a[5], mdh_params.d[5], mdh_params.theta[5];
+
+    P_02 = Eigen::Vector3d(mdhParams_.a[1], 0.0, mdhParams_.d[0]);
+    P_23 = Eigen::Vector3d(mdhParams_.a[2], 0.0, 0.0);
+    // P_34 = Eigen::Vector3d(mdhParams_.d[3], mdhParams_.a[3], 0.0);
+    P_64 = Eigen::Vector3d(0.0, 0.0, -mdhParams_.a[4] - mdhParams_.d[5]);
   }
 };
 
@@ -136,9 +187,9 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t& inputJoint,
   return true;
 }
 
-bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t& inputPose,
-                         const ArmMotion::Joint6Dof_t& lastJoint,
-                         ArmMotion::IKSolves_t& outputSolves) {
+bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
+                                        const ArmMotion::Joint6Dof_t& lastJoint,
+                                        ArmMotion::IKSolves_t& outputSolves) {
   double theta_1[2]{};
   double theta_23[2][2]{};
   double theta_456[2][3]{};
@@ -430,6 +481,101 @@ bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t& inputPose,
   }
 
   return true;
+}
+
+bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
+                                       const ArmMotion::Joint6Dof_t& lastJoint,
+                                       ArmMotion::IKSolves_t& outputSolves) {
+  // 具身智能使用较多的构型，234轴平行
+  double theta_1[2]{};
+  double theta_23[2][2]{};
+  double theta_456[2][3]{};
+
+  Eigen::Vector3d P_06_pos;      // yes
+  Eigen::Quaterniond P_06_quat;  // yes
+  Eigen::Vector3d P_04;
+  Eigen::Vector3d P0_24;
+  Eigen::Matrix3d R_10;
+  Eigen::Matrix3d R_31;
+  Eigen::Matrix3d R_30;
+  Eigen::Matrix3d R_36;
+  Eigen::Matrix3d R_06;  // yes
+
+  Eigen::Vector3d P0_64;
+
+  P_06_pos[0] = inputPose.x;
+  P_06_pos[1] = inputPose.y;
+  P_06_pos[2] = inputPose.z;
+
+  // deg to rad
+  P_06_quat = Eigen::Quaterniond(inputPose.quat.w, inputPose.quat.x,
+                                 inputPose.quat.y, inputPose.quat.z);
+  // quaternion to rotation
+  P_06_quat.normalize();
+  R_06 = P_06_quat.toRotationMatrix();
+
+  // 初始化解为上次的解，同步处理机械角度偏移
+  for (int i = 0; i < 2; i++) {
+    theta_1[i] = lastJoint.theta[0] + jointOffset_[0];
+    theta_23[i][0] = lastJoint.theta[1] + jointOffset_[1];
+    theta_23[i][1] = lastJoint.theta[2] + jointOffset_[2];
+    theta_456[i][0] = lastJoint.theta[3] + jointOffset_[3];
+    theta_456[i][1] = lastJoint.theta[4] + jointOffset_[4];
+    theta_456[i][2] = lastJoint.theta[5] + jointOffset_[5];
+  }
+
+  // 切换参考参考坐标系为基座（纯旋转变换）
+  P0_64 = R_06 * impl_->P_64;
+
+  // 获取基座到手腕的位置向量
+  P_04.head<3>() = P_06_pos + P0_64;
+
+  /* ---------------------------------J1------------------------------------- */
+  if ((P_04[0] * P_04[0] + P_04[1] * P_04[1]) <= 1e-6) {
+    /* 奇异位置，使用上次的解 */
+    theta_1[0] = lastJoint.theta[0];
+    theta_1[1] = theta_1[0];
+    for (int i = 0; i < 4; i++) {
+      outputSolves.solveFlag[0 + i][0] = -1;
+      outputSolves.solveFlag[4 + i][0] = -1;
+    }
+  } else {
+    /* 正常解，前向后向两组解 */
+    theta_1[0] = std::atan2(P_04[1], P_04[0]);
+    theta_1[1] = std::atan2(-P_04[1], -P_04[0]);
+    for (int i = 0; i < 4; i++) {
+      outputSolves.solveFlag[0 + i][0] = 1;
+      outputSolves.solveFlag[4 + i][0] = 1;
+    }
+  }
+
+  /* ---------------------------------J23------------------------------------ */
+  for (int ind_arm = 0; ind_arm < 2; ind_arm++) {
+    double c1 = std::cos(theta_1[ind_arm]);
+    double s1 = std::sin(theta_1[ind_arm]);
+
+    // 构造 R_01 的逆矩阵
+    R_10 << c1, s1, 0.0, -s1, c1, 0.0, 0.0, 0.0, 1.0;
+
+    Eigen::Vector3d P1_04;
+    P1_04 = R_10 * P_04;
+
+    Eigen::Vector3d P2_04;
+    P2_04 = P1_04 - impl_->P_02;
+  }
+}
+
+void KinematicSolver::SetIKMode(IKMode mode) {
+  ikMode_ = mode;
+}
+
+bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t& inputPose, const ArmMotion::Joint6Dof_t& lastJoint,
+                         ArmMotion::IKSolves_t& outputSolves) {
+  if (ikMode_ == IKMode::SphericalWrist) {
+    return IK_SphericalWrist(inputPose, lastJoint, outputSolves);
+  } else {
+    return IK_ParallelWrist(inputPose, lastJoint, outputSolves);
+  }
 }
 
 KinematicSolver::~KinematicSolver() = default;

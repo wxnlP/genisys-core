@@ -11,6 +11,13 @@ struct MDHConfig_t {
   double L_WRIST;
 };
 
+struct MDHParams {
+  double alpha[6];
+  double a[6];
+  double d[6];
+  double theta[6];
+};
+
 struct Quaternion_t {
   Quaternion_t() = default;
   Quaternion_t(double W, double X, double Y, double Z)

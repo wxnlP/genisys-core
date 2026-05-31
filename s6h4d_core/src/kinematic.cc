@@ -76,15 +76,6 @@ class KinematicSolver::Impl {
         (double)M_PI_2, 0.00, 0.00, 0.0,
         -(double)M_PI_2, 0.00, mdhConfig_.L_WRIST, 0.0;
 
-    // 备份
-    // MDH_Matrix_ <<
-    //     0.0000,           0.00,                   mdhConfig_.L_BASE,    0.0,
-    //     -(double)M_PI_2,  mdhConfig_.D_BASE,      0.00,                 0.0,
-    //     0.0000,           mdhConfig_.L_UPPERARM,  0.00,                 0.0,
-    //     0.0000,           mdhConfig_.D_ELBOW,     mdhConfig_.L_FOREARM, 0.0,
-    //     -(double)M_PI_2,  0.00,                   0.00,                 0.0,
-    //     (double)M_PI_2,   0.00,                   mdhConfig_.L_WRIST,   0.0;
-
     // 参考坐标系是向量起点坐标系
     L0_Base_ = Eigen::Vector3d(mdhConfig_.D_BASE, 0.0, mdhConfig_.L_BASE);
     L2_Arm_ = Eigen::Vector3d(mdhConfig_.L_UPPERARM, 0.0, 0.0);
@@ -111,6 +102,7 @@ class KinematicSolver::Impl {
 
     P_02 = Eigen::Vector3d(mdhParams_.a[1], 0.0, mdhParams_.d[0]);
     P_23 = Eigen::Vector3d(mdhParams_.a[2], 0.0, 0.0);
+    P_34 = Eigen::Vector3d(mdhParams_.a[3], mdhParams_.d[3], 0.0);
     P_65 = Eigen::Vector3d(0.0, 0.0, -mdhParams_.d[5]);
   }
 };
@@ -559,7 +551,7 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
 
     // 消除 J1 的影响，切换到 J1 的坐标系下进行后续计算
     P1_05 = R_10 * P_05;
-    P1_02 = R_10 * impl_->P_02;
+    P1_02 = impl_->P_02;
 
     P1_25 = P1_05 - P1_02;
 
@@ -575,8 +567,25 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
     double L3 = impl_->mdhParams_.a[3];
     double L4 = impl_->mdhParams_.a[4];
 
-    double x = P1_25[0] - L4 * std::cos(q234_sum);
-    double z = P1_25[2] + L4 * std::sin(q234_sum);
+    double cq234 = std::cos(q234_sum);
+    double sq234 = std::sin(q234_sum);
+
+    if (cq234 > 1.0) {
+      cq234 = 1.0;
+    }
+    if (cq234 < -1.0) {
+      cq234 = -1.0;
+    }
+
+    if (sq234 > 1.0) {
+      sq234 = 1.0;
+    }
+    if (sq234 < 1.0) {
+      sq234 = -1.0;
+    }
+
+    double x = P1_25[0] - L4 * cq234;
+    double z = P1_25[2] + L4 * sq234;
 
     // 余弦定理计算 q3 的余弦值，这里有一步隐式变换（-cos(c)=cos(q3)，c^2=x * x + z * z）
     double c3 = (x * x + z * z - L2 * L2 - L3 * L3) / (2 * L2 * L3);
@@ -660,7 +669,8 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
       double c5 = R_46(2, 2);
       double s6 = R_46(1, 0);
       double c6 = R_46(1, 1);
-      if (std::abs(s5) <= 1e-4) {
+
+      if (std::abs(s5) < 1e-4) {
         // 奇异，但不影响计算
         // TODO：必要情况需要退化？
         outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 0][2] = -1;

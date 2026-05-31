@@ -42,46 +42,22 @@ static void Euler2Rotation(const double* euler, double* R) {
 class KinematicSolver::Impl {
  public:
   // MDH params
-  ArmMotion::MDHConfig_t mdhConfig_{};
+  // ArmMotion::MDHConfig_t mdhConfig_{};
   ArmMotion::MDHParams mdhParams_{};
 
-  Eigen::Matrix<double, 6, 4> MDH_Matrix_;
+  // Eigen::Matrix<double, 6, 4> MDH_Matrix_;
 
   // 旧版本变量
-  Eigen::Vector3d L0_Base_;
-  Eigen::Vector3d L2_Arm_;
-  Eigen::Vector3d L3_Elbow_;
-  Eigen::Vector3d L6_Wrist_;
+  // Eigen::Vector3d L0_Base_;
+  // Eigen::Vector3d L2_Arm_;
+  // Eigen::Vector3d L3_Elbow_;
+  // Eigen::Vector3d L6_Wrist_;
 
   // 新版本变量
   Eigen::Vector3d P_02;
   Eigen::Vector3d P_23;
   Eigen::Vector3d P_34;
   Eigen::Vector3d P_65;
-
-  explicit Impl(const ArmMotion::MDHConfig_t& mdh_config)
-      : mdhConfig_(mdh_config) {
-    // 备份
-    // MDH_Matrix_ <<
-    //     0.0000,           0.00,                   mdhConfig_.L_BASE,    0.0,
-    //     -(double)M_PI_2,  mdhConfig_.D_BASE,      0.00,                 0.0,
-    //     0.0000,           mdhConfig_.L_UPPERARM,  0.00,                 0.0,
-    //     -(double)M_PI_2,  mdhConfig_.D_ELBOW,     mdhConfig_.L_FOREARM, 0.0,
-    //     (double)M_PI_2,   0.00,                   0.00,                 0.0,
-    //     -(double)M_PI_2,  0.00,                   mdhConfig_.L_WRIST,   0.0;
-    MDH_Matrix_ << 0.0000, 0.00, mdhConfig_.L_BASE, 0.0,
-        -(double)M_PI_2, mdhConfig_.D_BASE, 0.00, 0.0,
-        0.0000, mdhConfig_.L_UPPERARM, 0.00, 0.0,
-        -(double)M_PI_2, mdhConfig_.D_ELBOW, mdhConfig_.L_FOREARM, 0.0,
-        (double)M_PI_2, 0.00, 0.00, 0.0,
-        -(double)M_PI_2, 0.00, mdhConfig_.L_WRIST, 0.0;
-
-    // 参考坐标系是向量起点坐标系
-    L0_Base_ = Eigen::Vector3d(mdhConfig_.D_BASE, 0.0, mdhConfig_.L_BASE);
-    L2_Arm_ = Eigen::Vector3d(mdhConfig_.L_UPPERARM, 0.0, 0.0);
-    L3_Elbow_ = Eigen::Vector3d(mdhConfig_.D_ELBOW, mdhConfig_.L_FOREARM, 0.0);
-    L6_Wrist_ = Eigen::Vector3d(0.0, 0.0, -mdhConfig_.L_WRIST);
-  }
 
   explicit Impl(const ArmMotion::MDHParams& mdh_params)
       : mdhParams_(mdh_params) {
@@ -93,12 +69,12 @@ class KinematicSolver::Impl {
     //     mdh_params.alpha[3], mdh_params.a[3], mdh_params.d[3], mdh_params.theta[3],
     //     mdh_params.alpha[4], mdh_params.a[4], mdh_params.d[4], mdh_params.theta[4],
     //     mdh_params.alpha[5], mdh_params.a[5], mdh_params.d[5], mdh_params.theta[5];
-    MDH_Matrix_ << mdh_params.alpha[0], mdh_params.a[0], mdh_params.d[0], mdh_params.theta[0],
-        mdh_params.alpha[1], mdh_params.a[1], mdh_params.d[1], mdh_params.theta[1],
-        mdh_params.alpha[2], mdh_params.a[2], mdh_params.d[2], mdh_params.theta[2],
-        mdh_params.alpha[3], mdh_params.a[3], mdh_params.d[3], mdh_params.theta[3],
-        mdh_params.alpha[4], mdh_params.a[4], mdh_params.d[4], mdh_params.theta[4],
-        mdh_params.alpha[5], mdh_params.a[5], mdh_params.d[5], mdh_params.theta[5];
+    // MDH_Matrix_ << mdh_params.alpha[0], mdh_params.a[0], mdh_params.d[0], mdh_params.theta[0],
+    //     mdh_params.alpha[1], mdh_params.a[1], mdh_params.d[1], mdh_params.theta[1],
+    //     mdh_params.alpha[2], mdh_params.a[2], mdh_params.d[2], mdh_params.theta[2],
+    //     mdh_params.alpha[3], mdh_params.a[3], mdh_params.d[3], mdh_params.theta[3],
+    //     mdh_params.alpha[4], mdh_params.a[4], mdh_params.d[4], mdh_params.theta[4],
+    //     mdh_params.alpha[5], mdh_params.a[5], mdh_params.d[5], mdh_params.theta[5];
 
     P_02 = Eigen::Vector3d(mdhParams_.a[1], 0.0, mdhParams_.d[0]);
     P_23 = Eigen::Vector3d(mdhParams_.a[2], 0.0, 0.0);
@@ -106,17 +82,6 @@ class KinematicSolver::Impl {
     P_65 = Eigen::Vector3d(0.0, 0.0, -mdhParams_.d[5]);
   }
 };
-
-KinematicSolver::KinematicSolver(const ArmMotion::MDHConfig_t& mdh_config)
-    : impl_(std::make_unique<Impl>(mdh_config)) {
-  jointOffset_[0] = 0.0;
-  jointOffset_[1] = -(double)M_PI_2;
-  // jointOffset_[1] = 0.0f;
-  jointOffset_[2] = 0.0;
-  jointOffset_[3] = 0.0;
-  jointOffset_[4] = 0.0;
-  jointOffset_[5] = 0.0;
-}
 
 KinematicSolver::KinematicSolver(const ArmMotion::MDHParams& mdh_params)
     : impl_(std::make_unique<Impl>(mdh_params)) {
@@ -147,10 +112,10 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t& inputJoint,
 
     double st = std::sin(theta[i]);
     double ct = std::cos(theta[i]);
-    double sa = std::sin(impl_->MDH_Matrix_(i, 0));
-    double ca = std::cos(impl_->MDH_Matrix_(i, 0));
-    double a = impl_->MDH_Matrix_(i, 1);
-    double d = impl_->MDH_Matrix_(i, 2);
+    double sa = std::sin(impl_->mdhParams_.alpha[i]);
+    double ca = std::cos(impl_->mdhParams_.alpha[i]);
+    double a = impl_->mdhParams_.a[i];
+    double d = impl_->mdhParams_.d[i];
 
     T[i] << ct, -st, 0.0, a,
         st * ca, ct * ca, -sa, -d * sa,
@@ -228,7 +193,7 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
     theta_456[i][2] = lastJoint.theta[5] + jointOffset_[5];
   }
 
-  L0_Wrist = R_06 * impl_->L6_Wrist_;
+  L0_Wrist = R_06 * impl_->P_65;
 
   P_0w.head<3>() = P_06_pos + L0_Wrist;
 
@@ -263,12 +228,12 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
     // rotation
     P_0w_r = R_10 * P_0w;
 
-    L_2w = P_0w_r - impl_->L0_Base_;
+    L_2w = P_0w_r - impl_->P_02;
 
     double c = sqrt(L_2w[0] * L_2w[0] + L_2w[2] * L_2w[2]);
-    double b = sqrt(impl_->mdhConfig_.D_ELBOW * impl_->mdhConfig_.D_ELBOW +
-                    impl_->mdhConfig_.L_FOREARM * impl_->mdhConfig_.L_FOREARM);
-    double a = impl_->mdhConfig_.L_UPPERARM;
+    double b = sqrt(impl_->mdhParams_.a[3] * impl_->mdhParams_.a[3] +
+                    impl_->mdhParams_.d[3] * impl_->mdhParams_.d[3]);
+    double a = impl_->mdhParams_.a[2];
 
     if (fabs(a + b - c) <= 0.000001) {
       theta_23[0][0] = std::atan2(L_2w[2], L_2w[0]);
@@ -334,7 +299,7 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
 
       double alpha2 = std::atan2(L_2w[2], L_2w[0]);
       double alpha3 =
-          std::atan2(impl_->mdhConfig_.L_FOREARM, impl_->mdhConfig_.D_ELBOW);
+          std::atan2(impl_->mdhParams_.d[3], impl_->mdhParams_.a[3]);
 
       if (ind_arm == 0) {
         theta_23[0][0] = alpha2 + beta2;

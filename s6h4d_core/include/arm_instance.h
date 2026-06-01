@@ -18,9 +18,10 @@
 class ArmInstance {
  public:
   // 切换真机与仿真时，构造函数传入的arm_ctrl对象不同
-  ArmInstance(ArmCtrlBase& arm_ctrl, const ArmMotion::MDHParams& mdh_params)
+  ArmInstance(ArmCtrlBase& arm_ctrl, const ArmMotion::MDHParams& mdh_params, KinematicSolver::IKMode ik_mode=KinematicSolver::IKMode::SphericalWrist)
       : arm_ctrl_(arm_ctrl) {
     kinematic_solver_ = std::make_unique<KinematicSolver>(mdh_params);
+    kinematic_solver_->SetIKMode(ik_mode);
     jacobian_ = std::make_unique<Jacobian6Dof>(mdh_params);
     arm_ctrl_.Init();
   }

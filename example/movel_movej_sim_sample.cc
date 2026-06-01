@@ -47,19 +47,25 @@ int main() {
     return 1;
   }
 
-  ArmMotion::MDHParams mdh_params{
-      .alpha = {0.0, -M_PI_2, 0.0, -M_PI_2, M_PI_2, -M_PI_2},
-      .a = {0.0, 0.04, 0.20, 0.059, 0.0, 0.0},
-      .d = {0.123, 0.0, 0.0, 0.2, 0.0, 0.104},
-      .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}};
-  ArmInstance robot(ctrl, mdh_params);
+  // ArmMotion::MDHParams mdh_params{
+  //     .alpha = {0.0, -M_PI_2, 0.0, -M_PI_2, M_PI_2, -M_PI_2},
+  //     .a = {0.0, 0.04, 0.20, 0.059, 0.0, 0.0},
+  //     .d = {0.123, 0.0, 0.0, 0.2, 0.0, 0.104},
+  //     .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}};
+  ArmMotion::MDHParams mdh_params = {
+    .alpha = {0.0, -M_PI_2, 0.0, 0.0, -M_PI_2, M_PI_2},  // alpha
+    .a = {0.0, 0.02, 0.26, 0.24668, 0.075, 0.0},             // a
+    .d = {0.1207, 0.0, 0.0, 0.0, 0.0, 0.0265},       // d
+    .theta = {0.0, -M_PI, (M_PI - 0.233176), 0.233176, M_PI_2, 0.0}          // theta (初始偏移量)
+  };
+  ArmInstance robot(ctrl, mdh_params, KinematicSolver::IKMode::ParallelWrist);
   KinematicSolver fk_solver(mdh_params);
 
   if (!PrintCurrentState(ctrl, "Initial state")) {
     return 1;
   }
 
-  ArmMotion::Joint6Dof_t joint_target1(0.0, -0.840, 0.840, 0.0, 0.00, 0.00);
+  ArmMotion::Joint6Dof_t joint_target1(0.0, 1, -1, 0.0, 0.00, 0.00);
   ARM_LOG_INFO("MoveJ to drawing start pose");
   if (robot.MoveJ(joint_target1, 2, 3, 0.0) != 0) {
     ARM_LOG_ERROR("MoveJ to drawing start pose failed");

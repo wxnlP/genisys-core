@@ -48,12 +48,18 @@ int main() {
     return 1;
   }
 
-  ArmMotion::MDHParams mdh_params{
-      .alpha = {0.0, -M_PI_2, 0.0, -M_PI_2, M_PI_2, -M_PI_2},
-      .a = {0.0, 0.04, 0.20, 0.059, 0.0, 0.0},
-      .d = {0.123, 0.0, 0.0, 0.2, 0.0, 0.104},
-      .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}};
-  ArmInstance robot(ctrl, mdh_params);
+  // ArmMotion::MDHParams mdh_params{
+  //     .alpha = {0.0, -M_PI_2, 0.0, -M_PI_2, M_PI_2, -M_PI_2},
+  //     .a = {0.0, 0.04, 0.20, 0.059, 0.0, 0.0},
+  //     .d = {0.123, 0.0, 0.0, 0.2, 0.0, 0.104},
+  //     .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}};
+  ArmMotion::MDHParams mdh_params = {
+    .alpha = {0.0, -M_PI_2, 0.0, 0.0, -M_PI_2, M_PI_2},  // alpha
+    .a = {0.0, 0.02, 0.26, 0.24668, 0.075, 0.0},             // a
+    .d = {0.1207, 0.0, 0.0, 0.0, 0.0, 0.0265},       // d
+    .theta = {0.0, -M_PI, (M_PI - 0.233176), 0.233176, M_PI_2, 0.0}          // theta (初始偏移量)
+  };
+  ArmInstance robot(ctrl, mdh_params, KinematicSolver::IKMode::ParallelWrist);
   KinematicSolver fk_solver(mdh_params);
 
   if (!PrintCurrentState(ctrl, "Initial state")) {
@@ -62,10 +68,10 @@ int main() {
 
   // 1) 多点关节轨迹（抛物线融合）
   std::vector<ArmMotion::Joint6Dof_t> joint_points;
-  joint_points.emplace_back(0.00, -0.75, 0.80, 0.00, 0.10, 0.00);
-  joint_points.emplace_back(0.20, -0.95, 0.95, 0.10, 0.10, -0.10);
-  joint_points.emplace_back(-0.15, -0.85, 0.90, -0.05, 0.15, 0.05);
-  joint_points.emplace_back(0.00, -0.70, 0.75, 0.00, 0.10, 0.00);
+  joint_points.emplace_back(0.00, 0.75, -0.80, 0.00, 0.10, 0.00);
+  joint_points.emplace_back(0.20, 0.95, -0.95, 0.10, 0.10, -0.10);
+  joint_points.emplace_back(-0.15, 0.85, -0.90, -0.05, 0.15, 0.05);
+  joint_points.emplace_back(0.00, 0.70, -0.75, 0.00, 0.10, 0.00);
 
   ARM_LOG_INFO("MoveJMulti demo: 4 waypoints, blend radius=0.08 rad, v=0.5 rad/s");
   if (robot.MoveJMulti(joint_points, 0.08, 2.0, 3.0, 0.0) != 0) {

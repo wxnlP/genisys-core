@@ -2,15 +2,6 @@
 
 namespace ArmMotion {
 
-struct MDHConfig_t {
-  double L_BASE;
-  double D_BASE;
-  double L_UPPERARM;
-  double D_ELBOW;
-  double L_FOREARM;
-  double L_WRIST;
-};
-
 struct MDHParams {
   double alpha[6];
   double a[6];

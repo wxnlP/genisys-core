@@ -39,10 +39,44 @@ static void Euler2Rotation(const double* euler, double* R) {
   Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::ColMajor>>(R, 3, 3) = m;
 }
 
+static Eigen::Matrix4d PoseToTransform(const ArmMotion::Pose6Dof_t& pose) {
+  Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
+  Eigen::Matrix3d R;
+
+  Eigen::Quaterniond q(pose.quat.w, pose.quat.x, pose.quat.y, pose.quat.z);
+  if (q.norm() < 1e-12) {
+    q = Eigen::Quaterniond::Identity();
+  } else {
+    q.normalize();
+  }
+  R = q.toRotationMatrix();
+  
+
+  T.block<3, 3>(0, 0) = R;
+  T(0, 3) = pose.x;
+  T(1, 3) = pose.y;
+  T(2, 3) = pose.z;
+  return T;
+}
+
+static ArmMotion::Pose6Dof_t TransformToPose(const Eigen::Matrix4d& T) {
+  ArmMotion::Pose6Dof_t pose;
+  Eigen::Matrix3d R = T.block<3, 3>(0, 0);
+  Eigen::Quaterniond q(R);
+  q.normalize();
+
+  pose.x = T(0, 3);
+  pose.y = T(1, 3);
+  pose.z = T(2, 3);
+  pose.quat = ArmMotion::Quaternion_t(q.w(), q.x(), q.y(), q.z());
+
+  return pose;
+}
+
+
 class KinematicSolver::Impl {
  public:
   // MDH params
-  // ArmMotion::MDHConfig_t mdhConfig_{};
   ArmMotion::MDHParams mdhParams_{};
 
   // Eigen::Matrix<double, 6, 4> MDH_Matrix_;
@@ -58,18 +92,15 @@ class KinematicSolver::Impl {
   Eigen::Vector3d P_23;
   Eigen::Vector3d P_34;
   Eigen::Vector3d P_65;
+  Eigen::Matrix4d T_6tool{Eigen::Matrix4d::Identity()};
+  Eigen::Matrix4d T_tool6{Eigen::Matrix4d::Identity()};
+  bool toolPoseEnabled{false};
 
   explicit Impl(const ArmMotion::MDHParams& mdh_params)
       : mdhParams_(mdh_params) {
     // 备份
     // MDH_Matrix_ <<
     //     mdh_params.alpha[0], mdh_params.a[0], mdh_params.d[0], mdh_params.theta[0],
-    //     mdh_params.alpha[1], mdh_params.a[1], mdh_params.d[1], mdh_params.theta[1],
-    //     mdh_params.alpha[2], mdh_params.a[2], mdh_params.d[2], mdh_params.theta[2],
-    //     mdh_params.alpha[3], mdh_params.a[3], mdh_params.d[3], mdh_params.theta[3],
-    //     mdh_params.alpha[4], mdh_params.a[4], mdh_params.d[4], mdh_params.theta[4],
-    //     mdh_params.alpha[5], mdh_params.a[5], mdh_params.d[5], mdh_params.theta[5];
-    // MDH_Matrix_ << mdh_params.alpha[0], mdh_params.a[0], mdh_params.d[0], mdh_params.theta[0],
     //     mdh_params.alpha[1], mdh_params.a[1], mdh_params.d[1], mdh_params.theta[1],
     //     mdh_params.alpha[2], mdh_params.a[2], mdh_params.d[2], mdh_params.theta[2],
     //     mdh_params.alpha[3], mdh_params.a[3], mdh_params.d[3], mdh_params.theta[3],
@@ -134,12 +165,8 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t& inputJoint,
   Eigen::Quaterniond P_06_quat(R_06);
   P_06_quat.normalize();
 
-  outputPose.x = T_06(0, 3);
-  outputPose.y = T_06(1, 3);
-  outputPose.z = T_06(2, 3);
-
-  outputPose.quat = ArmMotion::Quaternion_t(P_06_quat.w(), P_06_quat.x(),
-                                            P_06_quat.y(), P_06_quat.z());
+  Eigen::Matrix4d T_0tcp = T_06 * impl_->T_6tool;
+  outputPose = TransformToPose(T_0tcp);
 
   return true;
 }
@@ -746,14 +773,41 @@ void KinematicSolver::SetIKMode(IKMode mode) {
   ikMode_ = mode;
 }
 
+void KinematicSolver::SetToolPose(const ArmMotion::Pose6Dof_t& tool_pose) {
+  impl_->T_6tool = PoseToTransform(tool_pose);
+  impl_->T_tool6 = impl_->T_6tool.inverse();
+  impl_->toolPoseEnabled = true;
+}
+
+void KinematicSolver::ClearToolPose() {
+  impl_->T_6tool = Eigen::Matrix4d::Identity();
+  impl_->T_tool6 = Eigen::Matrix4d::Identity();
+  impl_->toolPoseEnabled = false;
+}
+
 bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t& inputPose, const ArmMotion::Joint6Dof_t& lastJoint,
                          ArmMotion::IKSolves_t& outputSolves) {
-  if (ikMode_ == IKMode::SphericalWrist) {
-    return IK_SphericalWrist(inputPose, lastJoint, outputSolves);
-  } else if (ikMode_ == IKMode::ParallelWrist) {
-    return IK_ParallelWrist(inputPose, lastJoint, outputSolves);
+  ArmMotion::Pose6Dof_t flange_pose = inputPose;
+  if (impl_->toolPoseEnabled) {
+    Eigen::Matrix4d T_0tcp = PoseToTransform(inputPose);
+    Eigen::Matrix4d T_06 = T_0tcp * impl_->T_tool6;
+    flange_pose = TransformToPose(T_06);
   }
-  return false;
+
+  bool ok = false;
+  if (ikMode_ == IKMode::SphericalWrist) {
+    ok = IK_SphericalWrist(flange_pose, lastJoint, outputSolves);
+  } else if (ikMode_ == IKMode::ParallelWrist) {
+    ok = IK_ParallelWrist(flange_pose, lastJoint, outputSolves);
+  } else {
+    return false;
+  }
+
+  if (!ok) {
+    return false;
+  }
+
+  return true;
 }
 
 KinematicSolver::~KinematicSolver() = default;

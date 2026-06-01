@@ -5,34 +5,26 @@
 class Jacobian6Dof::Impl {
  public:
   // MDH params
-  ArmMotion::MDHConfig_t mdhConfig_{};
+  ArmMotion::MDHParams mdhParams_{};
 
   // 雅可比
   Eigen::Matrix<double, 6, 6> current_jacobian_;
   Eigen::Matrix<double, 6, 6> last_jacobian_;
   Eigen::Matrix<double, 6, 6> jacobian_dot_;
   Eigen::Matrix<double, 6, 1> current_dq_;
-  Eigen::Matrix<double, 6, 4> MDH_Matrix_;
 
-  explicit Impl(const ArmMotion::MDHConfig_t& mdh_config)
-      : mdhConfig_(mdh_config) {
-    MDH_Matrix_ << 0.0000, 0.00, mdhConfig_.L_BASE, 0.0, -(double)M_PI_2,
-        mdhConfig_.D_BASE, 0.00, 0.0, 0.0000, mdhConfig_.L_UPPERARM, 0.00, 0.0,
-        -(double)M_PI_2, mdhConfig_.D_ELBOW, mdhConfig_.L_FOREARM, 0.0,
-        (double)M_PI_2, 0.00, 0.00, 0.0, -(double)M_PI_2, 0.00,
-        mdhConfig_.L_WRIST, 0.0;
-  }
+  explicit Impl(const ArmMotion::MDHParams& mdh_params)
+      : mdhParams_(mdh_params) {}
 };
 
-Jacobian6Dof::Jacobian6Dof(const ArmMotion::MDHConfig_t& mdh_config)
-    : impl_(std::make_unique<Impl>(mdh_config)) {
-  jointOffset_[0] = 0.0;
-  jointOffset_[1] = -(double)M_PI_2;
-  // jointOffset_[1] = 0.0f;
-  jointOffset_[2] = 0.0;
-  jointOffset_[3] = 0.0;
-  jointOffset_[4] = 0.0;
-  jointOffset_[5] = 0.0;
+Jacobian6Dof::Jacobian6Dof(const ArmMotion::MDHParams& mdh_params)
+    : impl_(std::make_unique<Impl>(mdh_params)) {
+  jointOffset_[0] = mdh_params.theta[0];
+  jointOffset_[1] = mdh_params.theta[1];
+  jointOffset_[2] = mdh_params.theta[2];
+  jointOffset_[3] = mdh_params.theta[3];
+  jointOffset_[4] = mdh_params.theta[4];
+  jointOffset_[5] = mdh_params.theta[5];
 }
 
 void Jacobian6Dof::Update(const ArmMotion::Joint6Dof_t& inputJoint, double dt) {
@@ -50,10 +42,10 @@ void Jacobian6Dof::Update(const ArmMotion::Joint6Dof_t& inputJoint, double dt) {
 
     double st = std::sin(theta[i]);
     double ct = std::cos(theta[i]);
-    double sa = std::sin(impl_->MDH_Matrix_(i, 0));
-    double ca = std::cos(impl_->MDH_Matrix_(i, 0));
-    double a = impl_->MDH_Matrix_(i, 1);
-    double d = impl_->MDH_Matrix_(i, 2);
+    double sa = std::sin(impl_->mdhParams_.alpha[i]);
+    double ca = std::cos(impl_->mdhParams_.alpha[i]);
+    double a = impl_->mdhParams_.a[i];
+    double d = impl_->mdhParams_.d[i];
 
     T[i] << ct, -st, 0.0, a, st * ca, ct * ca, -sa, -sa * d, st * sa, ct * sa,
         ca, ca * d, 0.0, 0.0, 0.0, 1.0;

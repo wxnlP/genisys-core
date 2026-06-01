@@ -20,7 +20,11 @@ int main() {
     .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}          // theta (初始偏移量)
   };
   KinematicSolver kSolver(mdh_params);
-  // const ArmMotion::MDHConfig_t mdh_config{0.123, 0.04, 0.20, 0.059, 0.2, 0.104};
+  // const ArmMotion::MDHParams mdh_params{
+  //     .alpha = {0.0, -M_PI_2, 0.0, -M_PI_2, M_PI_2, -M_PI_2},
+  //     .a = {0.0, 0.04, 0.20, 0.059, 0.0, 0.0},
+  //     .d = {0.123, 0.0, 0.0, 0.2, 0.0, 0.104},
+  //     .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}};
   // KinematicSolver kSolver(mdh_config);
   // kSolver.SetIKMode(KinematicSolver::IKMode::ParallelWrist);
   ArmMotion::Joint6Dof_t joint{0.0, 0.0, 0.0, 0.0, 0.0, 0.0};

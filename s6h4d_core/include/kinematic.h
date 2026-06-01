@@ -10,11 +10,19 @@ class KinematicSolver {
     SphericalWrist,
     ParallelWrist
   };
-  explicit KinematicSolver(const ArmMotion::MDHConfig_t& mdh_config);
   explicit KinematicSolver(const ArmMotion::MDHParams& mdh_params);
   ~KinematicSolver();
 
   void SetIKMode(IKMode mode);
+  // 设置法兰坐标系到工具坐标系的固定变换（T_6_tool）。
+  void SetToolPose(const ArmMotion::Pose6Dof_t& tool_pose);
+  void ClearToolPose();
+
+  // 设置 IK 解筛选使用的关节限位（弧度）。
+  void SetJointLimits(const ArmMotion::Joint6Dof_t& joint_min,
+                      const ArmMotion::Joint6Dof_t& joint_max);
+  void ClearJointLimits();
+
   bool FK(const ArmMotion::Joint6Dof_t& inputJoint,
           ArmMotion::Pose6Dof_t& outputPose);
   bool IK(const ArmMotion::Pose6Dof_t& inputPose, const ArmMotion::Joint6Dof_t& lastJoint,

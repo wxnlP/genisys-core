@@ -48,9 +48,13 @@ int main() {
     return 1;
   }
 
-  ArmMotion::MDHConfig_t mdh_config{0.123, 0.04, 0.20, 0.059, 0.2, 0.104};
-  ArmInstance robot(ctrl, mdh_config);
-  KinematicSolver fk_solver(mdh_config);
+  ArmMotion::MDHParams mdh_params{
+      .alpha = {0.0, -M_PI_2, 0.0, -M_PI_2, M_PI_2, -M_PI_2},
+      .a = {0.0, 0.04, 0.20, 0.059, 0.0, 0.0},
+      .d = {0.123, 0.0, 0.0, 0.2, 0.0, 0.104},
+      .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}};
+  ArmInstance robot(ctrl, mdh_params);
+  KinematicSolver fk_solver(mdh_params);
 
   if (!PrintCurrentState(ctrl, "Initial state")) {
     return 1;

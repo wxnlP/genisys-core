@@ -491,3 +491,11 @@ int ArmInstance::GetCurrentJoint(ArmMotion::Joint6Dof_t& current_joint) {
   current_joint = current_state.position;
   return 0;
 }
+
+void ArmInstance::SetToolPose(const ArmMotion::Pose6Dof_t& tool_pose) {
+  kinematic_solver_->SetToolPose(tool_pose);
+}
+
+void ArmInstance::ClearToolPose() {
+  kinematic_solver_->ClearToolPose();
+}

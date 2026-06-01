@@ -18,10 +18,10 @@
 class ArmInstance {
  public:
   // 切换真机与仿真时，构造函数传入的arm_ctrl对象不同
-  ArmInstance(ArmCtrlBase& arm_ctrl, ArmMotion::MDHConfig_t& mdh_config)
+  ArmInstance(ArmCtrlBase& arm_ctrl, const ArmMotion::MDHParams& mdh_params)
       : arm_ctrl_(arm_ctrl) {
-    kinematic_solver_ = std::make_unique<KinematicSolver>(mdh_config);
-    jacobian_ = std::make_unique<Jacobian6Dof>(mdh_config);
+    kinematic_solver_ = std::make_unique<KinematicSolver>(mdh_params);
+    jacobian_ = std::make_unique<Jacobian6Dof>(mdh_params);
     arm_ctrl_.Init();
   }
   ~ArmInstance() = default;
@@ -66,6 +66,9 @@ class ArmInstance {
                  double v, double a, double t);
   int GetCurrentPose(ArmMotion::Pose6Dof_t& current_pose);
   int GetCurrentJoint(ArmMotion::Joint6Dof_t& current_joint);
+
+  void SetToolPose(const ArmMotion::Pose6Dof_t& tool_pose);
+  void ClearToolPose();
 
  private:
   bool SelectBestIKSolve(const ArmMotion::IKSolves_t& ik_solves,

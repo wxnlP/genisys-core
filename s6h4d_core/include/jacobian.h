@@ -6,7 +6,7 @@
 
 class Jacobian6Dof {
  public:
-  explicit Jacobian6Dof(const ArmMotion::MDHConfig_t& mdh_config);
+  explicit Jacobian6Dof(const ArmMotion::MDHParams& mdh_params);
   ~Jacobian6Dof();
 
   void Update(const ArmMotion::Joint6Dof_t& inputJoint, double dt);

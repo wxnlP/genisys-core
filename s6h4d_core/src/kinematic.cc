@@ -485,7 +485,7 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
   P_05.head<3>() = P_06_pos + P0_65;
 
   /* ---------------------------------J1------------------------------------- */
-  if ((P_05[0] * P_05[0] + P_05[1] * P_05[1]) <= 1e-4) {
+  if ((P_05[0] * P_05[0] + P_05[1] * P_05[1]) <= 1e-8) {
     /* 奇异位置，使用上次的解 */
     theta_1[0] = lastJoint.theta[0] + jointOffset_[0];
     theta_1[1] = theta_1[0];
@@ -524,8 +524,25 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
     Eigen::Matrix3d R_16;
     R_16 = R_10 * R_06;
 
-    // TODO：这里的 atan2 可能存在数值稳定性问题
-    double q234_sum = std::atan2(-R_16(2, 2), R_16(0, 2));
+    // 提取 q234 和角；在腕奇异附近（atan2 两输入同时趋近 0）退化到上次解以保持连续。
+    double q234_sum_ref = lastJoint.theta[1] + jointOffset_[1] +
+                          lastJoint.theta[2] + jointOffset_[2] +
+                          lastJoint.theta[3] + jointOffset_[3];
+    double q234_y = -R_16(2, 2);
+    double q234_x = R_16(0, 2);
+    double q234_sum;
+    
+    if (std::hypot(q234_y, q234_x) < 1e-6) {
+      q234_sum = q234_sum_ref;
+    } else {
+      q234_sum = std::atan2(q234_y, q234_x);
+      while (q234_sum - q234_sum_ref > (double)M_PI) {
+        q234_sum -= 2.0 * (double)M_PI;
+      }
+      while (q234_sum - q234_sum_ref < -(double)M_PI) {
+        q234_sum += 2.0 * (double)M_PI;
+      }
+    }
 
     // 消除 L4 的影响
     double L2 = impl_->mdhParams_.a[2];
@@ -545,7 +562,7 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
     if (sq234 > 1.0) {
       sq234 = 1.0;
     }
-    if (sq234 < 1.0) {
+    if (sq234 < -1.0) {
       sq234 = -1.0;
     }
 
@@ -560,6 +577,17 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
       for (int i = 0; i < 2; i++) {
         outputSolves.solveFlag[0 + i + 4 * ind_arm][1] = 0;
         outputSolves.solveFlag[2 + i + 4 * ind_arm][1] = 0;
+      }
+
+      for (int ind_elbow = 0; ind_elbow < 2; ind_elbow++) {
+        for (int ind_wrist = 0; ind_wrist < 2; ind_wrist++) {
+          int solve_index = ind_arm * 4 + ind_elbow * 2 + ind_wrist;
+          outputSolves.solveFlag[solve_index][2] = 0;
+          for (int joint_index = 0; joint_index < 6; joint_index++) {
+            outputSolves.solves[solve_index].theta[joint_index] =
+                lastJoint.theta[joint_index];
+          }
+        }
       }
       continue;
     } else if (std::abs(std::abs(c3) - 1.0) < 1e-4) {
@@ -581,7 +609,7 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
       }
 
       // 三角形退化
-      double q2 = std::atan2(z, x);
+      double q2 = -std::atan2(z, x);
 
       // 第一组
       theta_234[0][0] = q2;
@@ -635,16 +663,6 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
       double s6 = R_46(1, 0);
       double c6 = R_46(1, 1);
 
-      if (std::abs(s5) < 1e-4) {
-        // 奇异，但不影响计算
-        // TODO：必要情况需要退化？
-        outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 0][2] = -1;
-        outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 1][2] = -1;
-      } else {
-        outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 0][2] = 1;
-        outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 1][2] = 1;
-      }
-
       if (s5 > 1.0) {
         s5 = 1.0;
       }
@@ -670,11 +688,38 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
         c6 = -1.0;
       }
 
-      // 翻腕和不翻腕两组解
-      theta_56[0][0] = std::atan2(s5, c5);
-      theta_56[1][0] = std::atan2(-s5, -c5);
-      theta_56[0][1] = std::atan2(s6, c6);
-      theta_56[1][1] = std::atan2(-s6, -c6);
+      if (std::abs(s5) < 1e-4) {
+        // 奇异时腕部两分支退化为同一组，避免镜像分支在奇异点附近跳变。
+        outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 0][2] = -1;
+        outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 1][2] = -1;
+
+        // q5 在奇异处仅剩符号信息，按 c5 退化到 0 或 pi，并贴近上次解分支。
+        double q5 = (c5 >= 0.0) ? 0.0 : (double)M_PI;
+        double q5_ref = lastJoint.theta[4] + jointOffset_[4];
+        while (q5 - q5_ref > (double)M_PI) {
+          q5 -= 2.0 * (double)M_PI;
+        }
+        while (q5 - q5_ref < -(double)M_PI) {
+          q5 += 2.0 * (double)M_PI;
+        }
+
+        // q6 一般仍可由 R46 第二行直接反解；不可观测时回退到上次解。
+        double q6 = std::atan2(s6, c6);
+
+        theta_56[0][0] = q5;
+        theta_56[1][0] = q5;
+        theta_56[0][1] = q6;
+        theta_56[1][1] = q6;
+      } else {
+        outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 0][2] = 1;
+        outputSolves.solveFlag[4 * ind_arm + 2 * ind_elbow + 1][2] = 1;
+
+        // 翻腕和不翻腕两组解
+        theta_56[0][0] = std::atan2(s5, c5);
+        theta_56[1][0] = std::atan2(-s5, -c5);
+        theta_56[0][1] = std::atan2(s6, c6);
+        theta_56[1][1] = std::atan2(-s6, -c6);
+      }
 
       // 记录角度（减去关节偏移量）
       for (int ind_wrist = 0; ind_wrist < 2; ind_wrist++) {

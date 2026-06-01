@@ -89,7 +89,7 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
   cout << "## 1. 正运动学验证 (Forward Kinematics)" << endl;
 
   // ===== 1. 定义并打印输入角度 =====
-  ArmMotion::Joint6Dof_t initial_theta_deg(0, -0, 0, 0, 0.0000, 0);
+  ArmMotion::Joint6Dof_t initial_theta_deg(17.1887, -22.9183, 11.4592, 5.7296, 90.0000, 28.6479);
 
   cout << "[INPUT] 关节角输入 (Degree):" << endl;
   cout << "  ";
@@ -206,25 +206,23 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
 }
 
 int main() {
-  // const ArmMotion::MDHConfig_t mdh_config{0.123, 0.04, 0.20, 0.059, 0.2, 0.104};
-  // KinematicSolver kSolver(mdh_config);
-
-  // ArmMotion::MDHParams mdh_params = {
-  //   .alpha = {0.0, -M_PI_2, 0.0, 0.0, -M_PI_2, M_PI_2},  // alpha
-  //   .a = {0.0, 0.02, 0.26, 0.24668, 0.075, 0.0},             // a
-  //   .d = {0.1207, 0.0, 0.0, 0.0, 0.0, 0.0265},       // d
-  //   .theta = {0.0, -M_PI, (M_PI - 0.233176), 0.233176, M_PI_2, 0.0}          // theta (初始偏移量)
-  // };
 
   ArmMotion::MDHParams mdh_params = {
-    .alpha = {0.0, -M_PI_2, 0.0, -M_PI_2, M_PI_2, -M_PI_2},  // alpha
-    .a = {0.0, 0.04, 0.2, 0.059, 0.0, 0.0},             // a
-    .d = {0.123, 0.0, 0.0, 0.2, 0.0, 0.104},       // d
-    .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}          // theta (初始偏移量)
+    .alpha = {0.0, -M_PI_2, 0.0, 0.0, -M_PI_2, M_PI_2},  // alpha
+    .a = {0.0, 0.02, 0.26, 0.24668, 0.075, 0.0},             // a
+    .d = {0.1207, 0.0, 0.0, 0.0, 0.0, 0.0265},       // d
+    .theta = {0.0, -M_PI, (M_PI - 0.233176), 0.233176, M_PI_2, 0.0}          // theta (初始偏移量)
   };
 
+  // ArmMotion::MDHParams mdh_params = {
+  //   .alpha = {0.0, -M_PI_2, 0.0, -M_PI_2, M_PI_2, -M_PI_2},  // alpha
+  //   .a = {0.0, 0.04, 0.2, 0.059, 0.0, 0.0},             // a
+  //   .d = {0.123, 0.0, 0.0, 0.2, 0.0, 0.104},       // d
+  //   .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}          // theta (初始偏移量)
+  // };
+
   KinematicSolver kSolver(mdh_params);
-  // kSolver.SetIKMode(KinematicSolver::IKMode::ParallelWrist);
+  kSolver.SetIKMode(KinematicSolver::IKMode::ParallelWrist);
   // kSolver.SetIKMode(KinematicSolver::IKMode::SphericalWrist);
 
   ArmMotion::Joint6Dof_t joint;

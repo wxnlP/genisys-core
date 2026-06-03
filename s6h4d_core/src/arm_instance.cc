@@ -108,27 +108,9 @@ bool ArmInstance::SelectBestIKSolve(
   return found_valid_solve;
 }
 
-void ArmInstance::SetMotorParams(std::vector<double> stiffness, std::vector<double> damping) {
-  if (stiffness.size() != damping.size()) {
-    ARM_LOG_ERROR("[SetMotorParams] stiffness and damping size mismatch");
-    return;
-  }
-
-  if (stiffness.size() == 6) {
-    for (size_t i = 0; i < 6; ++i) {
-      motor_stiffness_.q[i] = stiffness[i];
-      motor_damping_.q[i] = damping[i];
-    }
-  } else if (stiffness.size() == 7) {
-    for (size_t i = 0; i < 6; ++i) {
-      motor_stiffness_.q[i] = stiffness[i];
-      motor_damping_.q[i] = damping[i];
-    }
-    gripper_stiffness_ = stiffness[6];
-    gripper_damping_ = damping[6];
-  } else {
-    ARM_LOG_ERROR("[SetMotorParams] invalid size {}, expected 6 or 7", stiffness.size());
-  }
+void ArmInstance::SetMotorParams(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping) {
+  motor_stiffness_ = stiffness;
+  motor_damping_ = damping;
 }
 
 void ArmInstance::Enable() { arm_ctrl_.Enable(); }

@@ -21,11 +21,10 @@ class GripperCtrlBase {
   // 最大行程：真机返回弧度（如 2.0 rad），仿真返回滑移量（如 0.045 m）
   virtual double GetMaxRange() const = 0;
 
-  virtual bool SendCommand(double position_phys, double velocity_phys,
-                           double effort, double stiffness,
-                           double damping) = 0;
+  virtual bool SendCommand(double position, double velocity,
+                           double effort, double stiffness, double damping) = 0;
 
-  virtual bool ReceiveState(double& position_phys, double& velocity_phys,
+  virtual bool ReceiveState(double& position, double& velocity,
                             double& effort) = 0;
 
  private:

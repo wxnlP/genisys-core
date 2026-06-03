@@ -8,8 +8,8 @@
 namespace {
 
 std::array<double, 6> ToArray(const ArmMotion::Joint6Dof_t& joint) {
-  return {joint.theta[0], joint.theta[1], joint.theta[2],
-          joint.theta[3], joint.theta[4], joint.theta[5]};
+  return {joint.q[0], joint.q[1], joint.q[2],
+          joint.q[3], joint.q[4], joint.q[5]};
 }
 
 std::array<double, 6> ToArray(const ArmMotion::CartesianTwist_t& twist) {
@@ -33,8 +33,8 @@ ArmMotion::Joint6Dof_t IntegratePosition(const ArmMotion::Joint6Dof_t& q,
                                          double dt) {
   ArmMotion::Joint6Dof_t q_next;
   for (int i = 0; i < 6; ++i) {
-    q_next.theta[i] =
-        q.theta[i] + dq.theta[i] * dt + 0.5 * ddq.theta[i] * dt * dt;
+    q_next.q[i] =
+        q.q[i] + dq.q[i] * dt + 0.5 * ddq.q[i] * dt * dt;
   }
   return q_next;
 }
@@ -44,7 +44,7 @@ ArmMotion::Joint6Dof_t IntegrateVelocity(const ArmMotion::Joint6Dof_t& dq,
                                          double dt) {
   ArmMotion::Joint6Dof_t dq_next;
   for (int i = 0; i < 6; ++i) {
-    dq_next.theta[i] = dq.theta[i] + ddq.theta[i] * dt;
+    dq_next.q[i] = dq.q[i] + ddq.q[i] * dt;
   }
   return dq_next;
 }
@@ -69,9 +69,9 @@ void PrintTwist(const char* label, const ArmMotion::CartesianTwist_t& twist) {
 }
 
 void PrintJoint(const char* label, const ArmMotion::Joint6Dof_t& joint) {
-  std::cout << label << " [" << joint.theta[0] << ", " << joint.theta[1] << ", "
-            << joint.theta[2] << ", " << joint.theta[3] << ", "
-            << joint.theta[4] << ", " << joint.theta[5] << "]" << std::endl;
+  std::cout << label << " [" << joint.q[0] << ", " << joint.q[1] << ", "
+            << joint.q[2] << ", " << joint.q[3] << ", "
+            << joint.q[4] << ", " << joint.q[5] << "]" << std::endl;
 }
 
 }  // namespace

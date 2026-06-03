@@ -30,7 +30,7 @@ double joint_distance_sq(const ArmMotion::Joint6Dof_t& j1,
                          const ArmMotion::Joint6Dof_t& j2) {
   double sum_sq = 0.0;
   for (int i = 0; i < 6; ++i) {
-    const double diff = wrap_to_pi(j1.theta[i] - j2.theta[i]);
+    const double diff = wrap_to_pi(j1.q[i] - j2.q[i]);
     sum_sq += diff * diff;
   }
   return sum_sq;
@@ -94,7 +94,7 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
   cout << "[INPUT] 关节角输入 (Degree):" << endl;
   cout << "  ";
   for (int i = 0; i < 6; ++i) {
-    cout << "J" << i + 1 << ":" << setw(8) << initial_theta_deg.theta[i]
+    cout << "J" << i + 1 << ":" << setw(8) << initial_theta_deg.q[i]
          << (i < 5 ? " | " : "");
   }
   cout << endl;
@@ -102,12 +102,12 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
   // 转换为弧度
   ArmMotion::Joint6Dof_t initial_theta_rad;
   for (int i = 0; i < 6; ++i)
-    initial_theta_rad.theta[i] = initial_theta_deg.theta[i] * DEG2RAD;
+    initial_theta_rad.q[i] = initial_theta_deg.q[i] * DEG2RAD;
 
   cout << "[INPUT] 关节角输入 (Radian):" << endl;
   cout << "  ";
   for (int i = 0; i < 6; ++i) {
-    cout << "J" << i + 1 << ":" << setw(8) << initial_theta_rad.theta[i]
+    cout << "J" << i + 1 << ":" << setw(8) << initial_theta_rad.q[i]
          << (i < 5 ? " | " : "");
   }
   cout << "\n" << endl;
@@ -181,7 +181,7 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
     cout << "解 " << i + 1 << ": ";
 
     for (int j = 0; j < 6; ++j) {
-      double deg = outputSolves.solves[i].theta[j] * RAD2DEG;
+      double deg = outputSolves.solves[i].q[j] * RAD2DEG;
       cout << setw(9) << deg << " ";
     }
     cout << " | flag=[" << static_cast<int>(outputSolves.solveFlag[i][0]) << ","

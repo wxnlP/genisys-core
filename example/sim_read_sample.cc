@@ -20,8 +20,8 @@ static void PrintJointState(const char* label,
   std::cout << std::string(48, '-') << "\n";
   for (int i = 0; i < 6; ++i) {
     std::cout << std::left << std::setw(12) << kJointNames[i] << std::setw(12)
-              << s.position.theta[i] << std::setw(12) << s.velocity.theta[i]
-              << std::setw(12) << s.effort.theta[i] << "\n";
+              << s.position.q[i] << std::setw(12) << s.velocity.q[i]
+              << std::setw(12) << s.effort.q[i] << "\n";
   }
   std::cout << "\n";
 }

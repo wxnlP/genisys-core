@@ -24,9 +24,11 @@ class ArmInstance {
     kinematic_solver_->SetIKMode(ik_mode);
     jacobian_ = std::make_unique<Jacobian6Dof>(mdh_params);
     arm_ctrl_.Init();
+
   }
   ~ArmInstance() = default;
 
+  void SetMotorParams(std::vector<double> stiffness, std::vector<double> damping);
   void Enable();
   void Disable();
 
@@ -83,6 +85,10 @@ class ArmInstance {
 
   ArmCtrlBase& arm_ctrl_;
   const double dt_ = 0.01;
+  ArmMotion::Joint6Dof_t motor_stiffness_{};
+  ArmMotion::Joint6Dof_t motor_damping_{};
+  double gripper_stiffness_{0.0};
+  double gripper_damping_{0.0};
   // 关节限位（弧度）
   double joint_min_[6]{-3.1416, -1.570, -1.5708, -3.1416, -1.5708, -3.1416};
   double joint_max_[6]{3.1416, 2.6, 1.5708, 3.1416, 1.5708, 3.1416};

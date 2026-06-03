@@ -38,7 +38,7 @@ void Jacobian6Dof::Update(const ArmMotion::Joint6Dof_t& inputJoint, double dt) {
   double theta[6];
 
   for (int i = 0; i < 6; i++) {
-    theta[i] = inputJoint.theta[i] + jointOffset_[i];
+    theta[i] = inputJoint.q[i] + jointOffset_[i];
 
     double st = std::sin(theta[i]);
     double ct = std::cos(theta[i]);
@@ -90,9 +90,9 @@ void Jacobian6Dof::Update(const ArmMotion::Joint6Dof_t& inputJoint, double dt) {
 bool Jacobian6Dof::ForwardVelocity(const ArmMotion::Joint6Dof_t& inputVel,
                                    ArmMotion::CartesianTwist_t& outputVel) {
   Eigen::Matrix<double, 6, 1> jointVel;
-  jointVel << inputVel.theta[0], inputVel.theta[1], 
-              inputVel.theta[2], inputVel.theta[3], 
-              inputVel.theta[4], inputVel.theta[5];
+  jointVel << inputVel.q[0], inputVel.q[1], 
+              inputVel.q[2], inputVel.q[3], 
+              inputVel.q[4], inputVel.q[5];
   Eigen::Matrix<double, 6, 1> cartesianVel = impl_->current_jacobian_ * jointVel;
 
   outputVel.linear.x = cartesianVel[0];
@@ -125,7 +125,7 @@ bool Jacobian6Dof::InverseVelocity(const ArmMotion::CartesianTwist_t& inputVel,
   Eigen::Matrix<double, 6, 1> dqResult = JT * x;
   impl_->current_dq_ = dqResult;
 
-  Eigen::Map<Eigen::Matrix<double, 6, 1>> outMap(&outputVel.theta[0]);
+  Eigen::Map<Eigen::Matrix<double, 6, 1>> outMap(&outputVel.q[0]);
   outMap = dqResult;
   return true;
 }
@@ -133,8 +133,8 @@ bool Jacobian6Dof::InverseVelocity(const ArmMotion::CartesianTwist_t& inputVel,
 bool Jacobian6Dof::ForwardAccel(const ArmMotion::Joint6Dof_t& inputAcc,
                                 ArmMotion::CartesianTwist_t& outputAcc) {
   Eigen::Matrix<double, 6, 1> jointAcc;
-  jointAcc << inputAcc.theta[0], inputAcc.theta[1], inputAcc.theta[2],
-              inputAcc.theta[3], inputAcc.theta[4], inputAcc.theta[5];
+  jointAcc << inputAcc.q[0], inputAcc.q[1], inputAcc.q[2],
+              inputAcc.q[3], inputAcc.q[4], inputAcc.q[5];
   Eigen::Matrix<double, 6, 1> cartesianAcc =
       impl_->current_jacobian_ * jointAcc +
       impl_->jacobian_dot_ * impl_->current_dq_;
@@ -172,7 +172,7 @@ bool Jacobian6Dof::InverseAccel(const ArmMotion::CartesianTwist_t& inputAcc,
   Eigen::Matrix<double, 6, 1> x = JJT.ldlt().solve(bias_acc);
   Eigen::Matrix<double, 6, 1> ddqResult = JT * x;
 
-  Eigen::Map<Eigen::Matrix<double, 6, 1>> outMap(&outputAcc.theta[0]);
+  Eigen::Map<Eigen::Matrix<double, 6, 1>> outMap(&outputAcc.q[0]);
   outMap = ddqResult;
   return true;
 }

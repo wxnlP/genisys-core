@@ -17,13 +17,13 @@ namespace {
 void PrintJointPoint(const ArmMotion::JointTrajectoryPoint_t& point) {
   std::cout << "t=" << std::setw(4) << point.t << "  s=" << point.s << "  q=[";
   for (int i = 0; i < 6; ++i) {
-    std::cout << point.position.theta[i];
+    std::cout << point.position.q[i];
     if (i < 5) {
       std::cout << ", ";
     }
   }
-  std::cout << "]  dq0=" << point.velocity.theta[0]
-            << "  ddq0=" << point.acceleration.theta[0] << '\n';
+  std::cout << "]  dq0=" << point.velocity.q[0]
+            << "  ddq0=" << point.acceleration.q[0] << '\n';
 }
 
 void PrintCartesianPoint(const ArmMotion::CartesianTrajectoryPoint_t& point) {
@@ -46,13 +46,13 @@ void WriteJointRow(std::ofstream& stream,
                    const ArmMotion::JointTrajectoryPoint_t& point) {
   stream << point.t;
   for (int i = 0; i < 6; ++i) {
-    stream << ',' << point.position.theta[i];
+    stream << ',' << point.position.q[i];
   }
   for (int i = 0; i < 6; ++i) {
-    stream << ',' << point.velocity.theta[i];
+    stream << ',' << point.velocity.q[i];
   }
   for (int i = 0; i < 6; ++i) {
-    stream << ',' << point.acceleration.theta[i];
+    stream << ',' << point.acceleration.q[i];
   }
   stream << '\n';
 }

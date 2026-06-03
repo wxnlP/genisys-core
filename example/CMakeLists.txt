@@ -6,7 +6,7 @@ set(SIM_READ_TARGET_NAME sim_read_example)
 set(SIM_MOVEL_MOVEJ_TARGET_NAME sim_movel_movej_example)
 set(SIM_MULTI_POINT_TARGET_NAME sim_multi_point_example)
 
-add_executable(demo demo.cc)
+add_executable(kinematic_demo demo.cc)
 add_executable(${KINEMATIC_TARGET_NAME} kinematic_sample.cc)
 add_executable(${JACOBIAN_TARGET_NAME} jacobian_sample.cc)
 add_executable(${TRAJECTORY_TARGET_NAME} trajectory_sample.cc)
@@ -57,7 +57,7 @@ if (BUILD_SIM_PROXY)
         sim_adapter
         s6h4d_sdk
     )
-    target_link_libraries(demo PRIVATE
+    target_link_libraries(kinematic_demo PRIVATE
         s6h4d_sdk
     )
 

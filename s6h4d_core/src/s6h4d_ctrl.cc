@@ -8,16 +8,16 @@ constexpr uint8_t kFrameTail = 207;  // 0xCF
 }  // namespace
 
 /* ------------------------------ PRIVATE ---------------------------------- */
-void S6h4dCtrl::Float2Bytes(const ArmMotion::JointState_t& joint,
+void S6h4dCtrl::Float2Bytes(const ArmMotion::JointCommand_t& joint,
                             uint8_t* buffer) {
   for (size_t i = 0; i < 6; i++) {
     const size_t offset = i * 3 * sizeof(float);
-    const float pos = static_cast<float>(joint.position.theta[i]);
-    const float vel = static_cast<float>(joint.velocity.theta[i]);
-    const float acc = static_cast<float>(joint.accel.theta[i]);
+    const float pos = static_cast<float>(joint.position.q[i]);
+    const float vel = static_cast<float>(joint.velocity.q[i]);
+    const float eff = static_cast<float>(joint.effort.q[i]);
     memcpy(buffer + offset + 0 * sizeof(float), &pos, sizeof(float));
     memcpy(buffer + offset + 1 * sizeof(float), &vel, sizeof(float));
-    memcpy(buffer + offset + 2 * sizeof(float), &acc, sizeof(float));
+    memcpy(buffer + offset + 2 * sizeof(float), &eff, sizeof(float));
   }
 }
 
@@ -27,7 +27,7 @@ void S6h4dCtrl::Bytes2Float(const uint8_t* bytes,
     // a[3]~a[26] 对应 1~6 轴角度，每轴4字节float
     float angle = 0.0f;
     memcpy(&angle, bytes + 3 + i * sizeof(float), sizeof(float));
-    joint.theta[i] = static_cast<double>(angle);
+    joint.q[i] = static_cast<double>(angle);
   }
 }
 
@@ -42,7 +42,7 @@ bool S6h4dCtrl::Init() {
   return true;
 }
 
-bool S6h4dCtrl::SetJointState(const ArmMotion::JointState_t& joint_cmd) {
+bool S6h4dCtrl::SetJointState(const ArmMotion::JointCommand_t& joint_cmd) {
   uint8_t buffer[78]{};
   buffer[0] = 0xEB;   // 帧头
   buffer[1] = 0x02;   // 通道号

@@ -25,7 +25,7 @@ option(BUILD_SIM_PROXY "Build sim proxy" ON)
 
 
 add_subdirectory(s6h4d_core)
-
+add_subdirectory(third_party/dm_driver)
 
 if(BUILD_DEFAULT_SERIAL) 
     add_subdirectory(third_party/serial)

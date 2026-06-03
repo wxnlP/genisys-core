@@ -42,7 +42,7 @@ int main() {
     std::cout << "解 " << i + 1 << ": ";
 
     for (int j = 0; j < 6; ++j) {
-      double deg = outputSolves.solves[i].theta[j] *( 180.0 / M_PI);
+      double deg = outputSolves.solves[i].q[j] *( 180.0 / M_PI);
       std::cout << std::setw(9) << deg << " ";
     }
     std::cout << " | flag=[" << static_cast<int>(outputSolves.solveFlag[i][0]) << ","

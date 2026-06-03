@@ -8,10 +8,10 @@
 #include "sim_ctrl.h"
 
 // ──────────────────────────────────────────────
-// 打印 JointState_t 的各字段
+// 打印 JointCommand_t 的各字段
 // ──────────────────────────────────────────────
 static void PrintJointState(const char* label,
-                            const ArmMotion::JointState_t& s) {
+                            const ArmMotion::JointCommand_t& s) {
   const char* kJointNames[6] = {"shoulder", "upper_arm", "elbow",
                                 "wrist1", "wrist2", "wrist3"};
 
@@ -23,8 +23,8 @@ static void PrintJointState(const char* label,
   std::cout << std::string(48, '-') << "\n";
   for (int i = 0; i < 6; ++i) {
     std::cout << std::left << std::setw(12) << kJointNames[i] << std::setw(12)
-              << s.position.theta[i] << std::setw(12) << s.velocity.theta[i]
-              << std::setw(12) << s.effort.theta[i] << "\n";
+              << s.position.q[i] << std::setw(12) << s.velocity.q[i]
+              << std::setw(12) << s.effort.q[i] << "\n";
   }
   std::cout << "\n";
 }
@@ -52,12 +52,12 @@ int main() {
   for (int i = 0; i < kPoints; ++i) {
     const double t = static_cast<double>(i) / static_cast<double>(kPoints - 1);
 
-    ArmMotion::JointState_t cmd{};
+    ArmMotion::JointCommand_t cmd{};
     for (int j = 0; j < 6; ++j) {
-      cmd.position.theta[j] =
+      cmd.position.q[j] =
           base[j] + amp[j] * std::sin(2.0 * kPi * t + phase[j]);
-      cmd.velocity.theta[j] = 0.0;
-      cmd.effort.theta[j] = 0.0;
+      cmd.velocity.q[j] = 0.0;
+      cmd.effort.q[j] = 0.0;
     }
 
     PrintJointState(("Send #" + std::to_string(i + 1)).c_str(), cmd);

@@ -17,8 +17,8 @@ bool JointTrajectory::Sample(double t,
   path_.EvaluateTangent(tangent);
 
   for (int i = 0; i < 6; ++i) {
-    point.velocity.theta[i] = tangent.theta[i] * state.sd;
-    point.acceleration.theta[i] = tangent.theta[i] * state.sdd;
+    point.velocity.q[i] = tangent.q[i] * state.sd;
+    point.acceleration.q[i] = tangent.q[i] * state.sdd;
   }
 
   return true;

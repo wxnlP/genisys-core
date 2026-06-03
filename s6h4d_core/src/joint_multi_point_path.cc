@@ -8,7 +8,7 @@ double MultiPointJointPath::JointDistance(const ArmMotion::Joint6Dof_t& p1,
                                           const ArmMotion::Joint6Dof_t& p2) const {
   double sum = 0.0;
   for (int i = 0; i < 6; ++i) {
-    double d = p1.theta[i] - p2.theta[i];
+    double d = p1.q[i] - p2.q[i];
     sum += d * d;
   }
   return std::sqrt(sum);
@@ -94,16 +94,16 @@ void MultiPointJointPath::EvaluatePos(double s, ArmMotion::Joint6Dof_t& point) c
 
     // 计算各关节分量
     for (int k = 0; k < 6; ++k) {
-      const double d_in  = (points_[j].theta[k] - points_[j - 1].theta[k]) / L_in;
-      const double d_out = (points_[j + 1].theta[k] - points_[j].theta[k]) / L_out;
+      const double d_in  = (points_[j].q[k] - points_[j - 1].q[k]) / L_in;
+      const double d_out = (points_[j + 1].q[k] - points_[j].q[k]) / L_out;
 
-      point.theta[k] = points_[j].theta[k]
+      point.q[k] = points_[j].q[k]
                        + r * (d_out - d_in) * 0.25
                        + (d_in + d_out) * 0.5 * u
                        + (d_out - d_in) / (4.0 * r) * u * u;
 
       // 切向量 d(pos)/ds = dp/du * L_total
-      last_tangent_.theta[k] =
+      last_tangent_.q[k] =
           ((d_in + d_out) * 0.5 + (d_out - d_in) / (2.0 * r) * u)
           * total_length_;
     }
@@ -123,16 +123,16 @@ void MultiPointJointPath::EvaluatePos(double s, ArmMotion::Joint6Dof_t& point) c
   // 不应该发生，但以防万一（如数值误差导致 L=0），直接返回线段起点
   if (L <= 0.0) {
     point = points_[seg];
-    for (int k = 0; k < 6; ++k) { last_tangent_.theta[k] = 0.0; }
+    for (int k = 0; k < 6; ++k) { last_tangent_.q[k] = 0.0; }
     return;
   }
 
   const double t = (arc - cum_lengths_[seg]) / L;  // 百分比
   for (int k = 0; k < 6; ++k) {
-    const double delta = points_[seg + 1].theta[k] - points_[seg].theta[k];
-    point.theta[k] = points_[seg].theta[k] + t * delta;
+    const double delta = points_[seg + 1].q[k] - points_[seg].q[k];
+    point.q[k] = points_[seg].q[k] + t * delta;
     // 切向量 = d(pos)/ds = delta/L * L_total
-    last_tangent_.theta[k] = delta * total_length_ / L;
+    last_tangent_.q[k] = delta * total_length_ / L;
   }
 }
 

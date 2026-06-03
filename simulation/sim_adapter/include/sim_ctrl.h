@@ -9,11 +9,11 @@ class SimCtrl : public ArmCtrlBase {
   ~SimCtrl() override = default;
 
   bool Init() override;
-  bool SetJointState(const ArmMotion::JointState_t& joint_cmd) override;
+  bool SetJointState(const ArmMotion::JointCommand_t& joint_cmd) override;
   bool GetJointState(ArmMotion::JointState_t& joint_state) override;
 
  private:
-  bool SendHttpRequest(const ArmMotion::JointState_t& joint_cmd);
+  bool SendHttpRequest(const ArmMotion::JointCommand_t& joint_cmd);
   bool GetHttpResponse(ArmMotion::JointState_t& joint_state);
 
   std::string http_host_{"127.0.0.1"};

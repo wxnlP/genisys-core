@@ -12,7 +12,7 @@ double JointPathLength(const ArmMotion::Joint6Dof_t& q0,
                        const ArmMotion::Joint6Dof_t& q1) {
   double sum = 0.0;
   for (int i = 0; i < 6; ++i) {
-    const double d = q1.theta[i] - q0.theta[i];
+    const double d = q1.q[i] - q0.q[i];
     sum += d * d;
   }
   return std::sqrt(sum);
@@ -66,7 +66,7 @@ bool ArmInstance::SelectBestIKSolve(
 
     double score = 0.0;
     for (int j = 0; j < 6; ++j) {
-      double diff = ik_solves.solves[i].theta[j] - reference_joint.theta[j];
+      double diff = ik_solves.solves[i].q[j] - reference_joint.q[j];
       while (diff > kPi) {
         diff -= kTwoPi;
       }
@@ -92,14 +92,14 @@ bool ArmInstance::SelectBestIKSolve(
       selected_joint = ik_solves.solves[i];
       // 将候选解展开到 reference_joint 邻域，避免 ±2pi 等价角导致的突跳。
       for (int j = 0; j < 6; ++j) {
-        double d = selected_joint.theta[j] - reference_joint.theta[j];
+        double d = selected_joint.q[j] - reference_joint.q[j];
         while (d > kPi) {
           d -= kTwoPi;
         }
         while (d <= -kPi) {
           d += kTwoPi;
         }
-        selected_joint.theta[j] = reference_joint.theta[j] + d;
+        selected_joint.q[j] = reference_joint.q[j] + d;
       }
       found_valid_solve = true;
     }
@@ -107,6 +107,33 @@ bool ArmInstance::SelectBestIKSolve(
 
   return found_valid_solve;
 }
+
+void ArmInstance::SetMotorParams(std::vector<double> stiffness, std::vector<double> damping) {
+  if (stiffness.size() != damping.size()) {
+    ARM_LOG_ERROR("[SetMotorParams] stiffness and damping size mismatch");
+    return;
+  }
+
+  if (stiffness.size() == 6) {
+    for (size_t i = 0; i < 6; ++i) {
+      motor_stiffness_.q[i] = stiffness[i];
+      motor_damping_.q[i] = damping[i];
+    }
+  } else if (stiffness.size() == 7) {
+    for (size_t i = 0; i < 6; ++i) {
+      motor_stiffness_.q[i] = stiffness[i];
+      motor_damping_.q[i] = damping[i];
+    }
+    gripper_stiffness_ = stiffness[6];
+    gripper_damping_ = damping[6];
+  } else {
+    ARM_LOG_ERROR("[SetMotorParams] invalid size {}, expected 6 or 7", stiffness.size());
+  }
+}
+
+void ArmInstance::Enable() { arm_ctrl_.Enable(); }
+
+void ArmInstance::Disable() { arm_ctrl_.Disable(); }
 
 int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
                        double t) {
@@ -191,8 +218,12 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
     jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6);
 
     // 发送控制命令到机械臂
-    ArmMotion::JointState_t joint_cmd{
-        .position = target_joint, .velocity = joint_vel, .accel = joint_acc};
+    ArmMotion::JointCommand_t joint_cmd;
+    joint_cmd.position = target_joint;
+    joint_cmd.velocity = joint_vel;
+    joint_cmd.stiffness = motor_stiffness_;
+    joint_cmd.damping = motor_damping_;
+    // TODO: 力矩支持
     if (!arm_ctrl_.SetJointState(joint_cmd)) {
       ARM_LOG_ERROR("[MoveL] failed: SetJointState at t={}", current_time);
       return -1;
@@ -211,9 +242,9 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
 int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
                        double a, double t) {
   for (int i = 0; i < 6; i++) {
-    if (target_joint.theta[i] < joint_min_[i] || target_joint.theta[i] > joint_max_[i]) {
+    if (target_joint.q[i] < joint_min_[i] || target_joint.q[i] > joint_max_[i]) {
       ARM_LOG_ERROR("[MoveJ] target joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
-                    i, target_joint.theta[i], joint_min_[i], joint_max_[i]);
+                    i, target_joint.q[i], joint_min_[i], joint_max_[i]);
       return -1;
     }
   }
@@ -259,22 +290,25 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
       return -1;
     }
 
-    ArmMotion::JointState_t joint_cmd{.position = point.position,
-                                      .velocity = point.velocity,
-                                      .accel = point.acceleration};
+    ArmMotion::JointCommand_t joint_cmd;
+    joint_cmd.position = point.position;
+    joint_cmd.velocity = point.velocity;
+    joint_cmd.stiffness = motor_stiffness_;
+    joint_cmd.damping = motor_damping_;
+    // TODO: 力矩支持
     if (!arm_ctrl_.SetJointState(joint_cmd)) {
       ARM_LOG_ERROR(
           "[MoveJ] failed: SetJointState at t={}, q0={}, q1={}, q2={}",
-          current_time, point.position.theta[0], point.position.theta[1],
-          point.position.theta[2]);
+          current_time, point.position.q[0], point.position.q[1],
+          point.position.q[2]);
       return -1;
     }
 
     // 采样后
     for (int i = 0; i < 6; ++i) {
-      if (point.position.theta[i] < joint_min_[i] || point.position.theta[i] > joint_max_[i]) {
+      if (point.position.q[i] < joint_min_[i] || point.position.q[i] > joint_max_[i]) {
         ARM_LOG_WARN("[MoveJ] trajectory point joint[{}]={:.4f} out of limit at t={}",
-                     i, point.position.theta[i], current_time);
+                     i, point.position.q[i], current_time);
         return -1;
       }
     }
@@ -296,10 +330,10 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
   // 检查输入点关节限位
   for (size_t p = 0; p < points.size(); ++p) {
     for (int i = 0; i < 6; ++i) {
-      if (points[p].theta[i] < joint_min_[i] || points[p].theta[i] > joint_max_[i]) {
+      if (points[p].q[i] < joint_min_[i] || points[p].q[i] > joint_max_[i]) {
         ARM_LOG_ERROR(
             "[MoveJMulti] input point {} joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
-            p, i, points[p].theta[i], joint_min_[i], joint_max_[i]);
+            p, i, points[p].q[i], joint_min_[i], joint_max_[i]);
         return -1;
       }
     }
@@ -353,16 +387,19 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
 
     // 轨迹点限位保护
     for (int i = 0; i < 6; ++i) {
-      if (point.position.theta[i] < joint_min_[i] || point.position.theta[i] > joint_max_[i]) {
+      if (point.position.q[i] < joint_min_[i] || point.position.q[i] > joint_max_[i]) {
         ARM_LOG_ERROR("[MoveJMulti] failed: sampled joint[{}]={:.4f} out of limit at t={}",
-                      i, point.position.theta[i], current_time);
+                      i, point.position.q[i], current_time);
         return -1;
       }
     }
 
-    ArmMotion::JointState_t joint_cmd{.position = point.position,
-                                      .velocity = point.velocity,
-                                      .accel = point.acceleration};
+    ArmMotion::JointCommand_t joint_cmd;
+    joint_cmd.position = point.position;
+    joint_cmd.velocity = point.velocity;
+    joint_cmd.stiffness = motor_stiffness_;
+    joint_cmd.damping = motor_damping_;
+    // TODO: 力矩、刚度、阻尼支持
     if (!arm_ctrl_.SetJointState(joint_cmd)) {
       ARM_LOG_ERROR("[MoveJMulti] failed: SetJointState at t={}", current_time);
       return -1;
@@ -454,8 +491,12 @@ int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points,
     ArmMotion::Joint6Dof_t joint_acc;
     jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6);
 
-    ArmMotion::JointState_t joint_cmd{
-        .position = target_joint, .velocity = joint_vel, .accel = joint_acc};
+    ArmMotion::JointCommand_t joint_cmd;
+    joint_cmd.position = target_joint;
+    joint_cmd.velocity = joint_vel;
+    joint_cmd.stiffness = motor_stiffness_;
+    joint_cmd.damping = motor_damping_;
+    // TODO: 力矩支持
     if (!arm_ctrl_.SetJointState(joint_cmd)) {
       ARM_LOG_ERROR("[MoveLMulti] failed: SetJointState at t={}", current_time);
       return -1;

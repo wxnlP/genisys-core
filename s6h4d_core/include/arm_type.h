@@ -28,9 +28,9 @@ struct Joint6Dof_t {
   Joint6Dof_t() = default;
 
   Joint6Dof_t(double a1, double a2, double a3, double a4, double a5, double a6)
-      : theta{a1, a2, a3, a4, a5, a6} {}
+      : q{a1, a2, a3, a4, a5, a6} {}
 
-  double theta[6]{};
+  double q[6]{};
 };
 
 struct Pose6Dof_t {
@@ -83,10 +83,17 @@ struct CartesianTrajectoryPoint_t {
   CartesianTwist_t acceleration{};
 };
 
+struct JointCommand_t {
+  Joint6Dof_t position{};
+  Joint6Dof_t velocity{};
+  Joint6Dof_t effort{};
+  Joint6Dof_t stiffness{};
+  Joint6Dof_t damping{};
+};
+
 struct JointState_t {
   Joint6Dof_t position{};
   Joint6Dof_t velocity{};
-  Joint6Dof_t accel{};
   Joint6Dof_t effort{};
 };
 }  // namespace ArmMotion

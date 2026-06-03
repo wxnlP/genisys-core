@@ -7,7 +7,9 @@ class ArmCtrlBase {
   ArmCtrlBase() = default;
   virtual ~ArmCtrlBase() = default;
 
-  virtual bool Init() = 0;
-  virtual bool SetJointState(const ArmMotion::JointState_t& joint_cmd) = 0;
+  virtual bool Init() { return true; };
+  virtual void Enable() { return; };
+  virtual void Disable() { return; };
+  virtual bool SetJointState(const ArmMotion::JointCommand_t& joint_cmd) = 0;
   virtual bool GetJointState(ArmMotion::JointState_t& joint_state) = 0;
 };

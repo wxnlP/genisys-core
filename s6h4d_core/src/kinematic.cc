@@ -134,7 +134,7 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t& inputJoint,
   Eigen::Matrix3d R_06;
 
   for (int i = 0; i < 6; i++) {
-    theta_in[i] = inputJoint.theta[i];
+    theta_in[i] = inputJoint.q[i];
   }
 
   // 处理齐次变换矩阵
@@ -212,12 +212,12 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
   }
 
   for (int i = 0; i < 2; i++) {
-    theta_1[i] = lastJoint.theta[0] + jointOffset_[0];
-    theta_23[i][0] = lastJoint.theta[1] + jointOffset_[1];
-    theta_23[i][1] = lastJoint.theta[2] + jointOffset_[2];
-    theta_456[i][0] = lastJoint.theta[3] + jointOffset_[3];
-    theta_456[i][1] = lastJoint.theta[4] + jointOffset_[4];
-    theta_456[i][2] = lastJoint.theta[5] + jointOffset_[5];
+    theta_1[i] = lastJoint.q[0] + jointOffset_[0];
+    theta_23[i][0] = lastJoint.q[1] + jointOffset_[1];
+    theta_23[i][1] = lastJoint.q[2] + jointOffset_[2];
+    theta_456[i][0] = lastJoint.q[3] + jointOffset_[3];
+    theta_456[i][1] = lastJoint.q[4] + jointOffset_[4];
+    theta_456[i][2] = lastJoint.q[5] + jointOffset_[5];
   }
 
   L0_Wrist = R_06 * impl_->P_65;
@@ -227,7 +227,7 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
   /* ---------------------------------J1--------------------------------------
    */
   if ((P_0w[0] * P_0w[0] + P_0w[1] * P_0w[1]) <= 0.000001) {
-    theta_1[0] = lastJoint.theta[0] + jointOffset_[0];
+    theta_1[0] = lastJoint.q[0] + jointOffset_[0];
     theta_1[1] = theta_1[0];
     for (int i = 0; i < 4; i++) {
       outputSolves.solveFlag[0 + i][0] = -1;
@@ -383,27 +383,27 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
       }
       if (cos5 == 1.0 || cos5 == -1.0) {
         if (ind_arm == 0) {
-          theta_456[0][0] = lastJoint.theta[3] + jointOffset_[3];
-          double c4 = std::cos(lastJoint.theta[3] + jointOffset_[3]);
-          double s4 = std::sin(lastJoint.theta[3] + jointOffset_[3]);
+          theta_456[0][0] = lastJoint.q[3] + jointOffset_[3];
+          double c4 = std::cos(lastJoint.q[3] + jointOffset_[3]);
+          double s4 = std::sin(lastJoint.q[3] + jointOffset_[3]);
           theta_456[0][2] = std::atan2(-s4 * R_36(0, 0) - c4 * R_36(2, 0),
                                        -s4 * R_36(0, 1) - c4 * R_36(2, 1));
 
-          theta_456[1][2] = lastJoint.theta[5] + jointOffset_[5];
-          double c6 = std::cos(lastJoint.theta[5] + jointOffset_[5]);
-          double s6 = std::sin(lastJoint.theta[5] + jointOffset_[5]);
+          theta_456[1][2] = lastJoint.q[5] + jointOffset_[5];
+          double c6 = std::cos(lastJoint.q[5] + jointOffset_[5]);
+          double s6 = std::sin(lastJoint.q[5] + jointOffset_[5]);
           theta_456[1][0] = std::atan2(-s6 * R_36(0, 0) - c6 * R_36(0, 1),
                                        -s6 * R_36(2, 0) - c6 * R_36(2, 1));
         } else {
-          theta_456[0][2] = lastJoint.theta[5] + jointOffset_[5];
-          double c6 = std::cos(lastJoint.theta[5] + jointOffset_[5]);
-          double s6 = std::sin(lastJoint.theta[5] + jointOffset_[5]);
+          theta_456[0][2] = lastJoint.q[5] + jointOffset_[5];
+          double c6 = std::cos(lastJoint.q[5] + jointOffset_[5]);
+          double s6 = std::sin(lastJoint.q[5] + jointOffset_[5]);
           theta_456[0][0] = std::atan2(-s6 * R_36(0, 0) - c6 * R_36(0, 1),
                                        -s6 * R_36(2, 0) - c6 * R_36(2, 1));
 
-          theta_456[1][0] = lastJoint.theta[3] + jointOffset_[3];
-          double c4 = std::cos(lastJoint.theta[3] + jointOffset_[3]);
-          double s4 = std::sin(lastJoint.theta[3] + jointOffset_[3]);
+          theta_456[1][0] = lastJoint.q[3] + jointOffset_[3];
+          double c4 = std::cos(lastJoint.q[3] + jointOffset_[3]);
+          double s4 = std::sin(lastJoint.q[3] + jointOffset_[3]);
           theta_456[1][2] = std::atan2(-s4 * R_36(0, 0) - c4 * R_36(2, 0),
                                        -s4 * R_36(0, 1) - c4 * R_36(2, 1));
         }
@@ -435,7 +435,7 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
         // while (theta_1_ <= -(double)M_PI) {
         //     theta_1_ += 2.0 * (double)M_PI;
         // }
-        outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[0] =
+        outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].q[0] =
             theta_1_;
 
         for (int i = 0; i < 2; i++) {
@@ -447,7 +447,7 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
           //     theta_23_ += 2.0 * (double)M_PI;
           // }
           outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist]
-              .theta[1 + i] = theta_23_;
+              .q[1 + i] = theta_23_;
         }
 
         for (int i = 0; i < 3; i++) {
@@ -459,7 +459,7 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
           //     theta_456_ += 2.0 * (double)M_PI;
           // }
           outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist]
-              .theta[3 + i] = theta_456_;
+              .q[3 + i] = theta_456_;
         }
       }
     }
@@ -496,12 +496,12 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
 
   // // 初始化解为上次的解，同步处理机械角度偏移
   // for (int i = 0; i < 2; i++) {
-  //   theta_1[i] = lastJoint.theta[0] + jointOffset_[0];
-  //   theta_234[i][0] = lastJoint.theta[1] + jointOffset_[1];
-  //   theta_234[i][1] = lastJoint.theta[2] + jointOffset_[2];
-  //   theta_234[i][2] = lastJoint.theta[3] + jointOffset_[3];
-  //   theta_56[i][0] = lastJoint.theta[4] + jointOffset_[4];
-  //   theta_56[i][1] = lastJoint.theta[5] + jointOffset_[5];
+  //   theta_1[i] = lastJoint.q[0] + jointOffset_[0];
+  //   theta_234[i][0] = lastJoint.q[1] + jointOffset_[1];
+  //   theta_234[i][1] = lastJoint.q[2] + jointOffset_[2];
+  //   theta_234[i][2] = lastJoint.q[3] + jointOffset_[3];
+  //   theta_56[i][0] = lastJoint.q[4] + jointOffset_[4];
+  //   theta_56[i][1] = lastJoint.q[5] + jointOffset_[5];
   // }
 
   // 切换参考参考坐标系为基座（纯旋转变换）
@@ -514,7 +514,7 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
   /* ---------------------------------J1------------------------------------- */
   if ((P_05[0] * P_05[0] + P_05[1] * P_05[1]) <= 1e-8) {
     /* 奇异位置，使用上次的解 */
-    theta_1[0] = lastJoint.theta[0] + jointOffset_[0];
+    theta_1[0] = lastJoint.q[0] + jointOffset_[0];
     theta_1[1] = theta_1[0];
     for (int i = 0; i < 4; i++) {
       outputSolves.solveFlag[0 + i][0] = -1;
@@ -552,9 +552,9 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
     R_16 = R_10 * R_06;
 
     // 提取 q234 和角；在腕奇异附近（atan2 两输入同时趋近 0）退化到上次解以保持连续。
-    double q234_sum_ref = lastJoint.theta[1] + jointOffset_[1] +
-                          lastJoint.theta[2] + jointOffset_[2] +
-                          lastJoint.theta[3] + jointOffset_[3];
+    double q234_sum_ref = lastJoint.q[1] + jointOffset_[1] +
+                          lastJoint.q[2] + jointOffset_[2] +
+                          lastJoint.q[3] + jointOffset_[3];
     double q234_y = -R_16(2, 2);
     double q234_x = R_16(0, 2);
     double q234_sum;
@@ -611,8 +611,8 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
           int solve_index = ind_arm * 4 + ind_elbow * 2 + ind_wrist;
           outputSolves.solveFlag[solve_index][2] = 0;
           for (int joint_index = 0; joint_index < 6; joint_index++) {
-            outputSolves.solves[solve_index].theta[joint_index] =
-                lastJoint.theta[joint_index];
+            outputSolves.solves[solve_index].q[joint_index] =
+                lastJoint.q[joint_index];
           }
         }
       }
@@ -722,7 +722,7 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
 
         // q5 在奇异处仅剩符号信息，按 c5 退化到 0 或 pi，并贴近上次解分支。
         double q5 = (c5 >= 0.0) ? 0.0 : (double)M_PI;
-        double q5_ref = lastJoint.theta[4] + jointOffset_[4];
+        double q5_ref = lastJoint.q[4] + jointOffset_[4];
         while (q5 - q5_ref > (double)M_PI) {
           q5 -= 2.0 * (double)M_PI;
         }
@@ -751,17 +751,17 @@ bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
       // 记录角度（减去关节偏移量）
       for (int ind_wrist = 0; ind_wrist < 2; ind_wrist++) {
         double theta_1_ = theta_1[ind_arm] - jointOffset_[0];
-        outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[0] = theta_1_;
+        outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].q[0] = theta_1_;
 
         for (int i = 0; i < 3; i++) {
           double theta_234_ = theta_234[ind_elbow][i] - jointOffset_[1 + i];
-          outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].theta[1 + i] = theta_234_;
+          outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist].q[1 + i] = theta_234_;
         }
 
         for (int i = 0; i < 2; i++) {
           double theta_56_ = theta_56[ind_wrist][i] - jointOffset_[4 + i];
           outputSolves.solves[ind_arm * 4 + ind_elbow * 2 + ind_wrist]
-              .theta[4 + i] = theta_56_;
+              .q[4 + i] = theta_56_;
         }
       }
     }

@@ -1,6 +1,7 @@
 #include "gripper_ctrl_base.h"
 
 #include "lspb_time_scaler.h"
+#include "arm_logger.h"
 #include <chrono>
 #include <cmath>
 #include <thread>
@@ -10,12 +11,15 @@ bool GripperCtrlBase::SetPosition(double position, double velocity,
   const double max_range = GetMaxRange();
 
   // 读取当前物理位置，转归一化
-  double current_pos = 0.0;
-  double current_vel = 0.0;
-  double current_effort = 0.0;
+  double current_pos{};
+  double current_vel{};
+  double current_effort{};
   if (!ReceiveState(current_pos, current_vel, current_effort)) {
     return false;
   }
+
+  ARM_LOG_INFO("Current State: {} {} {}", current_pos, current_vel, current_effort);
+
   double target_pos = position * max_range;
 
   // 已在目标位置

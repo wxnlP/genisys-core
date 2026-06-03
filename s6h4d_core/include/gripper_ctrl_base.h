@@ -6,9 +6,9 @@ class GripperCtrlBase {
       : motor_stiffness_(stiffness), motor_damping_(damping){};
   virtual ~GripperCtrlBase() = default;
 
-  // 设置夹爪开合度，范围 [0.0, 1.0]，0.0 闭合，1.0 全开
-  // 内部 LSPB 梯形速度平滑（同 MoveJ 风格：物理值 → 内部归一化）
-  //
+  virtual void Enable() { return; };
+  virtual void Disable() { return; };
+  
   // velocity : 物理速度上限（rad/s 或 m/s，取决于 GetMaxRange 量纲）
   // accel    : 物理加速度上限（rad/s² 或 m/s²）
   // effort   : 夹持力矩（Nm），≤0 时不做力控

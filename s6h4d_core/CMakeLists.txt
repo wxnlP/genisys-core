@@ -26,12 +26,13 @@ target_sources(${TARGET_NAME} PRIVATE
     src/joint_multi_point_path.cc
     src/cartesian_multi_point_path.cc
     src/gripper_ctrl_base.cc
+    src/geniarm_gripper.cc
 )
 set(LINK_LIBS  dm_driver)
 if(BUILD_DEFAULT_SERIAL)
     list(APPEND LINK_LIBS serial)
 endif()
-target_link_libraries(${TARGET_NAME} PUBLIC ${LINK_LIBS})
+target_link_libraries(${TARGET_NAME} PRIVATE ${LINK_LIBS})
 
 # 安装静态库目标
 install(TARGETS ${TARGET_NAME}

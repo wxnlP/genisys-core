@@ -9,11 +9,13 @@ class GeniArmGripper : public GripperCtrlBase {
       : GripperCtrlBase(stiffness, damping), motor_driver_(motor_driver) {}
   ~GeniArmGripper() override = default;
 
+  void Enable() override;
+  void Disable() override;
  private:
   double GetMaxRange() const override;
   bool SendCommand(double position, double velocity, double effort, double stiffness, double damping) override;
   bool ReceiveState(double& position, double& velocity, double& effort) override;
 
-  static constexpr double kMaxRange = 2.1;  // 弧度或米，取决于使用场景
+  static constexpr double kMaxRange = 1.9;  // 弧度或米，取决于使用场景
   DmMotorDriver& motor_driver_;
 };

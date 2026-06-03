@@ -8,6 +8,7 @@
 
 using JointStateArray = aimrt::protocols::sensor::JointStateArray;
 using JointCommandArray = aimrt::protocols::sensor::JointCommandArray;
+using JointCommand = aimrt::protocols::sensor::JointCommand;  
 
 namespace sim_proxy::proxy_module {
 
@@ -51,8 +52,16 @@ class ProxyModule : public aimrt::ModuleBase {
 
   std::string sdk_http_joint_state_topic_;
   std::string sdk_http_joint_cmd_topic_;
+  std::string sdk_http_gripper_state_topic_;
+  std::string sdk_http_gripper_cmd_topic_;
   std::string proxy_joint_state_topic_;
   std::string proxy_joint_cmd_topic_;
+
+  // 指令缓存：joint_cmd / gripper_cmd 各自更新自己部分，
+  // 每次发布时拼成完整的 7 关节数组，避免一方覆盖另一方
+  JointCommandArray arm_cache_;
+  JointCommand gripper_cache_;
+  std::mutex cmd_cache_mutex_;
 
   std::mutex mutex_;
   std::promise<void> stop_sig_;

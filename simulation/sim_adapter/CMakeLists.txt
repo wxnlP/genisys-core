@@ -4,6 +4,7 @@ add_library(${SIM_ADAPTER_TARGET_NAME} STATIC)
 
 target_sources(${SIM_ADAPTER_TARGET_NAME} PRIVATE
   src/sim_ctrl.cc
+  src/sim_gripper.cc
 )
 
 target_include_directories(${SIM_ADAPTER_TARGET_NAME} PUBLIC

@@ -1,8 +1,8 @@
 #include "proxy_module/proxy_module.h"
 #include "aimrt_module_protobuf_interface/channel/protobuf_channel.h"
 #include "aimrt_module_protobuf_interface/util/protobuf_tools.h"
-#include "yaml-cpp/yaml.h"
 #include "nlohmann_json.hpp"
+#include "yaml-cpp/yaml.h"
 
 namespace sim_proxy::proxy_module {
 
@@ -17,6 +17,8 @@ bool ProxyModule::Initialize(aimrt::CoreRef core) {
       YAML::Node cfg_node = YAML::LoadFile(std::string(file_path));
       sdk_http_joint_state_topic_ = cfg_node["sdk_http_joint_state_topic"].as<std::string>();
       sdk_http_joint_cmd_topic_ = cfg_node["sdk_http_joint_cmd_topic"].as<std::string>();
+      sdk_http_gripper_state_topic_ = cfg_node["sdk_http_gripper_state_topic"].as<std::string>();
+      sdk_http_gripper_cmd_topic_ = cfg_node["sdk_http_gripper_cmd_topic"].as<std::string>();
       proxy_joint_state_topic_ = cfg_node["proxy_joint_state_topic"].as<std::string>();
       proxy_joint_cmd_topic_ = cfg_node["proxy_joint_cmd_topic"].as<std::string>();
       http_executor_name_ = cfg_node["http_server_executor"].as<std::string>();
@@ -83,7 +85,7 @@ void ProxyModule::HttpServerThread() {
       nlohmann::json req_json = nlohmann::json::parse(req.body);
       nlohmann::json res_json;
       AIMRT_INFO("Request msg: ", req_json["joints"].dump());
-      
+
       if (req_json.contains("joints")) {
         res_json["joints"] = nlohmann::json::array();
         JointStateArray current_joint_state;
@@ -99,36 +101,47 @@ void ProxyModule::HttpServerThread() {
         res.status = 200;
         res.set_content(res_json.dump(), "application/json");
       } else {
-        res.status = 400; 
+        res.status = 400;
         res.set_content("Invalid JSON format", "application/json");
         return;
       }
     } catch (const std::exception& e) {
       AIMRT_WARN("Failed to parse HTTP request body: {}", e.what());
-      res.status = 400; 
+      res.status = 400;
       res.set_content("Invalid JSON format", "application/json");
       return;
     }
   });
 
-  // Post2: SDK发起控制仿真
+  // Post2: SDK发起控制仿真（6轴）
   http_server_.Post(sdk_http_joint_cmd_topic_, [this](const httplib::Request& req, httplib::Response& res) {
     try {
       AIMRT_DEBUG("Received HTTP request for mujoco joint command.");
       nlohmann::json req_json = nlohmann::json::parse(req.body);
-      nlohmann::json res_json;
       AIMRT_INFO("Request msg: ", req_json["joints"].dump());
 
       if (req_json.contains("joints")) {
+        // 更新 arm 缓存
+        {
+          std::lock_guard<std::mutex> lock(cmd_cache_mutex_);
+          arm_cache_.clear_joints();
+          for (const auto& joint_json : req_json["joints"]) {
+            auto* cmd = arm_cache_.add_joints();
+            cmd->set_name(joint_json["name"].get<std::string>());
+            cmd->set_position(joint_json["position"].get<double>());
+            cmd->set_velocity(joint_json["velocity"].get<double>());
+            cmd->set_effort(joint_json["effort"].get<double>());
+            cmd->set_damping(joint_json["damping"].get<double>());
+            cmd->set_stiffness(joint_json["stiffness"].get<double>());
+          }
+        }
+
+        // 拼 arm 缓存 + gripper 缓存发布
         JointCommandArray joint_cmd_array;
-        for (const auto& joint_json : req_json["joints"]) {
-          auto* joint_cmd = joint_cmd_array.add_joints();
-          joint_cmd->set_name(joint_json["name"].get<std::string>());
-          joint_cmd->set_position(joint_json["position"].get<double>());
-          joint_cmd->set_velocity(joint_json["velocity"].get<double>());
-          joint_cmd->set_effort(joint_json["effort"].get<double>());
-          joint_cmd->set_damping(joint_json["damping"].get<double>());
-          joint_cmd->set_stiffness(joint_json["stiffness"].get<double>());
+        {
+          std::lock_guard<std::mutex> lock(cmd_cache_mutex_);
+          joint_cmd_array = arm_cache_;
+          *joint_cmd_array.add_joints() = gripper_cache_;
         }
 
         auto now = std::chrono::system_clock::now();
@@ -140,18 +153,103 @@ void ProxyModule::HttpServerThread() {
         res.status = 200;
         res.set_content("Joint command published successfully", "application/json");
       } else {
-        res.status = 400; 
+        res.status = 400;
         res.set_content("Invalid JSON format", "application/json");
         return;
       }
     } catch (const std::exception& e) {
       AIMRT_WARN("Failed to parse HTTP request body: {}", e.what());
-      res.status = 400; 
+      res.status = 400;
       res.set_content("Invalid JSON format", "application/json");
       return;
     }
   });
-  
+
+  // Gripper 指令端：更新缓存，拼 arm 缓存发布（不读仿真状态，避免覆盖轨迹）
+  http_server_.Post(sdk_http_gripper_cmd_topic_, [this](const httplib::Request& req, httplib::Response& res) {
+    try {
+      nlohmann::json req_json = nlohmann::json::parse(req.body);
+      AIMRT_DEBUG("Received HTTP request for gripper command.");
+
+      JointCommandArray joint_cmd_array;
+      {
+        std::lock_guard<std::mutex> lock(cmd_cache_mutex_);
+
+        // 更新夹爪缓存
+        gripper_cache_.set_name("gripper_joint");
+        gripper_cache_.set_position(req_json.value("position", 0.0));
+        gripper_cache_.set_velocity(req_json.value("velocity", 0.0));
+        gripper_cache_.set_effort(req_json.value("effort", 0.0));
+        gripper_cache_.set_stiffness(req_json.value("stiffness", 0.0));
+        gripper_cache_.set_damping(req_json.value("damping", 0.0));
+
+        // 拼 arm 缓存；若为空则用仿真当前状态作为初始值
+        if (arm_cache_.joints_size() > 0) {
+          joint_cmd_array = arm_cache_;
+        } else {
+          JointStateArray current_state;
+          GetCurrentJointState(current_state);
+          for (const auto& joint : current_state.joints()) {
+            if (joint.name() == "gripper_joint") continue;
+            auto* cmd = joint_cmd_array.add_joints();
+            cmd->set_name(joint.name());
+            cmd->set_position(joint.position());
+          }
+        }
+        *joint_cmd_array.add_joints() = gripper_cache_;
+      }
+
+      auto now = std::chrono::system_clock::now();
+      auto duration = now.time_since_epoch();
+      auto total_nanoseconds =
+          std::chrono::duration_cast<std::chrono::nanoseconds>(duration).count();
+      joint_cmd_array.mutable_header()->set_time_stamp(
+          static_cast<uint64_t>(total_nanoseconds));
+      aimrt::channel::Publish(proxy_joint_cmd_pub_, joint_cmd_array);
+
+      res.status = 200;
+      res.set_content("Gripper command published", "application/json");
+    } catch (const std::exception& e) {
+      AIMRT_WARN("Failed to parse gripper command: {}", e.what());
+      res.status = 400;
+      res.set_content("Invalid JSON format", "application/json");
+    }
+  });
+
+  // Gripper 状态端：SDK 查询仿真中夹爪当前状态
+  http_server_.Post(sdk_http_gripper_state_topic_, [this](const httplib::Request& req, httplib::Response& res) {
+    try {
+      nlohmann::json res_json;
+      JointStateArray current_joint_state;
+      GetCurrentJointState(current_joint_state);
+
+      // 从仿真状态中提取 gripper_joint
+      bool found = false;
+      for (const auto& joint : current_joint_state.joints()) {
+        if (joint.name() == "gripper_joint") {
+          res_json["position"] = joint.position();
+          res_json["velocity"] = joint.velocity();
+          res_json["effort"] = joint.effort();
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        AIMRT_WARN("gripper_joint not found in current joint state.");
+        res.status = 400;
+        res.set_content("Failed to find gripper", "application/json");
+        return;
+      }
+
+      res.status = 200;
+      res.set_content(res_json.dump(), "application/json");
+    } catch (const std::exception& e) {
+      AIMRT_WARN("Failed to handle gripper state request: {}", e.what());
+      res.status = 400;
+      res.set_content("Invalid JSON format", "application/json");
+    }
+  });
+
   if (!http_server_.listen("127.0.0.1", 8080)) {
     AIMRT_ERROR("Failed to start HTTP server.");
   }

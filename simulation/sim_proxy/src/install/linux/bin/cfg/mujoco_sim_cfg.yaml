@@ -106,6 +106,8 @@ ProxyModule:
   http_server_executor: work_executor
   sdk_http_joint_state_topic: /sdk/joint_state
   sdk_http_joint_cmd_topic: /sdk/joint_cmd
+  sdk_http_gripper_state_topic: /sdk/gripper_state
+  sdk_http_gripper_cmd_topic: /sdk/gripper_cmd
   proxy_joint_state_topic: /sim/joint_state
   proxy_joint_cmd_topic: /sim/joint_cmd
 RvizModule:

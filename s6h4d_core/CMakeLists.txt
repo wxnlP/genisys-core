@@ -25,6 +25,7 @@ target_sources(${TARGET_NAME} PRIVATE
     src/arm_instance.cc
     src/joint_multi_point_path.cc
     src/cartesian_multi_point_path.cc
+    src/gripper_ctrl_base.cc
 )
 set(LINK_LIBS  dm_driver)
 if(BUILD_DEFAULT_SERIAL)

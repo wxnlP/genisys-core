@@ -1,7 +1,7 @@
 #pragma once
 
 #ifndef FMT_HEADER_ONLY
-#define FMT_HEADER_ONLY
+  #define FMT_HEADER_ONLY
 #endif
 
 #include <fmt/core.h>
@@ -10,6 +10,15 @@
 #include <atomic>
 #include <iostream>
 #include <string_view>
+
+// 加到文件顶部
+namespace Ansi {
+constexpr auto kReset = "\033[0m";
+constexpr auto kRed = "\033[31m";
+constexpr auto kGreen = "\033[32m";
+constexpr auto kYellow = "\033[33m";
+constexpr auto kCyan = "\033[36m";
+}  // namespace Ansi
 
 enum class LogLevel {
   DEBUG = 0,
@@ -48,12 +57,17 @@ class ArmLogger {
     if (!ShouldLog(level)) {
       return;
     }
+    const char* color = Ansi::kReset;
+    if (level == LogLevel::DEBUG) { color = Ansi::kCyan; }
+    if (level == LogLevel::INFO) { color = Ansi::kGreen; }
+    if (level == LogLevel::WARN) { color = Ansi::kYellow; }
+    if (level == LogLevel::ERROR) { color = Ansi::kRed; }
 
     const auto message = fmt::format(fmt_str, std::forward<Args>(args)...);
     std::ostream& output = (level == LogLevel::WARN || level == LogLevel::ERROR)
                                ? std::cerr
                                : std::cout;
-    output << '[' << LevelName(level) << "] " << message << '\n';
+    output << color << '[' << LevelName(level) << "] " << message << Ansi::kReset << '\n';
   }
 
  private:

@@ -8,7 +8,7 @@
 
 bool GripperCtrlBase::SetPosition(double position, double velocity,
                                   double accel, double effort) {
-  const double max_range = GetMaxRange();
+  const double max_range = max_range_;
 
   // 读取当前物理位置，转归一化
   double current_pos{};
@@ -76,6 +76,6 @@ bool GripperCtrlBase::GetPosition(double& position, double& effort) {
   if (!ReceiveState(position_phys, velocity_phys, effort)) {
     return false;
   }
-  position = position_phys / GetMaxRange();
+  position = position_phys / max_range_;
   return true;
 }

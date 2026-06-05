@@ -12,32 +12,22 @@ int main() {
   can_bus.SetReceiverId(ids, 2);
   ARM_LOG_INFO("CAN BUS Init: {}", sock_fd);
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  std::jthread sample_thread([&can_bus]() {
-    ARM_LOG_INFO("sample_thread");
-    while (true) {
-      can_bus.Sample();
-      // std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    }
-  });
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
   /* Motor Driver Init */
   DmMotorDriver dm4310(can_bus, 0x07);
 
   /* GeniArm Gripper Init */
   GeniArmGripper gripper(dm4310, 12.0, 0.8);
+  gripper.SetMaxRange(1.9);
+  gripper.Init();
   gripper.Enable();
 
-  std::jthread receive_thread([&dm4310]() {
-    DmMotorDriver::MotorState state{};
+  std::jthread receive_thread([&gripper]() {
+    double position, velocity, effort;
     while (true) {
-      dm4310.RequestState();
-      int ret = dm4310.GetLatestState(state);
+      int ret = gripper.ReceiveState(position, velocity, effort);
       if (ret != -1) {
         ARM_LOG_INFO("==================Motor State=====================");
-        ARM_LOG_INFO("id: {} pos: {} vel: {} torque: {}",
-                     state.id, state.pos, state.vel, state.torque);
+        ARM_LOG_INFO("pos: {} vel: {} torque: {}", position, velocity, effort);
         ARM_LOG_INFO("==================================================");
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(500));

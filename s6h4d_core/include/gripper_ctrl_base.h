@@ -9,7 +9,8 @@ class GripperCtrlBase {
   virtual void Enable() { return; };
   virtual void Disable() { return; };
   
-  // velocity : 物理速度上限（rad/s 或 m/s，取决于 GetMaxRange 量纲）
+  void SetMaxRange(double max_range) { max_range_ = max_range; }
+  // velocity : 物理速度上限（rad/s 或 m/s，取决于 max_range_ 量纲）
   // accel    : 物理加速度上限（rad/s² 或 m/s²）
   // effort   : 夹持力矩（Nm），≤0 时不做力控
   bool SetPosition(double position, double velocity, double accel, double effort);
@@ -18,9 +19,6 @@ class GripperCtrlBase {
   bool GetPosition(double& position, double& effort);
 
  protected:
-  // 最大行程：真机返回弧度（如 2.0 rad），仿真返回滑移量（如 0.045 m）
-  virtual double GetMaxRange() const = 0;
-
   virtual bool SendCommand(double position, double velocity,
                            double effort, double stiffness, double damping) = 0;
 
@@ -31,4 +29,5 @@ class GripperCtrlBase {
   static constexpr double kDefaultDt = 0.01;
   double motor_stiffness_;
   double motor_damping_;
+  double max_range_;
 };

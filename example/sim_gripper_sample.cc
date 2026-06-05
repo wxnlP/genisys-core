@@ -26,6 +26,7 @@ void PrintGripperState(const char* label, SimGripper& gripper) {
 
 int main() {
   SimGripper gripper;
+  gripper.SetMaxRange(0.045);  // 设置滑块最大行程为 45mm
 
   ARM_LOG_INFO("=== Gripper Demo Start ===");
 

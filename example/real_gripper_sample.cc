@@ -5,6 +5,7 @@
 #include "geniarm_gripper.h"
 
 int main() {
+  /* Socket CAN Init */
   SocketCANBus can_bus("can0", true);
   int sock_fd = can_bus.Init();
   uint32_t ids[7] = {0x11, 0x17};
@@ -21,8 +22,10 @@ int main() {
   });
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
+  /* Motor Driver Init */
   DmMotorDriver dm4310(can_bus, 0x07);
 
+  /* GeniArm Gripper Init */
   GeniArmGripper gripper(dm4310, 12.0, 0.8);
   gripper.Enable();
 
@@ -42,7 +45,6 @@ int main() {
   });
 
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
-  DmMotorDriver::MotorState state;
 
   bool ret = gripper.SetPosition(1, 0.5, 1, 0);
   ARM_LOG_INFO("SetPosition: {}", ret);

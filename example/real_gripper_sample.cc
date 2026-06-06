@@ -13,11 +13,13 @@ int main() {
   ARM_LOG_INFO("CAN BUS Init: {}", sock_fd);
 
   /* Motor Driver Init */
-  DmMotorDriver dm4310(can_bus, 0x07);
+  DmMotorDriver dm4340p(can_bus, 0x07, DmMotorDriver::MotorModel::DM4340P);
+  DmMotorDriver dm4310(can_bus, 0x07, DmMotorDriver::MotorModel::DM4310);
+
 
   /* GeniArm Gripper Init */
-  GeniArmGripper gripper(dm4310, 12.0, 0.8);
-  gripper.SetMaxRange(1.9);
+  GeniArmGripper gripper(dm4310, 12.0, 1);
+  gripper.SetMaxRange(-2.2);
   gripper.Init();
   gripper.Enable();
 
@@ -36,9 +38,20 @@ int main() {
 
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-  bool ret = gripper.SetPosition(1, 0.5, 1, 0);
-  ARM_LOG_INFO("SetPosition: {}", ret);
+  /* 位置速度控制 */
+  // bool ret = gripper.SetPosition(1, 0.5, 1, 0);
+  // ARM_LOG_INFO("SetPosition: {}", ret);
+  // std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+  // gripper.SetPosition(0.0, 0.5, 1, 0);
+  // gripper.Disable();
+
+  /* 力控 */
+  gripper.SetPosition(0.4, 0.5, 1, 0);
+ 
+  ARM_LOG_INFO("=== Test 1: -3Nm torque ===");
+  gripper.SetTorque(-3.0, 1.0);   // 1Nm，2Nm/s 斜坡
   std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+  ARM_LOG_INFO("回归零点......");
   gripper.SetPosition(0.0, 0.5, 1, 0);
   gripper.Disable();
   return 0;

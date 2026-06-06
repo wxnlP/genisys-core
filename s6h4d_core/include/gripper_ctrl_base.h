@@ -14,7 +14,7 @@ class GripperCtrlBase {
   // accel    : 物理加速度上限（rad/s² 或 m/s²）
   // effort   : 夹持力矩（Nm），≤0 时不做力控
   bool SetPosition(double position, double velocity, double accel, double effort);
-
+  bool SetTorque(double effort, double ramp_rate = 3.0);
   // 获取当前夹爪开合度 [0.0, 1.0]
   bool GetPosition(double& position, double& effort);
 

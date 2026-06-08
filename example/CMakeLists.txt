@@ -16,21 +16,21 @@ add_executable(${REAL_GRIPPER_TARGET_NAME} real_gripper_sample.cc)
 
 
 target_link_libraries(${KINEMATIC_TARGET_NAME} PRIVATE
-    s6h4d_sdk
+    robotic_arm_sdk
 )
 target_link_libraries(${JACOBIAN_TARGET_NAME} PRIVATE
-    s6h4d_sdk
+    robotic_arm_sdk
 )
 target_link_libraries(${TRAJECTORY_TARGET_NAME} PRIVATE
-    s6h4d_sdk
+    robotic_arm_sdk
 )
 
 target_link_libraries(kinematic_demo PRIVATE
-    s6h4d_sdk
+    robotic_arm_sdk
 )
 
 target_link_libraries(${REAL_GRIPPER_TARGET_NAME} PRIVATE
-    s6h4d_sdk    
+    robotic_arm_sdk    
     dm_driver    
 )
 
@@ -56,23 +56,23 @@ if (BUILD_SIM_PROXY)
 
     target_link_libraries(${SIM_SEND_TARGET_NAME} PRIVATE
         sim_adapter
-        s6h4d_sdk
+        robotic_arm_sdk
     )
     target_link_libraries(${SIM_READ_TARGET_NAME} PRIVATE
         sim_adapter
-        s6h4d_sdk
+        robotic_arm_sdk
     )
     target_link_libraries(${SIM_MOVEL_MOVEJ_TARGET_NAME} PRIVATE
         sim_adapter
-        s6h4d_sdk
+        robotic_arm_sdk
     )
     target_link_libraries(${SIM_MULTI_POINT_TARGET_NAME} PRIVATE
         sim_adapter
-        s6h4d_sdk
+        robotic_arm_sdk
     )
     target_link_libraries(${SIM_GRIPPER_TARGET_NAME} PRIVATE
         sim_adapter
-        s6h4d_sdk
+        robotic_arm_sdk
     )
 
 

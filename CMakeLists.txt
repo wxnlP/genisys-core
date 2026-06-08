@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(s6h4d_sdk LANGUAGES C CXX)
+project(robotic_arm_sdk LANGUAGES C CXX)
 
 # 修改默认的库文件、存档文件的存放位置
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -24,7 +24,7 @@ option(BUILD_EXAMPLES "Build examples" ON)
 option(BUILD_SIM_PROXY "Build sim proxy" ON)
 
 
-add_subdirectory(s6h4d_core)
+add_subdirectory(arm_core)
 add_subdirectory(third_party/dm_driver)
 
 if(BUILD_DEFAULT_SERIAL) 

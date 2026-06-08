@@ -12,7 +12,7 @@ target_include_directories(${SIM_ADAPTER_TARGET_NAME} PUBLIC
 )
 
 target_link_libraries(${SIM_ADAPTER_TARGET_NAME} PUBLIC
-  s6h4d_sdk
+  robotic_arm_sdk
   sim_common_header
 )
 

@@ -1,4 +1,4 @@
-set(TARGET_NAME s6h4d_sdk)
+set(TARGET_NAME robotic_arm_sdk)
 
 add_library(${TARGET_NAME} STATIC)
 

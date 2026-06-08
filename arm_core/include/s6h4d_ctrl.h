@@ -2,6 +2,8 @@
 
 #include "arm_ctrl_base.h"
 #include "serial/serial.h"
+#include <thread>
+#include <mutex>
 
 class S6h4dCtrl : public ArmCtrlBase {
  public:
@@ -18,4 +20,7 @@ class S6h4dCtrl : public ArmCtrlBase {
   void Bytes2Float(const uint8_t* bytes, ArmMotion::Joint6Dof_t& joint);
 
   serial::Serial& serial_;
+  std::jthread joint_state_thread_;
+  std::mutex joint_state_mutex_;
+  ArmMotion::JointState_t last_joint_state_{};
 };

@@ -1,5 +1,6 @@
 #include "s6h4d_ctrl.h"
 
+#include <chrono>
 #include <cstring>
 
 namespace {
@@ -39,6 +40,40 @@ bool S6h4dCtrl::Init() {
       return false;
     }
   }
+  serial::Timeout timeout(100,  // inter_byte_timeout
+                          500,  // read_timeout_constant (总超时基数)
+                          0,    // read_timeout_multiplier
+                          100,  // write_timeout_constant
+                          0);   // write_timeout_multiplier
+  serial_.setTimeout(timeout);
+  joint_state_thread_ = std::jthread([this](std::stop_token stoken) {
+    uint8_t frame[36]{};
+    while (!stoken.stop_requested()) {
+      size_t head_read = serial_.read(&frame[0], 1);
+      if (head_read != 1) {
+        continue;
+      }
+      // 判断帧头
+      if (frame[0] != kFrameHead) {
+        continue;
+      }
+
+      // 读取剩余部分
+      size_t body_read = serial_.read(&frame[1], 36 - 1);
+      if (body_read != 36 - 1) {
+        continue;
+      }
+
+      if (frame[36 - 1] != kFrameTail) {
+        continue;
+      }
+
+      {
+        std::lock_guard<std::mutex> lock(joint_state_mutex_);
+        Bytes2Float(frame, last_joint_state_.position);
+      }
+    }
+  });
   return true;
 }
 
@@ -58,33 +93,7 @@ bool S6h4dCtrl::SetJointState(const ArmMotion::JointCommand_t& joint_cmd) {
 }
 
 bool S6h4dCtrl::GetJointState(ArmMotion::JointState_t& joint_state) {
-  uint8_t frame[36]{};
-
-  // 对齐帧头，避免串口缓冲区存在残留导致错位解析
-  for (int attempt = 0; attempt < 64; ++attempt) {
-    size_t head_read = serial_.read(&frame[0], 1);
-    if (head_read != 1) {
-      return false;
-    }
-    // 判断帧头
-    if (frame[0] != kFrameHead) {
-      continue;
-    }
-
-    // 读取剩余部分
-    size_t body_read = serial_.read(&frame[1], 36 - 1);
-    if (body_read != 36 - 1) {
-      return false;
-    }
-
-    if (frame[36 - 1] != kFrameTail) {
-      continue;
-    }
-
-    joint_state = ArmMotion::JointState_t{};
-    Bytes2Float(frame, joint_state.position);
-    return true;
-  }
-
-  return false;
+  std::lock_guard<std::mutex> lock(joint_state_mutex_);
+  joint_state = last_joint_state_;
+  return true;
 }

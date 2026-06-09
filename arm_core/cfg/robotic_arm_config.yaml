@@ -1,0 +1,66 @@
+robot:
+  name: "geniarm"
+  port: "can0"
+  kinematics:
+    ik_mode: "UR" # or Piper
+    MDH:
+      alpha: [0.0, -90.0, 0.0, 0.0, -90.0, 90.0]
+      a: [0.0, 0.02, 0.26, 0.24668, 0.075, 0.0]
+      d: [0.1207, 0.0, 0.0, 0.0, 0.0, 0.0265]
+      offset: [0.0, -180.0, 166.64, 13.36, 90.0, 0.0]
+  dynamics: ""
+  joints:
+    - name: "joint1"
+      motor_id: 0x01
+      feedback_id: 0x11
+      model: "DM4340P"
+      MIT:
+        stiffness: 120.0
+        damping: 5.0
+    - name: "joint2"
+      motor_id: 0x02
+      feedback_id: 0x12
+      model: "DM4340P"
+      MIT:
+        stiffness: 120.0
+        damping: 5.0
+    - name: "joint3"
+      motor_id: 0x03
+      feedback_id: 0x13
+      model: "DM4340P"
+      MIT:
+        stiffness: 120.0
+        damping: 5.0
+    - name: "joint4"
+      motor_id: 0x04
+      feedback_id: 0x14
+      model: "DM4310"
+      MIT:
+        stiffness: 12.0
+        damping: 1.0
+    - name: "joint5"
+      motor_id: 0x05
+      feedback_id: 0x15
+      model: "DM4310"
+      MIT:
+        stiffness: 12.0
+        damping: 1.0
+    - name: "joint6"
+      motor_id: 0x06
+      feedback_id: 0x16
+      model: "DM4310"
+      MIT:
+        stiffness: 12.0
+        damping: 1.0
+
+gripper:
+  name: "geniarm_gripper"
+  port: "can0"
+  max_range: -2.2
+  actuators:
+    - motor_id: 0x07
+      feedback_id: 0x17
+      model: "DM4310"
+      MIT:
+        stiffness: 12.0
+        damping: 1.0

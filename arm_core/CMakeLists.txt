@@ -3,13 +3,14 @@ set(TARGET_NAME robotic_arm_sdk)
 add_library(${TARGET_NAME} STATIC)
 
 find_package(Eigen3 REQUIRED)
+find_package(yaml-cpp REQUIRED)
 
 # 头文件搜索路径
 target_include_directories(${TARGET_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(${TARGET_NAME} PUBLIC Eigen3::Eigen)
+target_link_libraries(${TARGET_NAME} PUBLIC Eigen3::Eigen yaml-cpp)
 
 # 添加源文件
 target_sources(${TARGET_NAME} PRIVATE
@@ -27,6 +28,7 @@ target_sources(${TARGET_NAME} PRIVATE
     src/cartesian_multi_point_path.cc
     src/gripper_ctrl_base.cc
     src/geniarm_gripper.cc
+    src/robo_manger.cc
 )
 set(LINK_LIBS  dm_driver)
 if(BUILD_DEFAULT_SERIAL)
@@ -44,4 +46,8 @@ install(TARGETS ${TARGET_NAME}
 # 安装头文件
 install(DIRECTORY include/
     DESTINATION include/${TARGET_NAME}
+)
+
+install(DIRECTORY cfg/
+    DESTINATION ${CMAKE_BINARY_DIR}/cfg
 )

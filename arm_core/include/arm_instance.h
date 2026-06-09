@@ -18,17 +18,19 @@
 class ArmInstance {
  public:
   // 切换真机与仿真时，构造函数传入的arm_ctrl对象不同
-  ArmInstance(ArmCtrlBase& arm_ctrl, const ArmMotion::MDHParams& mdh_params, KinematicSolver::IKMode ik_mode=KinematicSolver::IKMode::SphericalWrist)
+  ArmInstance(ArmCtrlBase& arm_ctrl, const ArmMotion::MDHParams& mdh_params, KinematicSolver::IKMode ik_mode = KinematicSolver::IKMode::SphericalWrist)
       : arm_ctrl_(arm_ctrl) {
     kinematic_solver_ = std::make_unique<KinematicSolver>(mdh_params);
     kinematic_solver_->SetIKMode(ik_mode);
     jacobian_ = std::make_unique<Jacobian6Dof>(mdh_params);
-    arm_ctrl_.Init();
-
   }
   ~ArmInstance() = default;
 
   void SetMotorParams(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping);
+  void SetJointLimits(ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max);
+
+  void Init(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping,
+            ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max);
   void Enable();
   void Disable();
 
@@ -89,6 +91,6 @@ class ArmInstance {
   ArmMotion::Joint6Dof_t motor_damping_{};
 
   // 关节限位（弧度）
-  double joint_min_[6]{-3.1416, -1.570, -1.5708, -3.1416, -1.5708, -3.1416};
-  double joint_max_[6]{3.1416, 2.6, 1.5708, 3.1416, 1.5708, 3.1416};
+  ArmMotion::Joint6Dof_t joint_min_{};
+  ArmMotion::Joint6Dof_t joint_max_{};
 };

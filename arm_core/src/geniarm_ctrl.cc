@@ -41,7 +41,7 @@ void GeniArmCtrl::Disable() {
 
 bool GeniArmCtrl::SetJointState(const ArmMotion::JointCommand_t& joint_cmd) {
   for (int i = 0; i < motor_driver_.size(); ++i) {
-    DmMotorDriver::CtrlCmd cmd(joint_cmd.velocity.q[i], joint_cmd.position.q[i], joint_cmd.effort.q[i], joint_cmd.stiffness.q[i], joint_cmd.damping.q[i]);
+    DmMotorDriver::CtrlCmd cmd(joint_cmd.position.q[i], joint_cmd.velocity.q[i], joint_cmd.effort.q[i], joint_cmd.stiffness.q[i], joint_cmd.damping.q[i]);
     if (motor_driver_[i].MoveCtrl(cmd) == -1) {
       return false;
     }

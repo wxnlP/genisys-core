@@ -113,6 +113,18 @@ void ArmInstance::SetMotorParams(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Jo
   motor_damping_ = damping;
 }
 
+void ArmInstance::SetJointLimits(ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max) {
+  joint_min_ = joint_min;
+  joint_max_ = joint_max;
+}
+
+void ArmInstance::Init(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping,
+                       ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max) {
+  SetMotorParams(stiffness, damping);
+  SetJointLimits(joint_min, joint_max);
+  arm_ctrl_.Init();
+}
+
 void ArmInstance::Enable() { arm_ctrl_.Enable(); }
 
 void ArmInstance::Disable() { arm_ctrl_.Disable(); }
@@ -224,9 +236,9 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
 int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
                        double a, double t) {
   for (int i = 0; i < 6; i++) {
-    if (target_joint.q[i] < joint_min_[i] || target_joint.q[i] > joint_max_[i]) {
+    if (target_joint.q[i] < joint_min_.q[i] || target_joint.q[i] > joint_max_.q[i]) {
       ARM_LOG_ERROR("[MoveJ] target joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
-                    i, target_joint.q[i], joint_min_[i], joint_max_[i]);
+                    i, target_joint.q[i], joint_min_.q[i], joint_max_.q[i]);
       return -1;
     }
   }
@@ -288,7 +300,7 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
 
     // 采样后
     for (int i = 0; i < 6; ++i) {
-      if (point.position.q[i] < joint_min_[i] || point.position.q[i] > joint_max_[i]) {
+      if (point.position.q[i] < joint_min_.q[i] || point.position.q[i] > joint_max_.q[i]) {
         ARM_LOG_WARN("[MoveJ] trajectory point joint[{}]={:.4f} out of limit at t={}",
                      i, point.position.q[i], current_time);
         return -1;
@@ -312,10 +324,10 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
   // 检查输入点关节限位
   for (size_t p = 0; p < points.size(); ++p) {
     for (int i = 0; i < 6; ++i) {
-      if (points[p].q[i] < joint_min_[i] || points[p].q[i] > joint_max_[i]) {
+      if (points[p].q[i] < joint_min_.q[i] || points[p].q[i] > joint_max_.q[i]) {
         ARM_LOG_ERROR(
             "[MoveJMulti] input point {} joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
-            p, i, points[p].q[i], joint_min_[i], joint_max_[i]);
+            p, i, points[p].q[i], joint_min_.q[i], joint_max_.q[i]);
         return -1;
       }
     }
@@ -369,7 +381,7 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
 
     // 轨迹点限位保护
     for (int i = 0; i < 6; ++i) {
-      if (point.position.q[i] < joint_min_[i] || point.position.q[i] > joint_max_[i]) {
+      if (point.position.q[i] < joint_min_.q[i] || point.position.q[i] > joint_max_.q[i]) {
         ARM_LOG_ERROR("[MoveJMulti] failed: sampled joint[{}]={:.4f} out of limit at t={}",
                       i, point.position.q[i], current_time);
         return -1;

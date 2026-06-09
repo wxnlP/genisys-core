@@ -15,6 +15,9 @@ RoboManager::RoboManager(const std::string& yaml_file) {
   std::vector<uint32_t> feedback_ids;
   std::vector<double> motor_stiffness;
   std::vector<double> motor_damping;
+  std::vector<double> limits_lower = config["robot"]["joint_limits"]["lower"].as<std::vector<double>>();
+  std::vector<double> limits_upper = config["robot"]["joint_limits"]["upper"].as<std::vector<double>>();
+  int count = 0;
   for (const auto& joint : config["robot"]["joints"]) {
     // 处理电机id和反馈id
     uint32_t motor_id = joint["motor_id"].as<uint32_t>();
@@ -40,7 +43,8 @@ RoboManager::RoboManager(const std::string& yaml_file) {
     motor_stiffness.push_back(stiffness);
     motor_damping.push_back(damping);
 
-    arm_motors_.push_back(DmMotorDriver(*can_bus_, motor_id, motor_model));
+    arm_motors_.push_back(DmMotorDriver(*can_bus_, motor_id, limits_lower[count], limits_upper[count], motor_model));
+    count++;
   }
 
   if (arm_motors_.size() < 6) {
@@ -74,14 +78,6 @@ RoboManager::RoboManager(const std::string& yaml_file) {
   }
   // 创建机械臂实例
   arm_instance_ = std::make_shared<ArmInstance>(*arm_ctrl_, mdh_params, ik_mode);
-  // 设置 MIT 固定参数
-  ArmMotion::Joint6Dof_t arm_stiffness{};
-  ArmMotion::Joint6Dof_t arm_damping{};
-  for (size_t i = 0; i < 6; ++i) {
-    arm_stiffness.q[i] = motor_stiffness[i];
-    arm_damping.q[i] = motor_damping[i];
-  }
-  arm_instance_->SetMotorParams(arm_stiffness, arm_damping);
 
   // 5. 创建夹爪实例
   std::string gripper_port = config["gripper"]["port"].as<std::string>();
@@ -115,6 +111,18 @@ RoboManager::RoboManager(const std::string& yaml_file) {
   // 6.初始化
   can_bus_->SetReceiverId(feedback_ids.data(), feedback_ids.size());
   gripper_->Init();
+    // 设置 MIT 固定参数
+  ArmMotion::Joint6Dof_t arm_stiffness{};
+  ArmMotion::Joint6Dof_t arm_damping{};
+  ArmMotion::Joint6Dof_t joint_min{};
+  ArmMotion::Joint6Dof_t joint_max{};
+  for (size_t i = 0; i < 6; ++i) {
+    arm_stiffness.q[i] = motor_stiffness[i];
+    arm_damping.q[i] = motor_damping[i];
+    joint_min.q[i] = limits_lower[i];
+    joint_max.q[i] = limits_upper[i];
+  }
+  arm_instance_->Init(arm_stiffness, arm_damping, joint_min, joint_max);
 
   ARM_LOG_INFO("RoboManager 初始化完成");
 }

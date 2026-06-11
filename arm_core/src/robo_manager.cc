@@ -1,4 +1,4 @@
-#include "robo_manger.h"
+#include "robo_manager.h"
 #include "arm_logger.h"
 #include "yaml-cpp/yaml.h"
 
@@ -126,3 +126,5 @@ RoboManager::RoboManager(const std::string& yaml_file) {
 
   ARM_LOG_INFO("RoboManager 初始化完成");
 }
+
+RoboManager::~RoboManager() = default;

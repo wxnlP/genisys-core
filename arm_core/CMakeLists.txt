@@ -28,7 +28,8 @@ target_sources(${TARGET_NAME} PRIVATE
     src/cartesian_multi_point_path.cc
     src/gripper_ctrl_base.cc
     src/geniarm_gripper.cc
-    src/robo_manger.cc
+    src/geniarm_ctrl.cc
+    src/robo_manager.cc
 )
 set(LINK_LIBS  dm_driver)
 if(BUILD_DEFAULT_SERIAL)

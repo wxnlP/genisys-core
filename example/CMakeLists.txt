@@ -7,12 +7,15 @@ set(SIM_MOVEL_MOVEJ_TARGET_NAME sim_movel_movej_example)
 set(SIM_MULTI_POINT_TARGET_NAME sim_multi_point_example)
 set(SIM_GRIPPER_TARGET_NAME sim_gripper_example)
 set(REAL_GRIPPER_TARGET_NAME real_gripper_example)
+set(REAL_ARM_TARGET_NAME real_arm_example)
+
 
 add_executable(kinematic_demo demo.cc)
 add_executable(${KINEMATIC_TARGET_NAME} kinematic_sample.cc)
 add_executable(${JACOBIAN_TARGET_NAME} jacobian_sample.cc)
 add_executable(${TRAJECTORY_TARGET_NAME} trajectory_sample.cc)
 add_executable(${REAL_GRIPPER_TARGET_NAME} real_gripper_sample.cc)
+add_executable(${REAL_ARM_TARGET_NAME} real_arm_sample.cc)
 
 
 target_link_libraries(${KINEMATIC_TARGET_NAME} PRIVATE
@@ -32,6 +35,12 @@ target_link_libraries(kinematic_demo PRIVATE
 target_link_libraries(${REAL_GRIPPER_TARGET_NAME} PRIVATE
     robotic_arm_sdk    
     dm_driver    
+)
+
+target_link_libraries(${REAL_ARM_TARGET_NAME} PRIVATE
+    robotic_arm_sdk    
+    dm_driver   
+    serial 
 )
 
 install(TARGETS ${KINEMATIC_TARGET_NAME}

@@ -2,8 +2,8 @@ robot:
   name: "geniarm"
   port: "can0"
   joint_limits:
-    lower: [-3.1416, -1.570, -1.5708, -3.1416, -1.5708, -3.1416]
-    upper: [3.1416, 2.6, 1.5708, 3.1416, 1.5708, 3.1416]
+    lower: [-2.61, -0.001, -3.7, -1.5708, -1.5708, -1.5708]
+    upper: [2.61, 3.7, 0.001, 1.5708, 1.5708, 1.5708]
   kinematics:
     ik_mode: "UR" # or Piper
     MDH:
@@ -59,7 +59,7 @@ robot:
 gripper:
   name: "geniarm_gripper"
   port: "can0"
-  max_range: -2.2
+  max_range: 1.95
   motor_id: 0x07
   feedback_id: 0x17
   model: "DM4310"

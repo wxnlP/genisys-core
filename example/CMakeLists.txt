@@ -64,23 +64,18 @@ if (BUILD_SIM_PROXY)
     add_executable(${SIM_GRIPPER_TARGET_NAME} sim_gripper_sample.cc)
 
     target_link_libraries(${SIM_SEND_TARGET_NAME} PRIVATE
-        sim_adapter
         robotic_arm_sdk
     )
     target_link_libraries(${SIM_READ_TARGET_NAME} PRIVATE
-        sim_adapter
         robotic_arm_sdk
     )
     target_link_libraries(${SIM_MOVEL_MOVEJ_TARGET_NAME} PRIVATE
-        sim_adapter
         robotic_arm_sdk
     )
     target_link_libraries(${SIM_MULTI_POINT_TARGET_NAME} PRIVATE
-        sim_adapter
         robotic_arm_sdk
     )
     target_link_libraries(${SIM_GRIPPER_TARGET_NAME} PRIVATE
-        sim_adapter
         robotic_arm_sdk
     )
 

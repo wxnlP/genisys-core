@@ -5,13 +5,13 @@
 #include <thread>
 
 #include "arm_logger.h"
-#include "sim_ctrl.h"
+#include "robo_manager.h"
 
 // ──────────────────────────────────────────────
-// 打印 JointCommand_t 的各字段
+// 打印 JointState_t 的各字段
 // ──────────────────────────────────────────────
 static void PrintJointState(const char* label,
-                            const ArmMotion::JointCommand_t& s) {
+                            const ArmMotion::JointState_t& s) {
   const char* kJointNames[6] = {"shoulder", "upper_arm", "elbow",
                                 "wrist1", "wrist2", "wrist3"};
 
@@ -30,42 +30,41 @@ static void PrintJointState(const char* label,
 }
 
 int main() {
-  SimCtrl ctrl;
-  if (!ctrl.Init()) {
-    ARM_LOG_ERROR("SimCtrl::Init() failed");
-    return 1;
-  }
+  RoboManager mgr("geniarm_sim_config.yaml");
+  auto arm = mgr.GetArmInstance();
 
-  constexpr int kIntervalMs = 200;
-  constexpr int kPoints = 10;
   constexpr double kPi = 3.14159265358979323846;
   constexpr double kDegToRad = kPi / 180.0;
 
-  // 小幅动作基准点。
+  // 小幅动作基准点
   const double base[6] = {0.0, 0.1, -1.4, 0.1, -0.1, 0.0};
   const double amp[6] = {8.0 * kDegToRad, 10.0 * kDegToRad, 12.0 * kDegToRad,
                          9.0 * kDegToRad, 7.0 * kDegToRad, 6.0 * kDegToRad};
   const double phase[6] = {0.0, 0.5, 1.0, 1.5, 2.0, 2.5};
 
-  ARM_LOG_INFO("Send demo: publish {} points", kPoints);
+  constexpr int kPoints = 10;
+  ARM_LOG_INFO("MoveJ demo: {} sinusoidal waypoints", kPoints);
 
   for (int i = 0; i < kPoints; ++i) {
     const double t = static_cast<double>(i) / static_cast<double>(kPoints - 1);
 
-    ArmMotion::JointCommand_t cmd{};
+    ArmMotion::Joint6Dof_t target{};
     for (int j = 0; j < 6; ++j) {
-      cmd.position.q[j] =
-          base[j] + amp[j] * std::sin(2.0 * kPi * t + phase[j]);
-      cmd.velocity.q[j] = 0.0;
-      cmd.effort.q[j] = 0.0;
+      target.q[j] = base[j] + amp[j] * std::sin(2.0 * kPi * t + phase[j]);
     }
 
-    PrintJointState(("Send #" + std::to_string(i + 1)).c_str(), cmd);
+    ARM_LOG_INFO("MoveJ to waypoint #{}", i + 1);
+    if (arm->MoveJ(target, 1.0, 2.0, 0.0) != 0) {
+      ARM_LOG_ERROR("MoveJ #{} failed", i + 1);
+      return 1;
+    }
 
-    const bool ok = ctrl.SetJointState(cmd);
-    ARM_LOG_INFO("SetJointState: {}", ok ? "OK" : "FAILED");
+    ArmMotion::JointState_t state{};
+    if (arm->GetCurrentJoint(state.position) == 0) {
+      PrintJointState(("After MoveJ #" + std::to_string(i + 1)).c_str(), state);
+    }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(kIntervalMs));
+    std::this_thread::sleep_for(std::chrono::milliseconds(200));
   }
 
   return 0;

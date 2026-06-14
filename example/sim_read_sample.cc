@@ -5,7 +5,7 @@
 #include <thread>
 
 #include "arm_logger.h"
-#include "sim_ctrl.h"
+#include "robo_manager.h"
 
 static void PrintJointState(const char* label,
                             const ArmMotion::JointState_t& s) {
@@ -34,11 +34,8 @@ void SignalHandler(int /*signum*/) { g_running = 0; }
 }  // namespace
 
 int main() {
-  SimCtrl ctrl;
-  if (!ctrl.Init()) {
-    ARM_LOG_ERROR("SimCtrl::Init() failed");
-    return 1;
-  }
+  RoboManager mgr("geniarm_sim_config.yaml");
+  auto arm = mgr.GetArmInstance();
 
   constexpr int kIntervalMs = 100;
   std::signal(SIGINT, SignalHandler);
@@ -48,12 +45,12 @@ int main() {
   int iter = 0;
   while (g_running) {
     ArmMotion::JointState_t state{};
-    bool ok = ctrl.GetJointState(state);
+    int ret = arm->GetCurrentJoint(state.position);
 
-    if (ok) {
+    if (ret == 0) {
       PrintJointState(("Read #" + std::to_string(++iter)).c_str(), state);
     } else {
-      ARM_LOG_WARN("GetJointState failed");
+      ARM_LOG_WARN("GetCurrentJoint failed");
     }
 
     std::this_thread::sleep_for(std::chrono::milliseconds(kIntervalMs));

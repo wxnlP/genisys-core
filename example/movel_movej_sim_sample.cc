@@ -5,8 +5,7 @@
 
 #include "arm_instance.h"
 #include "arm_logger.h"
-#include "kinematic.h"
-#include "sim_ctrl.h"
+#include "robo_manager.h"
 
 namespace {
 
@@ -28,10 +27,10 @@ void PrintJointState(const char* label, const ArmMotion::JointState_t& s) {
   }
 }
 
-bool PrintCurrentState(SimCtrl& ctrl, const char* title) {
+bool PrintCurrentState(ArmInstance& arm, const char* title) {
   ArmMotion::JointState_t state{};
-  if (!ctrl.GetJointState(state)) {
-    ARM_LOG_ERROR("GetJointState failed: {}", title);
+  if (arm.GetCurrentJoint(state.position) != 0) {
+    ARM_LOG_ERROR("GetCurrentJoint failed: {}", title);
     return false;
   }
   PrintJointState(title, state);
@@ -41,51 +40,28 @@ bool PrintCurrentState(SimCtrl& ctrl, const char* title) {
 }  // namespace
 
 int main() {
-  SimCtrl ctrl;
-  if (!ctrl.Init()) {
-    ARM_LOG_ERROR("SimCtrl::Init() failed");
-    return 1;
-  }
+  RoboManager mgr("geniarm_sim_config.yaml");
+  auto arm = mgr.GetArmInstance();
 
-  // ArmMotion::MDHParams mdh_params{
-  //     .alpha = {0.0, -M_PI_2, 0.0, -M_PI_2, M_PI_2, -M_PI_2},
-  //     .a = {0.0, 0.04, 0.20, 0.059, 0.0, 0.0},
-  //     .d = {0.123, 0.0, 0.0, 0.2, 0.0, 0.104},
-  //     .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}};
-  ArmMotion::MDHParams mdh_params = {
-    .alpha = {0.0, -M_PI_2, 0.0, 0.0, -M_PI_2, M_PI_2},  // alpha
-    .a = {0.0, 0.02, 0.26, 0.24668, 0.075, 0.0},             // a
-    .d = {0.1207, 0.0, 0.0, 0.0, 0.0, 0.0265},       // d
-    .theta = {0.0, -M_PI, (M_PI - 0.233176), 0.233176, M_PI_2, 0.0}          // theta (初始偏移量)
-  };
-  ArmInstance robot(ctrl, mdh_params, KinematicSolver::IKMode::ParallelWrist);
-  KinematicSolver fk_solver(mdh_params);
-
-  if (!PrintCurrentState(ctrl, "Initial state")) {
+  if (!PrintCurrentState(*arm, "Initial state")) {
     return 1;
   }
 
   ArmMotion::Joint6Dof_t joint_target1(0.0, 1, -1, 0.0, 0.00, 0.00);
   ARM_LOG_INFO("MoveJ to drawing start pose");
-  if (robot.MoveJ(joint_target1, 2, 3, 0.0) != 0) {
+  if (arm->MoveJ(joint_target1, 2, 3, 0.0) != 0) {
     ARM_LOG_ERROR("MoveJ to drawing start pose failed");
     return 1;
   }
 
   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-  if (!PrintCurrentState(ctrl, "After MoveJ to drawing start pose")) {
-    return 1;
-  }
-
-  ArmMotion::JointState_t state_after_movej{};
-  if (!ctrl.GetJointState(state_after_movej)) {
-    ARM_LOG_ERROR("GetJointState failed before MoveL");
+  if (!PrintCurrentState(*arm, "After MoveJ to drawing start pose")) {
     return 1;
   }
 
   ArmMotion::Pose6Dof_t current_pose{};
-  if (!fk_solver.FK(state_after_movej.position, current_pose)) {
-    ARM_LOG_ERROR("FK failed before MoveL");
+  if (arm->GetCurrentPose(current_pose) != 0) {
+    ARM_LOG_ERROR("GetCurrentPose failed before MoveL");
     return 1;
   }
 
@@ -93,43 +69,43 @@ int main() {
   lateral_pose.y -= 0.12;
 
   ARM_LOG_INFO("MoveL side translation (-Y 0.12m)");
-  if (robot.MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
+  if (arm->MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
     ARM_LOG_ERROR("MoveL side translation failed");
     return 1;
   }
   lateral_pose.z -= 0.12;
   ARM_LOG_INFO("MoveL side translation (-Z 0.12m)");
-  if (robot.MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
+  if (arm->MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
     ARM_LOG_ERROR("MoveL side translation failed");
     return 1;
   }
   lateral_pose.y += 0.12;
   ARM_LOG_INFO("MoveL side translation (+Y 0.12m)");
-  if (robot.MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
+  if (arm->MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
     ARM_LOG_ERROR("MoveL side translation failed");
     return 1;
   }
   lateral_pose.z += 0.12;
   ARM_LOG_INFO("MoveL side translation (+Z 0.12m)");
-  if (robot.MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
+  if (arm->MoveL(lateral_pose, 0.1, 0.2, 0.0) != 0) {
     ARM_LOG_ERROR("MoveL side translation failed");
     return 1;
   }
 
   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-  if (!PrintCurrentState(ctrl, "After lateral MoveL")) {
+  if (!PrintCurrentState(*arm, "After lateral MoveL")) {
     return 1;
   }
 
   ArmMotion::Joint6Dof_t joint_origin(0.0, 0.0, 0.0, 0.0, 0.0, 0.0);
   ARM_LOG_INFO("MoveJ back to joint origin");
-  if (robot.MoveJ(joint_origin, 2, 3, 0.0) != 0) {
+  if (arm->MoveJ(joint_origin, 2, 3, 0.0) != 0) {
     ARM_LOG_ERROR("MoveJ back to joint origin failed");
     return 1;
   }
 
   std::this_thread::sleep_for(std::chrono::milliseconds(300));
-  if (!PrintCurrentState(ctrl, "After MoveJ to origin")) {
+  if (!PrintCurrentState(*arm, "After MoveJ to origin")) {
     return 1;
   }
 

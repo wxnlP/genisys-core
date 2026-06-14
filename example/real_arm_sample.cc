@@ -1,6 +1,6 @@
 #include <atomic>
 #include <csignal>
-#include <future>
+#include <thread>
 #include "arm_logger.h"
 #include "robo_manager.h"
 
@@ -9,9 +9,9 @@ void SignalHandler(int) { g_running = false; }
 
 int main() {
   std::signal(SIGINT, SignalHandler);  // 注册 Ctrl+C 信号
-  RoboManager robo_manger("robotic_arm_config.yaml");
+  RoboManager robo_manger("geniarm_config.yaml");
   std::shared_ptr<ArmInstance> arm = robo_manger.GetArmInstance();
-  std::shared_ptr<GeniArmGripper> gripper = robo_manger.GetGripper();
+  std::shared_ptr<GripperCtrlBase> gripper = robo_manger.GetGripper();
 
   arm->Enable();
   // gripper->Enable();

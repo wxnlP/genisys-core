@@ -1,0 +1,24 @@
+robot:
+  name: "geniarm"
+  env: "sim"
+  joint_limits:
+    lower: [-2.61, -0.001, -3.7, -1.5708, -1.5708, -1.5708]
+    upper: [2.61, 3.7, 0.001, 1.5708, 1.5708, 1.5708]
+  trajectory_mode: "quintic"
+  kinematics:
+    ik_mode: "UR"
+    MDH:
+      alpha: [0.0, -90.0, 0.0, 0.0, -90.0, 90.0]
+      a: [0.0, 0.02, 0.26, 0.24668, 0.075, 0.0]
+      d: [0.1207, 0.0, 0.0, 0.0, 0.0, 0.0265]
+      offset: [0.0, -180.0, 166.64, 13.36, 90.0, 0.0]
+  MIT:
+    stiffness: [120.0, 120.0, 120.0, 12.0, 12.0, 12.0]
+    damping: [5.0, 5.0, 5.0, 1.0, 1.0, 1.0]
+
+gripper:
+  env: "sim"
+  max_range: 1.95
+  MIT:
+    stiffness: 12.0
+    damping: 1.0

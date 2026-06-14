@@ -1,9 +1,11 @@
 robot:
   name: "geniarm"
+  env: "real" # or sim
   port: "can0"
   joint_limits:
     lower: [-2.61, -0.001, -3.7, -1.5708, -1.5708, -1.5708]
     upper: [2.61, 3.7, 0.001, 1.5708, 1.5708, 1.5708]
+  trajectory_mode: "quintic"
   kinematics:
     ik_mode: "UR" # or Piper
     MDH:

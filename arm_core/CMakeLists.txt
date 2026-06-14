@@ -18,6 +18,7 @@ target_sources(${TARGET_NAME} PRIVATE
     src/jacobian.cc
     src/cubic_time_scaler.cc
     src/lspb_time_scaler.cc
+    src/quintic_time_scaler.cc
     src/cartesian_linear_path.cc
     src/joint_path.cc
     src/cartesian_trajectory.cc

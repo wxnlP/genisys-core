@@ -3,7 +3,7 @@
 #include <cmath>
 #include <limits>
 #include <thread>
-
+#include <algorithm>
 #include "arm_logger.h"
 
 namespace {
@@ -24,22 +24,6 @@ double CartesianPosDistance(const ArmMotion::Pose6Dof_t& p0,
   const double dy = p1.y - p0.y;
   const double dz = p1.z - p0.z;
   return std::sqrt(dx * dx + dy * dy + dz * dz);
-}
-
-bool BuildLspbConfigFromPhysicalVA(double path_length, double v_phys,
-                                   double a_phys, double t,
-                                   TimeScalerBase::PlanConfig& config) {
-  constexpr double kEps = 1e-9;
-  if (path_length <= kEps || v_phys <= 0.0 || a_phys <= 0.0) {
-    return false;
-  }
-
-  // 将物理单位速度/加速度换算为归一化路径参数速度/加速度。
-  // s ∈ [0,1], path = p(s), 其中 ds/dt = sd。
-  config.T = t;
-  config.v_max = v_phys / path_length;
-  config.a_max = a_phys / path_length;
-  return true;
 }
 
 }  // namespace
@@ -118,6 +102,10 @@ void ArmInstance::SetJointLimits(ArmMotion::Joint6Dof_t joint_min, ArmMotion::Jo
   joint_max_ = joint_max;
 }
 
+void ArmInstance::SetTrajectoryMode(TrajectoryMode mode) {
+  traj_planning_mode = mode;
+}
+
 void ArmInstance::Init(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping,
                        ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max) {
   SetMotorParams(stiffness, damping);
@@ -154,23 +142,48 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
     return 0;
   }
 
-  // 创建 LSPB 时间缩放器用于速度加速度约束
-  LSPBTimeScaler time_scaler;
+  // 单位归一化
+  double normalized_v = v / path_length;
+  double normalized_a = a /path_length;
+
+  // 处理时间规划器选择
   TimeScalerBase::PlanConfig config;
-  if (!BuildLspbConfigFromPhysicalVA(path_length, v, a, t, config)) {
-    ARM_LOG_ERROR("[MoveL] failed: invalid args (path_length={}, v={}, a={})",
-                  path_length, v, a);
-    return -1;
+  switch (traj_planning_mode) {
+    case TrajectoryMode::CUBIC: {
+      double t_v = 1.5 / normalized_v;
+      double t_a = std::sqrt((6.0 / normalized_a));
+      config.T = std::max(t_v, t_a);
+      time_scaler_ = std::make_unique<CubicTimeScaler>();
+      break;
+    }
+    case TrajectoryMode::QUINTIC: {
+      double t_v = 1.875 / normalized_v;
+      double t_a = std::sqrt((5.7735 / normalized_a));
+      config.T = std::max(t_v, t_a);
+      time_scaler_ = std::make_unique<QuinticTimeScaler>();
+      break;
+    }
+    case TrajectoryMode::LSPB: {
+      config.T = t;
+      config.a_max = normalized_a;
+      config.v_max = normalized_v;
+      time_scaler_ = std::make_unique<LSPBTimeScaler>();
+      break;
+    }
+    default:
+      ARM_LOG_ERROR("[MoveL] failed: time scaler setting");
+      return -1;
+      break;
   }
 
-  if (!time_scaler.Plan(config)) {
+  if (!time_scaler_->Plan(config)) {
     // 处理规划失败的情况
     ARM_LOG_ERROR("[MoveL] failed: time scaler plan");
     return -1;
   }
 
   // 创建笛卡尔轨迹
-  cartesian_trajectory_ = std::make_unique<CartesianTrajectory>(path, time_scaler);
+  cartesian_trajectory_ = std::make_unique<CartesianTrajectory>(path, *time_scaler_);
   double duration = cartesian_trajectory_->GetDuration();
 
   double current_time = 0.0;
@@ -256,21 +269,48 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
     return 0;
   }
 
+  // 单位归一化
+  double normalized_v = v / path_length;
+  double normalized_a = a /path_length;
+
   JointPath path(start_joint, target_joint);
-  LSPBTimeScaler time_scaler;
+  
+  // 处理时间规划器选择
   TimeScalerBase::PlanConfig config;
-  if (!BuildLspbConfigFromPhysicalVA(path_length, v, a, t, config)) {
-    ARM_LOG_ERROR("[MoveJ] failed: invalid args (path_length={}, v={}, a={})",
-                  path_length, v, a);
-    return -1;
+  switch (traj_planning_mode) {
+    case TrajectoryMode::CUBIC: {
+      double t_v = 1.5 / normalized_v;
+      double t_a = std::sqrt((6.0 / normalized_a));
+      config.T = std::max(t_v, t_a);
+      time_scaler_ = std::make_unique<CubicTimeScaler>();
+      break;
+    }
+    case TrajectoryMode::QUINTIC: {
+      double t_v = 1.875 / normalized_v;
+      double t_a = std::sqrt((5.7735 / normalized_a));
+      config.T = std::max(t_v, t_a);
+      time_scaler_ = std::make_unique<QuinticTimeScaler>();
+      break;
+    }
+    case TrajectoryMode::LSPB: {
+      config.T = t;
+      config.a_max = normalized_a;
+      config.v_max = normalized_v;
+      time_scaler_ = std::make_unique<LSPBTimeScaler>();
+      break;
+    }
+    default:
+      ARM_LOG_ERROR("[MoveL] failed: time scaler setting");
+      return -1;
+      break;
   }
 
-  if (!time_scaler.Plan(config)) {
+  if (!time_scaler_->Plan(config)) {
     ARM_LOG_ERROR("[MoveJ] failed: time scaler plan");
     return -1;
   }
 
-  joint_trajectory_ = std::make_unique<JointTrajectory>(path, time_scaler);
+  joint_trajectory_ = std::make_unique<JointTrajectory>(path, *time_scaler_);
   double duration = joint_trajectory_->GetDuration();
 
   double current_time = 0.0;
@@ -351,20 +391,46 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
     return -1;
   }
 
-  LSPBTimeScaler time_scaler;
+  // 单位归一化
+  double normalized_v = v / path_length;
+  double normalized_a = a /path_length;
+
+  // 处理时间规划器选择
   TimeScalerBase::PlanConfig config;
-  if (!BuildLspbConfigFromPhysicalVA(path_length, v, a, t, config)) {
-    ARM_LOG_ERROR(
-        "[MoveJMulti] failed: invalid args (path_length={}, v={}, a={})",
-        path_length, v, a);
-    return -1;
+  switch (traj_planning_mode) {
+    case TrajectoryMode::CUBIC: {
+      double t_v = 1.5 / normalized_v;
+      double t_a = std::sqrt((6.0 / normalized_a));
+      config.T = std::max(t_v, t_a);
+      time_scaler_ = std::make_unique<CubicTimeScaler>();
+      break;
+    }
+    case TrajectoryMode::QUINTIC: {
+      double t_v = 1.875 / normalized_v;
+      double t_a = std::sqrt((5.7735 / normalized_a));
+      config.T = std::max(t_v, t_a);
+      time_scaler_ = std::make_unique<QuinticTimeScaler>();
+      break;
+    }
+    case TrajectoryMode::LSPB: {
+      config.T = t;
+      config.a_max = normalized_a;
+      config.v_max = normalized_v;
+      time_scaler_ = std::make_unique<LSPBTimeScaler>();
+      break;
+    }
+    default:
+      ARM_LOG_ERROR("[MoveL] failed: time scaler setting");
+      return -1;
+      break;
   }
-  if (!time_scaler.Plan(config)) {
+
+  if (!time_scaler_->Plan(config)) {
     ARM_LOG_ERROR("[MoveJMulti] failed: time scaler plan");
     return -1;
   }
 
-  JointTrajectory trajectory(path, time_scaler);
+  JointTrajectory trajectory(path, *time_scaler_);
   double duration = trajectory.GetDuration();
 
   double current_time = 0.0;
@@ -436,20 +502,46 @@ int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points,
     return -1;
   }
 
-  LSPBTimeScaler time_scaler;
+  // 单位归一化
+  double normalized_v = v / path_length;
+  double normalized_a = a /path_length;
+  
+  // 处理时间规划器选择
   TimeScalerBase::PlanConfig config;
-  if (!BuildLspbConfigFromPhysicalVA(path_length, v, a, t, config)) {
-    ARM_LOG_ERROR(
-        "[MoveLMulti] failed: invalid args (path_length={}, v={}, a={})",
-        path_length, v, a);
-    return -1;
+  switch (traj_planning_mode) {
+    case TrajectoryMode::CUBIC: {
+      double t_v = 1.5 / normalized_v;
+      double t_a = std::sqrt((6.0 / normalized_a));
+      config.T = std::max(t_v, t_a);
+      time_scaler_ = std::make_unique<CubicTimeScaler>();
+      break;
+    }
+    case TrajectoryMode::QUINTIC: {
+      double t_v = 1.875 / normalized_v;
+      double t_a = std::sqrt((5.7735 / normalized_a));
+      config.T = std::max(t_v, t_a);
+      time_scaler_ = std::make_unique<QuinticTimeScaler>();
+      break;
+    }
+    case TrajectoryMode::LSPB: {
+      config.T = t;
+      config.a_max = normalized_a;
+      config.v_max = normalized_v;
+      time_scaler_ = std::make_unique<LSPBTimeScaler>();
+      break;
+    }
+    default:
+      ARM_LOG_ERROR("[MoveL] failed: time scaler setting");
+      return -1;
+      break;
   }
-  if (!time_scaler.Plan(config)) {
+
+  if (!time_scaler_->Plan(config)) {
     ARM_LOG_ERROR("[MoveLMulti] failed: time scaler plan");
     return -1;
   }
 
-  CartesianTrajectory trajectory(path, time_scaler);
+  CartesianTrajectory trajectory(path, *time_scaler_);
   double duration = trajectory.GetDuration();
 
   double current_time = 0.0;

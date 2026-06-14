@@ -14,9 +14,15 @@
 #include "joint_trajectory.h"
 #include "kinematic.h"
 #include "lspb_time_scaler.h"
+#include "quintic_time_scaler.h"
 
 class ArmInstance {
  public:
+  enum class TrajectoryMode {
+    LSPB,     // 梯形加减速
+    CUBIC,    // 三次多项式
+    QUINTIC,  // 五次多项式
+  };
   // 切换真机与仿真时，构造函数传入的arm_ctrl对象不同
   ArmInstance(ArmCtrlBase& arm_ctrl, const ArmMotion::MDHParams& mdh_params, KinematicSolver::IKMode ik_mode = KinematicSolver::IKMode::SphericalWrist)
       : arm_ctrl_(arm_ctrl) {
@@ -28,6 +34,7 @@ class ArmInstance {
 
   void SetMotorParams(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping);
   void SetJointLimits(ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max);
+  void SetTrajectoryMode(TrajectoryMode mode);
 
   void Init(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping,
             ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max);
@@ -84,6 +91,7 @@ class ArmInstance {
   std::unique_ptr<Jacobian6Dof> jacobian_;
   std::unique_ptr<JointTrajectory> joint_trajectory_;
   std::unique_ptr<CartesianTrajectory> cartesian_trajectory_;
+  std::unique_ptr<TimeScalerBase> time_scaler_;
 
   ArmCtrlBase& arm_ctrl_;
   const double dt_ = 0.01;
@@ -93,4 +101,7 @@ class ArmInstance {
   // 关节限位（弧度）
   ArmMotion::Joint6Dof_t joint_min_{};
   ArmMotion::Joint6Dof_t joint_max_{};
+
+  // 轨迹规划模式
+  TrajectoryMode traj_planning_mode{TrajectoryMode::QUINTIC};
 };

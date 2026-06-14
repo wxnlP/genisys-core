@@ -36,8 +36,7 @@ class ArmInstance {
   void SetJointLimits(ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max);
   void SetTrajectoryMode(TrajectoryMode mode);
 
-  void Init(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping,
-            ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max);
+  void Init();
   void Enable();
   void Disable();
 

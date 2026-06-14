@@ -106,10 +106,7 @@ void ArmInstance::SetTrajectoryMode(TrajectoryMode mode) {
   traj_planning_mode = mode;
 }
 
-void ArmInstance::Init(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping,
-                       ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max) {
-  SetMotorParams(stiffness, damping);
-  SetJointLimits(joint_min, joint_max);
+void ArmInstance::Init() {
   arm_ctrl_.Init();
 }
 

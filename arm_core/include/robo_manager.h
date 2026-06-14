@@ -1,26 +1,33 @@
 #pragma once
 
+#include <memory>
+#include <string>
+
+#include "arm_ctrl_base.h"
 #include "arm_instance.h"
-#include "geniarm_ctrl.h"
-#include "geniarm_gripper.h"
-#include "s6h4d_ctrl.h"
-#include "dm_motor_driver.h"
-#include "canfd_bus.h"
+#include "gripper_ctrl_base.h"
 
 class RoboManager {
  public:
-  RoboManager(const std::string& yaml_file);
+  explicit RoboManager(const std::string& yaml_file);
   ~RoboManager();
 
+  // 禁止拷贝
+  RoboManager(const RoboManager&) = delete;
+  RoboManager& operator=(const RoboManager&) = delete;
+  // 允许移动
+  RoboManager(RoboManager&&) noexcept;
+  RoboManager& operator=(RoboManager&&) noexcept;
+
   std::shared_ptr<ArmInstance> GetArmInstance() { return arm_instance_; }
-  std::shared_ptr<GeniArmGripper> GetGripper() { return gripper_; }
+  std::shared_ptr<GripperCtrlBase> GetGripper() { return gripper_; }
 
  private:
   std::shared_ptr<ArmInstance> arm_instance_;
-  std::shared_ptr<GeniArmGripper> gripper_;
+  std::shared_ptr<ArmCtrlBase> arm_ctrl_;
+  std::shared_ptr<GripperCtrlBase> gripper_;
 
-  std::shared_ptr<SocketCANBus> can_bus_;
-  std::vector<DmMotorDriver> arm_motors_;
-  std::shared_ptr<DmMotorDriver> gripper_motor_;
-  std::shared_ptr<GeniArmCtrl> arm_ctrl_;
+  // Pimpl：隔离真机硬件依赖（dm_motor / canfd_bus）
+  class Impl;
+  std::unique_ptr<Impl> impl_;
 };

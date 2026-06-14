@@ -6,6 +6,7 @@ class GripperCtrlBase {
       : motor_stiffness_(stiffness), motor_damping_(damping){};
   virtual ~GripperCtrlBase() = default;
 
+  virtual void Init() {};
   virtual void Enable() { return; };
   virtual void Disable() { return; };
   

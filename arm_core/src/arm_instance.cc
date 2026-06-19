@@ -28,6 +28,32 @@ double CartesianPosDistance(const ArmMotion::Pose6Dof_t& p0,
 
 }  // namespace
 
+// ── 类型桥接：ArmMotion::* ↔ ArmCtrlBase::* ──────────────────────────
+bool ArmInstance::GetActuatorJointState(ArmMotion::JointState_t& state) {
+  ArmCtrlBase::JointState actuator_state;
+  if (!arm_ctrl_.GetJointState(actuator_state)) {
+    return false;
+  }
+  for (int i = 0; i < 6; ++i) {
+    state.position.q[i] = actuator_state.position[i];
+    state.velocity.q[i] = actuator_state.velocity[i];
+    state.effort.q[i]   = actuator_state.effort[i];
+  }
+  return true;
+}
+
+bool ArmInstance::SetActuatorJointState(const ArmMotion::JointCommand_t& cmd) {
+  ArmCtrlBase::JointCommand actuator_cmd;
+  for (int i = 0; i < 6; ++i) {
+    actuator_cmd.position[i]  = cmd.position.q[i];
+    actuator_cmd.velocity[i]  = cmd.velocity.q[i];
+    actuator_cmd.effort[i]    = cmd.effort.q[i];
+    actuator_cmd.stiffness[i] = cmd.stiffness.q[i];
+    actuator_cmd.damping[i]   = cmd.damping.q[i];
+  }
+  return arm_ctrl_.SetJointState(actuator_cmd);
+}
+
 bool ArmInstance::SelectBestIKSolve(
     const ArmMotion::IKSolves_t& ik_solves,
     const ArmMotion::Joint6Dof_t& reference_joint,
@@ -118,7 +144,7 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
                        double t) {
   // 获取当前关节状态作为起始位置
   ArmMotion::JointState_t current_state;
-  if (!arm_ctrl_.GetJointState(current_state)) {
+  if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[MoveL] failed: GetJointState at start");
     return -1;
   }
@@ -228,7 +254,7 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
     joint_cmd.stiffness = motor_stiffness_;
     joint_cmd.damping = motor_damping_;
     // TODO: 力矩支持
-    if (!arm_ctrl_.SetJointState(joint_cmd)) {
+    if (!SetActuatorJointState(joint_cmd)) {
       ARM_LOG_ERROR("[MoveL] failed: SetJointState at t={}", current_time);
       return -1;
     }
@@ -254,7 +280,7 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
   }
 
   ArmMotion::JointState_t current_state;
-  if (!arm_ctrl_.GetJointState(current_state)) {
+  if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[MoveJ] failed: GetJointState at start");
     return -1;
   }
@@ -327,7 +353,7 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
     joint_cmd.stiffness = motor_stiffness_;
     joint_cmd.damping = motor_damping_;
     // TODO: 力矩支持
-    if (!arm_ctrl_.SetJointState(joint_cmd)) {
+    if (!SetActuatorJointState(joint_cmd)) {
       ARM_LOG_ERROR(
           "[MoveJ] failed: SetJointState at t={}, q0={}, q1={}, q2={}",
           current_time, point.position.q[0], point.position.q[1],
@@ -371,7 +397,7 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
   }
 
   ArmMotion::JointState_t current_state;
-  if (!arm_ctrl_.GetJointState(current_state)) {
+  if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[MoveJMulti] failed: GetJointState at start");
     return -1;
   }
@@ -457,7 +483,7 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
     joint_cmd.stiffness = motor_stiffness_;
     joint_cmd.damping = motor_damping_;
     // TODO: 力矩、刚度、阻尼支持
-    if (!arm_ctrl_.SetJointState(joint_cmd)) {
+    if (!SetActuatorJointState(joint_cmd)) {
       ARM_LOG_ERROR("[MoveJMulti] failed: SetJointState at t={}", current_time);
       return -1;
     }
@@ -476,7 +502,7 @@ int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points,
   }
 
   ArmMotion::JointState_t current_state;
-  if (!arm_ctrl_.GetJointState(current_state)) {
+  if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[MoveLMulti] failed: GetJointState at start");
     return -1;
   }
@@ -580,7 +606,7 @@ int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points,
     joint_cmd.stiffness = motor_stiffness_;
     joint_cmd.damping = motor_damping_;
     // TODO: 力矩支持
-    if (!arm_ctrl_.SetJointState(joint_cmd)) {
+    if (!SetActuatorJointState(joint_cmd)) {
       ARM_LOG_ERROR("[MoveLMulti] failed: SetJointState at t={}", current_time);
       return -1;
     }
@@ -595,7 +621,7 @@ int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points,
 
 int ArmInstance::GetCurrentPose(ArmMotion::Pose6Dof_t& current_pose) {
   ArmMotion::JointState_t current_state;
-  if (!arm_ctrl_.GetJointState(current_state)) {
+  if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[GetCurrentPose] failed: GetJointState");
     return -1;
   }
@@ -608,7 +634,7 @@ int ArmInstance::GetCurrentPose(ArmMotion::Pose6Dof_t& current_pose) {
 
 int ArmInstance::GetCurrentJoint(ArmMotion::Joint6Dof_t& current_joint) {
   ArmMotion::JointState_t current_state;
-  if (!arm_ctrl_.GetJointState(current_state)) {
+  if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[GetCurrentJoint] failed: GetJointState");
     return -1;
   }

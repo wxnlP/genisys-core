@@ -86,6 +86,10 @@ class ArmInstance {
                          const ArmMotion::Joint6Dof_t& reference_joint,
                          ArmMotion::Joint6Dof_t& selected_joint) const;
 
+  // 类型桥接：ArmMotion::* ↔ ArmCtrlBase::*
+  bool GetActuatorJointState(ArmMotion::JointState_t& state);
+  bool SetActuatorJointState(const ArmMotion::JointCommand_t& cmd);
+
   std::unique_ptr<KinematicSolver> kinematic_solver_;
   std::unique_ptr<Jacobian6Dof> jacobian_;
   std::unique_ptr<JointTrajectory> joint_trajectory_;

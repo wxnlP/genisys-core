@@ -16,8 +16,8 @@ public:
     bool Init() override;
     void Enable() override;
     void Disable() override;
-    bool SetJointState(const ArmMotion::JointCommand_t& joint_cmd) override;
-    bool GetJointState(ArmMotion::JointState_t& joint_state) override;
+    bool SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) override;
+    bool GetJointState(ArmCtrlBase::JointState& joint_state) override;
     bool SetCtrlMode(DmMotorDriver::CtrlMode mode);
 
 private:
@@ -25,5 +25,5 @@ private:
     std::mutex state_mutex_;
     std::jthread state_update_thread_;
 
-    ArmMotion::JointState_t latest_joint_state_{};
+    ArmCtrlBase::JointState latest_joint_state_{};
 };

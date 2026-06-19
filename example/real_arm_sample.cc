@@ -11,12 +11,12 @@ int main() {
   std::signal(SIGINT, SignalHandler);  // 注册 Ctrl+C 信号
   RoboManager robo_manger("geniarm_config.yaml");
   std::shared_ptr<ArmInstance> arm = robo_manger.GetArmInstance();
-  std::shared_ptr<GripperCtrlBase> gripper = robo_manger.GetGripper();、
+  std::shared_ptr<GripperController> gripper_ctrl = robo_manger.GetGripperController();
 
   arm->Enable();
   // gripper->Enable();
 
-  std::jthread arm_joint_thread([arm, gripper](std::stop_token stoken) {
+  std::jthread arm_joint_thread([arm](std::stop_token stoken) {
     ArmMotion::Pose6Dof_t pose{};
     ArmMotion::Joint6Dof_t jog{};
     double gripper_pos{};

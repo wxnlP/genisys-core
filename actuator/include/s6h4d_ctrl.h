@@ -12,15 +12,15 @@ class S6h4dCtrl : public ArmCtrlBase {
   ~S6h4dCtrl() override = default;
 
   bool Init() override;
-  bool SetJointState(const ArmMotion::JointCommand_t& joint_cmd) override;
-  bool GetJointState(ArmMotion::JointState_t& joint_state) override;
+  bool SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) override;
+  bool GetJointState(ArmCtrlBase::JointState& joint_state) override;
 
  private:
-  void Float2Bytes(const ArmMotion::JointCommand_t& joint, uint8_t* buffer);
-  void Bytes2Float(const uint8_t* bytes, ArmMotion::Joint6Dof_t& joint);
+  void Float2Bytes(const ArmCtrlBase::JointCommand& joint, uint8_t* buffer);
+  void Bytes2Float(const uint8_t* bytes, ArmCtrlBase::JointState& joint);
 
   serial::Serial& serial_;
   std::jthread joint_state_thread_;
   std::mutex joint_state_mutex_;
-  ArmMotion::JointState_t last_joint_state_{};
+  ArmCtrlBase::JointState last_joint_state_{};
 };

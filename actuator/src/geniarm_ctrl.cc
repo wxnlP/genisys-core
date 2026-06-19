@@ -1,5 +1,5 @@
 #include "geniarm_ctrl.h"
-#include "arm_logger.h"
+
 
 GeniArmCtrl::GeniArmCtrl(std::vector<DmMotorDriver>& motor_driver) : motor_driver_(motor_driver) {}
 
@@ -16,9 +16,9 @@ bool GeniArmCtrl::Init() {
         for (int i = 0; i < motor_driver_.size(); ++i) {
           DmMotorDriver::MotorState state;
           motor_driver_[i].GetLatestState(state);
-          latest_joint_state_.position.q[i] = state.pos;
-          latest_joint_state_.velocity.q[i] = state.vel;
-          latest_joint_state_.effort.q[i] = state.torque;
+          latest_joint_state_.position[i] = state.pos;
+          latest_joint_state_.velocity[i] = state.vel;
+          latest_joint_state_.effort[i] = state.torque;
         }
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -39,9 +39,9 @@ void GeniArmCtrl::Disable() {
   }
 }
 
-bool GeniArmCtrl::SetJointState(const ArmMotion::JointCommand_t& joint_cmd) {
+bool GeniArmCtrl::SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) {
   for (int i = 0; i < motor_driver_.size(); ++i) {
-    DmMotorDriver::CtrlCmd cmd(joint_cmd.position.q[i], joint_cmd.velocity.q[i], joint_cmd.effort.q[i], joint_cmd.stiffness.q[i], joint_cmd.damping.q[i]);
+    DmMotorDriver::CtrlCmd cmd(joint_cmd.position[i], joint_cmd.velocity[i], joint_cmd.effort[i], joint_cmd.stiffness[i], joint_cmd.damping[i]);
     if (motor_driver_[i].MoveCtrl(cmd) == -1) {
       return false;
     }
@@ -49,7 +49,7 @@ bool GeniArmCtrl::SetJointState(const ArmMotion::JointCommand_t& joint_cmd) {
   return true;
 }
 
-bool GeniArmCtrl::GetJointState(ArmMotion::JointState_t& joint_state) {
+bool GeniArmCtrl::GetJointState(ArmCtrlBase::JointState& joint_state) {
   std::lock_guard<std::mutex> lock(state_mutex_);
   joint_state = latest_joint_state_;
   return true;
@@ -58,7 +58,6 @@ bool GeniArmCtrl::GetJointState(ArmMotion::JointState_t& joint_state) {
 bool GeniArmCtrl::SetCtrlMode(DmMotorDriver::CtrlMode mode) {
   for (auto& motor : motor_driver_) {
     if (motor.SetCtrlMode(mode, false) == -1) {
-      ARM_LOG_ERROR("设置电机控制模式失败");
       return false;
     }
   }

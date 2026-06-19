@@ -12,7 +12,7 @@ class GeniArmGripper : public GripperCtrlBase {
       : GripperCtrlBase(stiffness, damping), motor_driver_(motor_driver) {}
   ~GeniArmGripper() override = default;
 
-  void Init();
+  void Init() override;
   void Enable() override;
   void Disable() override;
   bool ReceiveState(double& position, double& velocity, double& effort) override;

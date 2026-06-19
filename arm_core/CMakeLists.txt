@@ -9,7 +9,7 @@ target_include_directories(${TARGET_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(${TARGET_NAME} PUBLIC Eigen3::Eigen yaml-cpp)
+target_link_libraries(${TARGET_NAME} PUBLIC Eigen3::Eigen yaml-cpp actuator_controller)
 
 # 添加源文件
 target_sources(${TARGET_NAME} PRIVATE
@@ -22,20 +22,12 @@ target_sources(${TARGET_NAME} PRIVATE
     src/joint_path.cc
     src/cartesian_trajectory.cc
     src/joint_trajectory.cc
-    src/s6h4d_ctrl.cc
     src/arm_instance.cc
     src/joint_multi_point_path.cc
     src/cartesian_multi_point_path.cc
     src/gripper_controller.cc
-    src/geniarm_gripper.cc
-    src/geniarm_ctrl.cc
     src/robo_manager.cc
 )
-set(LINK_LIBS  dm_driver)
-if(BUILD_DEFAULT_SERIAL)
-    list(APPEND LINK_LIBS serial)
-endif()
-target_link_libraries(${TARGET_NAME} PRIVATE ${LINK_LIBS})
 
 # 安装静态库目标
 install(TARGETS ${TARGET_NAME}

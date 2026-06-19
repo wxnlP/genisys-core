@@ -22,10 +22,10 @@ option(BUILD_DEFAULT_SERIAL "Build the default serial library" ON)
 option(BUILD_EXAMPLES "Build examples" ON)
 
 
+add_subdirectory(actuator)
 add_subdirectory(arm_core)
-add_subdirectory(third_party/dm_driver)
 
-if(BUILD_DEFAULT_SERIAL) 
-    add_subdirectory(third_party/serial)
+if (BUILD_EXAMPLES)
+    add_subdirectory(example)
 endif()
 

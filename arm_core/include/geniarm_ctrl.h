@@ -18,6 +18,7 @@ public:
     void Disable() override;
     bool SetJointState(const ArmMotion::JointCommand_t& joint_cmd) override;
     bool GetJointState(ArmMotion::JointState_t& joint_state) override;
+    bool SetCtrlMode(DmMotorDriver::CtrlMode mode);
 
 private:
     std::vector<DmMotorDriver>& motor_driver_;

@@ -54,3 +54,13 @@ bool GeniArmCtrl::GetJointState(ArmMotion::JointState_t& joint_state) {
   joint_state = latest_joint_state_;
   return true;
 }
+
+bool GeniArmCtrl::SetCtrlMode(DmMotorDriver::CtrlMode mode) {
+  for (auto& motor : motor_driver_) {
+    if (motor.SetCtrlMode(mode, false) == -1) {
+      ARM_LOG_ERROR("设置电机控制模式失败");
+      return false;
+    }
+  }
+  return true;
+}

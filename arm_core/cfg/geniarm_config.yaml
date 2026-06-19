@@ -41,22 +41,22 @@ robot:
       feedback_id: 0x14
       model: "DM4310"
       MIT:
-        stiffness: 12.0
-        damping: 1.0
+        stiffness: 18.0
+        damping: 2.0
     - name: "joint5"
       motor_id: 0x05
       feedback_id: 0x15
       model: "DM4310"
       MIT:
-        stiffness: 12.0
-        damping: 1.0
+        stiffness: 18.0
+        damping: 2.0
     - name: "joint6"
       motor_id: 0x06
       feedback_id: 0x16
       model: "DM4310"
       MIT:
-        stiffness: 12.0
-        damping: 1.0
+        stiffness: 18.0
+        damping: 2.0
 
 gripper:
   name: "geniarm_gripper"
@@ -66,5 +66,5 @@ gripper:
   feedback_id: 0x17
   model: "DM4310"
   MIT:
-    stiffness: 12.0
+    stiffness: 8.0
     damping: 1.0

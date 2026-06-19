@@ -7,6 +7,14 @@
 #include <thread>
 #include <condition_variable>
 
+void GripperController::Enable() {
+  gripper_.Enable();
+}
+
+void GripperController::Disable() {
+  gripper_.Disable();
+}
+
 bool GripperController::SetPosition(double position, double velocity,
                                     double accel, double effort) {
   const double max_range = gripper_.GetMaxRange();

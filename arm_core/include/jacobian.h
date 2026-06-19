@@ -9,15 +9,15 @@ class Jacobian6Dof {
   explicit Jacobian6Dof(const ArmMotion::MDHParams& mdh_params);
   ~Jacobian6Dof();
 
-  void Update(const ArmMotion::Joint6Dof_t& inputJoint, double dt);
-  bool ForwardVelocity(const ArmMotion::Joint6Dof_t& inputVel,
-                       ArmMotion::CartesianTwist_t& outputVel);
-  bool InverseVelocity(const ArmMotion::CartesianTwist_t& inputVel,
-                       ArmMotion::Joint6Dof_t& outputVel, double damping);
-  bool ForwardAccel(const ArmMotion::Joint6Dof_t& inputAcc,
-                    ArmMotion::CartesianTwist_t& outputAcc);
-  bool InverseAccel(const ArmMotion::CartesianTwist_t& inputAcc,
-                    ArmMotion::Joint6Dof_t& outputAcc, double damping);
+  void Update(const ArmMotion::Joint6Dof& inputJoint, double dt);
+  bool ForwardVelocity(const ArmMotion::Joint6Dof& inputVel,
+                       ArmMotion::CartesianTwist& outputVel);
+  bool InverseVelocity(const ArmMotion::CartesianTwist& inputVel,
+                       ArmMotion::Joint6Dof& outputVel, double damping);
+  bool ForwardAccel(const ArmMotion::Joint6Dof& inputAcc,
+                    ArmMotion::CartesianTwist& outputAcc);
+  bool InverseAccel(const ArmMotion::CartesianTwist& inputAcc,
+                    ArmMotion::Joint6Dof& outputAcc, double damping);
 
  private:
   class Impl;

@@ -1,7 +1,7 @@
 #include "cartesian_trajectory.h"
 
 bool CartesianTrajectory::Sample(
-    double t, ArmMotion::CartesianTrajectoryPoint_t& point) const {
+    double t, ArmMotion::CartesianTrajectoryPoint& point) const {
   TimeScalerBase::State state{};
   if (!time_scaler_.Evaluate(t, state)) {
     return false;

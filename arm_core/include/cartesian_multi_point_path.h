@@ -20,10 +20,10 @@ struct CartesianMultiPointPathImpl;
 // GetTotalLength() 返回路径总弧长，供 LSPBTimeScaler 规划使用。
 class CartesianMultiPointPath : public CartesianPathBase {
  public:
-  CartesianMultiPointPath(std::vector<ArmMotion::Pose6Dof_t> points, double r);
+  CartesianMultiPointPath(std::vector<ArmMotion::Pose6Dof> points, double r);
   ~CartesianMultiPointPath() override;
 
-  void EvaluatePos(double s, ArmMotion::Pose6Dof_t& point) const override;
+  void EvaluatePos(double s, ArmMotion::Pose6Dof& point) const override;
   void EvaluateTangent(ArmMotion::Vector3d& pos, ArmMotion::Vector3d& omega) const override;
 
   double GetTotalLength() const;

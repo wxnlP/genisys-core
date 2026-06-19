@@ -6,7 +6,7 @@ struct CartesianLinearPath::Impl {
     Eigen::Quaterniond q_start_, q_target_;
 };
 
-CartesianLinearPath::CartesianLinearPath(const ArmMotion::Pose6Dof_t& pose_start, const ArmMotion::Pose6Dof_t& pose_target)
+CartesianLinearPath::CartesianLinearPath(const ArmMotion::Pose6Dof& pose_start, const ArmMotion::Pose6Dof& pose_target)
     : impl_(std::make_unique<Impl>())
 {
     // 1. 初始化位置矢量
@@ -26,7 +26,7 @@ CartesianLinearPath::CartesianLinearPath(const ArmMotion::Pose6Dof_t& pose_start
 
 CartesianLinearPath::~CartesianLinearPath() = default;
 
-void CartesianLinearPath::EvaluatePos(double s, ArmMotion::Pose6Dof_t& path) const
+void CartesianLinearPath::EvaluatePos(double s, ArmMotion::Pose6Dof& path) const
 {
     // 1. 线性插值位置
     Eigen::Vector3d p_s = impl_->p_start_ + s * (impl_->p_target_ - impl_->p_start_);

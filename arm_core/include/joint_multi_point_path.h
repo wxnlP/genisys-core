@@ -16,17 +16,17 @@
 // 幅值约等于总弧长，供 JointTrajectory 速度/加速度缩放使用。
 class MultiPointJointPath : public JointPathBase {
  public:
-  MultiPointJointPath(std::vector<ArmMotion::Joint6Dof_t> points, double r);
+  MultiPointJointPath(std::vector<ArmMotion::Joint6Dof> points, double r);
   ~MultiPointJointPath() override = default;
 
-  void EvaluatePos(double s, ArmMotion::Joint6Dof_t& point) const override;
-  void EvaluateTangent(ArmMotion::Joint6Dof_t& tangent) const override;
+  void EvaluatePos(double s, ArmMotion::Joint6Dof& point) const override;
+  void EvaluateTangent(ArmMotion::Joint6Dof& tangent) const override;
   double GetTotalLength() const { return total_length_; }
  private:
-  double JointDistance(const ArmMotion::Joint6Dof_t& p1, const ArmMotion::Joint6Dof_t& p2) const;
+  double JointDistance(const ArmMotion::Joint6Dof& p1, const ArmMotion::Joint6Dof& p2) const;
   void Precompute();
 
-  std::vector<ArmMotion::Joint6Dof_t> points_;
+  std::vector<ArmMotion::Joint6Dof> points_;
   double r_;
 
   // 预计算数据
@@ -36,5 +36,5 @@ class MultiPointJointPath : public JointPathBase {
   double total_length_{0.0};         // 总弧长 = cum_lengths_[n-1]    
 
   // 缓存上一次 EvaluatePos 求得的切向量，供 EvaluateTangent 使用
-  mutable ArmMotion::Joint6Dof_t last_tangent_{};
+  mutable ArmMotion::Joint6Dof last_tangent_{};
 };

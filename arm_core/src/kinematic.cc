@@ -39,7 +39,7 @@ static void Euler2Rotation(const double* euler, double* R) {
   Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::ColMajor>>(R, 3, 3) = m;
 }
 
-static Eigen::Matrix4d PoseToTransform(const ArmMotion::Pose6Dof_t& pose) {
+static Eigen::Matrix4d PoseToTransform(const ArmMotion::Pose6Dof& pose) {
   Eigen::Matrix4d T = Eigen::Matrix4d::Identity();
   Eigen::Matrix3d R;
 
@@ -59,8 +59,8 @@ static Eigen::Matrix4d PoseToTransform(const ArmMotion::Pose6Dof_t& pose) {
   return T;
 }
 
-static ArmMotion::Pose6Dof_t TransformToPose(const Eigen::Matrix4d& T) {
-  ArmMotion::Pose6Dof_t pose;
+static ArmMotion::Pose6Dof TransformToPose(const Eigen::Matrix4d& T) {
+  ArmMotion::Pose6Dof pose;
   Eigen::Matrix3d R = T.block<3, 3>(0, 0);
   Eigen::Quaterniond q(R);
   q.normalize();
@@ -68,7 +68,7 @@ static ArmMotion::Pose6Dof_t TransformToPose(const Eigen::Matrix4d& T) {
   pose.x = T(0, 3);
   pose.y = T(1, 3);
   pose.z = T(2, 3);
-  pose.quat = ArmMotion::Quaternion_t(q.w(), q.x(), q.y(), q.z());
+  pose.quat = ArmMotion::Quaternion(q.w(), q.x(), q.y(), q.z());
 
   return pose;
 }
@@ -124,8 +124,8 @@ KinematicSolver::KinematicSolver(const ArmMotion::MDHParams& mdh_params)
   jointOffset_[5] = mdh_params.theta[5];
 }
 
-bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t& inputJoint,
-                         ArmMotion::Pose6Dof_t& outputPose) {
+bool KinematicSolver::FK(const ArmMotion::Joint6Dof& inputJoint,
+                         ArmMotion::Pose6Dof& outputPose) {
   double theta_in[6];
   double theta[6];
 
@@ -171,9 +171,9 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof_t& inputJoint,
   return true;
 }
 
-bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
-                                        const ArmMotion::Joint6Dof_t& lastJoint,
-                                        ArmMotion::IKSolves_t& outputSolves) {
+bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof& inputPose,
+                                        const ArmMotion::Joint6Dof& lastJoint,
+                                        ArmMotion::IKSolves& outputSolves) {
   double theta_1[2]{};
   double theta_23[2][2]{};
   double theta_456[2][3]{};
@@ -468,9 +468,9 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof_t& inputPose,
   return true;
 }
 
-bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof_t& inputPose,
-                                       const ArmMotion::Joint6Dof_t& lastJoint,
-                                       ArmMotion::IKSolves_t& outputSolves) {
+bool KinematicSolver::IK_ParallelWrist(const ArmMotion::Pose6Dof& inputPose,
+                                       const ArmMotion::Joint6Dof& lastJoint,
+                                       ArmMotion::IKSolves& outputSolves) {
   // 具身智能使用较多的构型，234轴平行
   double theta_1[2]{};
   double theta_234[2][3]{};
@@ -773,7 +773,7 @@ void KinematicSolver::SetIKMode(IKMode mode) {
   ikMode_ = mode;
 }
 
-void KinematicSolver::SetToolPose(const ArmMotion::Pose6Dof_t& tool_pose) {
+void KinematicSolver::SetToolPose(const ArmMotion::Pose6Dof& tool_pose) {
   impl_->T_6tool = PoseToTransform(tool_pose);
   impl_->T_tool6 = impl_->T_6tool.inverse();
   impl_->toolPoseEnabled = true;
@@ -785,9 +785,9 @@ void KinematicSolver::ClearToolPose() {
   impl_->toolPoseEnabled = false;
 }
 
-bool KinematicSolver::IK(const ArmMotion::Pose6Dof_t& inputPose, const ArmMotion::Joint6Dof_t& lastJoint,
-                         ArmMotion::IKSolves_t& outputSolves) {
-  ArmMotion::Pose6Dof_t flange_pose = inputPose;
+bool KinematicSolver::IK(const ArmMotion::Pose6Dof& inputPose, const ArmMotion::Joint6Dof& lastJoint,
+                         ArmMotion::IKSolves& outputSolves) {
+  ArmMotion::Pose6Dof flange_pose = inputPose;
   if (impl_->toolPoseEnabled) {
     Eigen::Matrix4d T_0tcp = PoseToTransform(inputPose);
     Eigen::Matrix4d T_06 = T_0tcp * impl_->T_tool6;

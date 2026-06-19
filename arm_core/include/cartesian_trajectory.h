@@ -9,7 +9,7 @@ class CartesianTrajectory {
                       const TimeScalerBase& time_scaler)
       : path_(path), time_scaler_(time_scaler) {}
 
-  bool Sample(double t, ArmMotion::CartesianTrajectoryPoint_t& point) const;
+  bool Sample(double t, ArmMotion::CartesianTrajectoryPoint& point) const;
   double GetDuration() const;
 
  private:

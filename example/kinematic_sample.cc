@@ -26,8 +26,8 @@ double wrap_to_pi(double angle) {
   return angle;
 }
 
-double joint_distance_sq(const ArmMotion::Joint6Dof_t& j1,
-                         const ArmMotion::Joint6Dof_t& j2) {
+double joint_distance_sq(const ArmMotion::Joint6Dof& j1,
+                         const ArmMotion::Joint6Dof& j2) {
   double sum_sq = 0.0;
   for (int i = 0; i < 6; ++i) {
     const double diff = wrap_to_pi(j1.q[i] - j2.q[i]);
@@ -36,8 +36,8 @@ double joint_distance_sq(const ArmMotion::Joint6Dof_t& j1,
   return sum_sq;
 }
 
-double solve_score(const ArmMotion::IKSolves_t& solves, int idx,
-                   const ArmMotion::Joint6Dof_t& ref_joint, bool* is_valid) {
+double solve_score(const ArmMotion::IKSolves& solves, int idx,
+                   const ArmMotion::Joint6Dof& ref_joint, bool* is_valid) {
   const char j1_flag = solves.solveFlag[idx][0];
   const char j23_flag = solves.solveFlag[idx][1];
   const char wrist_flag = solves.solveFlag[idx][2];
@@ -64,8 +64,8 @@ double solve_score(const ArmMotion::IKSolves_t& solves, int idx,
   return score;
 }
 
-int select_best_ik_solve_index(const ArmMotion::IKSolves_t& solves,
-                               const ArmMotion::Joint6Dof_t& ref_joint) {
+int select_best_ik_solve_index(const ArmMotion::IKSolves& solves,
+                               const ArmMotion::Joint6Dof& ref_joint) {
   double best_score = std::numeric_limits<double>::infinity();
   int best_idx = -1;
 
@@ -83,13 +83,13 @@ int select_best_ik_solve_index(const ArmMotion::IKSolves_t& solves,
 
 // --- C++ 版本的 demo_forward_kinematics ---
 void demo_forward_kinematics(KinematicSolver& kinematic_solver,
-                             ArmMotion::Pose6Dof_t& outPose,
-                             ArmMotion::Joint6Dof_t& outJoint) {
+                             ArmMotion::Pose6Dof& outPose,
+                             ArmMotion::Joint6Dof& outJoint) {
   cout << "======================================================" << endl;
   cout << "## 1. 正运动学验证 (Forward Kinematics)" << endl;
 
   // ===== 1. 定义并打印输入角度 =====
-  ArmMotion::Joint6Dof_t initial_theta_deg(17.1887, -22.9183, 11.4592, 5.7296, 90.0000, 28.6479);
+  ArmMotion::Joint6Dof initial_theta_deg(17.1887, -22.9183, 11.4592, 5.7296, 90.0000, 28.6479);
 
   cout << "[INPUT] 关节角输入 (Degree):" << endl;
   cout << "  ";
@@ -100,7 +100,7 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
   cout << endl;
 
   // 转换为弧度
-  ArmMotion::Joint6Dof_t initial_theta_rad;
+  ArmMotion::Joint6Dof initial_theta_rad;
   for (int i = 0; i < 6; ++i)
     initial_theta_rad.q[i] = initial_theta_deg.q[i] * DEG2RAD;
 
@@ -152,13 +152,13 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
 
 // --- C++ 版本的 demo_inverse_kinematics ---
 void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
-                             const ArmMotion::Pose6Dof_t& pose,
-                             const ArmMotion::Joint6Dof_t& lastJoint_rad) {
+                             const ArmMotion::Pose6Dof& pose,
+                             const ArmMotion::Joint6Dof& lastJoint_rad) {
   cout << "## 2. 逆运动学验证 (Inverse Kinematics)" << endl;
   cout << fixed << setprecision(4);
 
   // 关键点：创建一个副本并强制设置使用四元数进行计算
-  ArmMotion::Pose6Dof_t inputPose = pose;
+  ArmMotion::Pose6Dof inputPose = pose;
   inputPose.vaildR = false;  // 告诉 IK 使用 qx, qy, qz, qw 而不是 R 矩阵
 
   cout << "* 输入末端位置 (m): (" << inputPose.x << ", " << inputPose.y << ", "
@@ -167,7 +167,7 @@ void demo_inverse_kinematics(KinematicSolver& kinematic_solver,
        << inputPose.quat.y << ", " << inputPose.quat.z << ", "
        << inputPose.quat.w << ")" << endl;
 
-  ArmMotion::IKSolves_t outputSolves;
+  ArmMotion::IKSolves outputSolves;
 
   // 调用 IK（此时内部会执行 P_06_quat.toRotationMatrix()）
   kinematic_solver.IK(inputPose, lastJoint_rad, outputSolves);
@@ -225,8 +225,8 @@ int main() {
   kSolver.SetIKMode(KinematicSolver::IKMode::ParallelWrist);
   // kSolver.SetIKMode(KinematicSolver::IKMode::SphericalWrist);
 
-  ArmMotion::Joint6Dof_t joint;
-  ArmMotion::Pose6Dof_t pose;
+  ArmMotion::Joint6Dof joint;
+  ArmMotion::Pose6Dof pose;
 
   demo_forward_kinematics(kSolver, pose, joint);
   demo_inverse_kinematics(kSolver, pose, joint);

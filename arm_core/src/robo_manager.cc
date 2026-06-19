@@ -142,10 +142,10 @@ RoboManager::RoboManager(const std::string& yaml_file)
 
   gripper_->SetMaxRange(gripper_max_range);
 
-  ArmMotion::Joint6Dof_t arm_stiffness{};
-  ArmMotion::Joint6Dof_t arm_damping{};
-  ArmMotion::Joint6Dof_t joint_min{};
-  ArmMotion::Joint6Dof_t joint_max{};
+  ArmMotion::Joint6Dof arm_stiffness{};
+  ArmMotion::Joint6Dof arm_damping{};
+  ArmMotion::Joint6Dof joint_min{};
+  ArmMotion::Joint6Dof joint_max{};
   for (size_t i = 0; i < 6; ++i) {
     arm_stiffness.q[i] = motor_stiffness[i];
     arm_damping.q[i] = motor_damping[i];

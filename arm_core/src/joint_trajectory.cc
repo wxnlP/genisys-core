@@ -1,7 +1,7 @@
 #include "joint_trajectory.h"
 
 bool JointTrajectory::Sample(double t,
-                             ArmMotion::JointTrajectoryPoint_t& point) const {
+                             ArmMotion::JointTrajectoryPoint& point) const {
   TimeScalerBase::State state{};
   if (!time_scaler_.Evaluate(t, state)) {
     return false;
@@ -12,7 +12,7 @@ bool JointTrajectory::Sample(double t,
   point.sd = state.sd;
   point.sdd = state.sdd;
 
-  ArmMotion::Joint6Dof_t tangent;
+  ArmMotion::Joint6Dof tangent;
   path_.EvaluatePos(state.s, point.position);
   path_.EvaluateTangent(tangent);
 

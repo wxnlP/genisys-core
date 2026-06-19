@@ -32,8 +32,8 @@ class ArmInstance {
   }
   ~ArmInstance() = default;
 
-  void SetMotorParams(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping);
-  void SetJointLimits(ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max);
+  void SetMotorParams(ArmMotion::Joint6Dof stiffness, ArmMotion::Joint6Dof damping);
+  void SetJointLimits(ArmMotion::Joint6Dof joint_min, ArmMotion::Joint6Dof joint_max);
   void SetTrajectoryMode(TrajectoryMode mode);
 
   void Init();
@@ -46,7 +46,7 @@ class ArmInstance {
   //   v           : TCP 线速度上限（m/s）
   //   a           : TCP 线加速度上限（m/s^2）
   //   t           : 期望总时长（s），<=0 表示由 v/a 自动规划
-  int MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a, double t);
+  int MoveL(ArmMotion::Pose6Dof target_pose, double v, double a, double t);
 
   // 单段关节运动（MoveJ）
   // 参数单位：
@@ -54,7 +54,7 @@ class ArmInstance {
   //   v           : 关节空间路径速度上限（rad/s）
   //   a           : 关节空间路径加速度上限（rad/s^2）
   //   t           : 期望总时长（s），<=0 表示由 v/a 自动规划
-  int MoveJ(ArmMotion::Joint6Dof_t target_joint, double v, double a, double t);
+  int MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a, double t);
 
   // 多点笛卡尔运动（MoveLMulti，圆弧融合）
   // 参数单位：
@@ -63,7 +63,7 @@ class ArmInstance {
   //   v      : TCP 线速度上限（m/s）
   //   a      : TCP 线加速度上限（m/s^2）
   //   t      : 期望总时长（s），<=0 表示由 v/a 自动规划
-  int MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points, double r,
+  int MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, double r,
                  double v, double a, double t);
 
   // 多点关节运动（MoveJMulti，抛物线融合）
@@ -73,22 +73,22 @@ class ArmInstance {
   //   v      : 关节空间路径速度上限（rad/s）
   //   a      : 关节空间路径加速度上限（rad/s^2）
   //   t      : 期望总时长（s），<=0 表示由 v/a 自动规划
-  int MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points, double r,
+  int MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, double r,
                  double v, double a, double t);
-  int GetCurrentPose(ArmMotion::Pose6Dof_t& current_pose);
-  int GetCurrentJoint(ArmMotion::Joint6Dof_t& current_joint);
+  int GetCurrentPose(ArmMotion::Pose6Dof& current_pose);
+  int GetCurrentJoint(ArmMotion::Joint6Dof& current_joint);
 
-  void SetToolPose(const ArmMotion::Pose6Dof_t& tool_pose);
+  void SetToolPose(const ArmMotion::Pose6Dof& tool_pose);
   void ClearToolPose();
 
  private:
-  bool SelectBestIKSolve(const ArmMotion::IKSolves_t& ik_solves,
-                         const ArmMotion::Joint6Dof_t& reference_joint,
-                         ArmMotion::Joint6Dof_t& selected_joint) const;
+  bool SelectBestIKSolve(const ArmMotion::IKSolves& ik_solves,
+                         const ArmMotion::Joint6Dof& reference_joint,
+                         ArmMotion::Joint6Dof& selected_joint) const;
 
   // 类型桥接：ArmMotion::* ↔ ArmCtrlBase::*
-  bool GetActuatorJointState(ArmMotion::JointState_t& state);
-  bool SetActuatorJointState(const ArmMotion::JointCommand_t& cmd);
+  bool GetActuatorJointState(ArmMotion::JointState& state);
+  bool SetActuatorJointState(const ArmMotion::JointCommand& cmd);
 
   std::unique_ptr<KinematicSolver> kinematic_solver_;
   std::unique_ptr<Jacobian6Dof> jacobian_;
@@ -98,12 +98,12 @@ class ArmInstance {
 
   ArmCtrlBase& arm_ctrl_;
   const double dt_ = 0.01;
-  ArmMotion::Joint6Dof_t motor_stiffness_{};
-  ArmMotion::Joint6Dof_t motor_damping_{};
+  ArmMotion::Joint6Dof motor_stiffness_{};
+  ArmMotion::Joint6Dof motor_damping_{};
 
   // 关节限位（弧度）
-  ArmMotion::Joint6Dof_t joint_min_{};
-  ArmMotion::Joint6Dof_t joint_max_{};
+  ArmMotion::Joint6Dof joint_min_{};
+  ArmMotion::Joint6Dof joint_max_{};
 
   // 轨迹规划模式
   TrajectoryMode traj_planning_mode{TrajectoryMode::QUINTIC};

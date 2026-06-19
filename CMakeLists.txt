@@ -15,6 +15,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 禁用编译器扩展，确保代码兼容性
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # 是否构建默认 serial 库
 option(BUILD_DEFAULT_SERIAL "Build the default serial library" ON)
 

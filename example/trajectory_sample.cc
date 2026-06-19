@@ -14,7 +14,7 @@
 
 namespace {
 
-void PrintJointPoint(const ArmMotion::JointTrajectoryPoint_t& point) {
+void PrintJointPoint(const ArmMotion::JointTrajectoryPoint& point) {
   std::cout << "t=" << std::setw(4) << point.t << "  s=" << point.s << "  q=[";
   for (int i = 0; i < 6; ++i) {
     std::cout << point.position.q[i];
@@ -26,7 +26,7 @@ void PrintJointPoint(const ArmMotion::JointTrajectoryPoint_t& point) {
             << "  ddq0=" << point.acceleration.q[0] << '\n';
 }
 
-void PrintCartesianPoint(const ArmMotion::CartesianTrajectoryPoint_t& point) {
+void PrintCartesianPoint(const ArmMotion::CartesianTrajectoryPoint& point) {
   std::cout << "t=" << std::setw(4) << point.t << "  s=" << point.s << "  p=["
             << point.pose.x << ", " << point.pose.y << ", " << point.pose.z
             << "]"
@@ -43,7 +43,7 @@ void WriteJointHeader(std::ofstream& stream) {
 }
 
 void WriteJointRow(std::ofstream& stream,
-                   const ArmMotion::JointTrajectoryPoint_t& point) {
+                   const ArmMotion::JointTrajectoryPoint& point) {
   stream << point.t;
   for (int i = 0; i < 6; ++i) {
     stream << ',' << point.position.q[i];
@@ -63,7 +63,7 @@ void WriteCartesianHeader(std::ofstream& stream) {
 }
 
 void WriteCartesianRow(std::ofstream& stream,
-                       const ArmMotion::CartesianTrajectoryPoint_t& point) {
+                       const ArmMotion::CartesianTrajectoryPoint& point) {
   stream << point.t << ',' << point.s << ',' << point.sd << ',' << point.sdd
          << ',' << point.pose.x << ',' << point.pose.y << ',' << point.pose.z
          << ',' << point.pose.quat.w << ',' << point.pose.quat.x << ','
@@ -78,7 +78,7 @@ void WriteCartesianRow(std::ofstream& stream,
 }
 
 bool SampleJointPoint(const JointTrajectory& trajectory, double t,
-                      ArmMotion::JointTrajectoryPoint_t& point) {
+                      ArmMotion::JointTrajectoryPoint& point) {
   if (trajectory.Sample(t, point)) {
     return true;
   }
@@ -86,7 +86,7 @@ bool SampleJointPoint(const JointTrajectory& trajectory, double t,
 }
 
 bool SampleCartesianPoint(const CartesianTrajectory& trajectory, double t,
-                          ArmMotion::CartesianTrajectoryPoint_t& point) {
+                          ArmMotion::CartesianTrajectoryPoint& point) {
   if (trajectory.Sample(t, point)) {
     return true;
   }
@@ -98,8 +98,8 @@ bool SampleCartesianPoint(const CartesianTrajectory& trajectory, double t,
 int main() {
   std::cout << std::fixed << std::setprecision(4);
 
-  ArmMotion::Joint6Dof_t joint_start(0.0, 0.1, 0.2, 0.0, -0.1, 0.3);
-  ArmMotion::Joint6Dof_t joint_target(0.5, -0.2, 0.4, 0.3, 0.2, -0.1);
+  ArmMotion::Joint6Dof joint_start(0.0, 0.1, 0.2, 0.0, -0.1, 0.3);
+  ArmMotion::Joint6Dof joint_target(0.5, -0.2, 0.4, 0.3, 0.2, -0.1);
   JointPath joint_path(joint_start, joint_target);
 
   CubicTimeScaler joint_scaler;
@@ -112,13 +112,13 @@ int main() {
 
   JointTrajectory joint_trajectory(joint_path, joint_scaler);
 
-  ArmMotion::Pose6Dof_t pose_start;
+  ArmMotion::Pose6Dof pose_start;
   pose_start.x = 0.30;
   pose_start.y = -0.10;
   pose_start.z = 0.20;
   pose_start.quat.w = 1.0;
 
-  ArmMotion::Pose6Dof_t pose_target;
+  ArmMotion::Pose6Dof pose_target;
   pose_target.x = 0.45;
   pose_target.y = 0.15;
   pose_target.z = 0.35;
@@ -155,8 +155,8 @@ int main() {
   WriteCartesianHeader(cartesian_csv);
 
   for (double t = 0.0; t < total_duration; t += dt) {
-    ArmMotion::JointTrajectoryPoint_t joint_point;
-    ArmMotion::CartesianTrajectoryPoint_t cartesian_point;
+    ArmMotion::JointTrajectoryPoint joint_point;
+    ArmMotion::CartesianTrajectoryPoint cartesian_point;
 
     if (!SampleJointPoint(joint_trajectory, t, joint_point)) {
       ARM_LOG_ERROR("joint trajectory sample failed at t={}", t);
@@ -177,7 +177,7 @@ int main() {
 
   ARM_LOG_INFO("Joint trajectory key samples");
   for (double t : sample_times) {
-    ArmMotion::JointTrajectoryPoint_t point;
+    ArmMotion::JointTrajectoryPoint point;
     if (!SampleJointPoint(joint_trajectory, t, point)) {
       ARM_LOG_ERROR("joint trajectory sample failed at t={}", t);
       return 1;
@@ -187,7 +187,7 @@ int main() {
 
   ARM_LOG_INFO("Cartesian trajectory samples");
   for (double t : sample_times) {
-    ArmMotion::CartesianTrajectoryPoint_t point;
+    ArmMotion::CartesianTrajectoryPoint point;
     if (!SampleCartesianPoint(cartesian_trajectory, t, point)) {
       ARM_LOG_ERROR("cartesian trajectory sample failed at t={}", t);
       return 1;

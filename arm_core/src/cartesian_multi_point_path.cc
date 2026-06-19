@@ -20,7 +20,7 @@ struct CartesianMultiPointPathImpl {
     Eigen::Vector3d n1{};
   };
 
-  std::vector<ArmMotion::Pose6Dof_t> points_;
+  std::vector<ArmMotion::Pose6Dof> points_;
   double r_;
 
   int n_{0};
@@ -51,7 +51,7 @@ static void SampleOrientation(
     const std::vector<double>& ori_arcs,
     const std::vector<Eigen::Quaterniond>& quats,
     double total_length,
-    ArmMotion::Pose6Dof_t& out_point,
+    ArmMotion::Pose6Dof& out_point,
     ArmMotion::Vector3d& out_ang_tangent) {
   const int n = static_cast<int>(ori_arcs.size());
 
@@ -183,7 +183,7 @@ static void Precompute(CartesianMultiPointPathImpl& impl) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 CartesianMultiPointPath::CartesianMultiPointPath(
-    std::vector<ArmMotion::Pose6Dof_t> points, double r)
+    std::vector<ArmMotion::Pose6Dof> points, double r)
     : impl_(std::make_unique<CartesianMultiPointPathImpl>()) {
   impl_->points_ = std::move(points);
   impl_->r_ = r;
@@ -201,7 +201,7 @@ double CartesianMultiPointPath::GetTotalLength() const {
 // ─────────────────────────────────────────────────────────────────────────────
 
 void CartesianMultiPointPath::EvaluatePos(double s,
-                                          ArmMotion::Pose6Dof_t& point) const {
+                                          ArmMotion::Pose6Dof& point) const {
   if (impl_->n_ < 2) return;
 
   s = std::max(0.0, std::min(1.0, s));

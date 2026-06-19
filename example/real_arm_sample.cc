@@ -17,8 +17,8 @@ int main() {
   // gripper->Enable();
 
   std::jthread arm_joint_thread([arm](std::stop_token stoken) {
-    ArmMotion::Pose6Dof_t pose{};
-    ArmMotion::Joint6Dof_t jog{};
+    ArmMotion::Pose6Dof pose{};
+    ArmMotion::Joint6Dof jog{};
     double gripper_pos{};
     double gripper_vel{};
     double gripper_effort{};
@@ -49,42 +49,42 @@ int main() {
   // gripper->SetPosition(0, 0.5, 1.0, 0);
 
   ARM_LOG_INFO("开始关节Move测试");
-  ArmMotion::Joint6Dof_t jog{ 0, 1.00, -1.00, 0.0, 0.0, 0.0};
+  ArmMotion::Joint6Dof jog{ 0, 1.00, -1.00, 0.0, 0.0, 0.0};
   arm->MoveJ(jog, 0.5, 0.3, 0);
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
-  ArmMotion::Pose6Dof_t current_pose;
+  ArmMotion::Pose6Dof current_pose;
   arm->GetCurrentPose(current_pose);
   ARM_LOG_INFO("当前位置：x: {}, y: {}, z: {}", current_pose.x, current_pose.y, current_pose.z);
 
-  // ArmMotion::Pose6Dof_t traget_pose = current_pose;
+  // ArmMotion::Pose6Dof traget_pose = current_pose;
   // traget_pose.y += 0.1;
   // ARM_LOG_INFO("朝Y方向平移0.1m");
   // arm->MoveL(traget_pose, 0.5, 0.3, 0);
   // arm->GetCurrentPose(current_pose);
   // ARM_LOG_INFO("当前位置：x: {}, y: {}, z: {}", current_pose.x, current_pose.y, current_pose.z);
 
-  std::vector<ArmMotion::Pose6Dof_t> cart_points;
-  ArmMotion::Pose6Dof_t p1 = current_pose;
+  std::vector<ArmMotion::Pose6Dof> cart_points;
+  ArmMotion::Pose6Dof p1 = current_pose;
   p1.y -= 0.10;
   cart_points.push_back(p1);
 
-  ArmMotion::Pose6Dof_t p2 = p1;
+  ArmMotion::Pose6Dof p2 = p1;
   p2.z -= 0.10;
   cart_points.push_back(p2);
 
-  ArmMotion::Pose6Dof_t p3 = p2;
+  ArmMotion::Pose6Dof p3 = p2;
   p3.y += 0.10;
   cart_points.push_back(p3);
 
-  ArmMotion::Pose6Dof_t p4 = p3;
+  ArmMotion::Pose6Dof p4 = p3;
   p4.z += 0.10;
   cart_points.push_back(p4);
 
   arm->MoveLMulti(cart_points, 0.01, 0.1, 0.2, 0);
 
   std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-  jog = ArmMotion::Joint6Dof_t{};
+  jog = ArmMotion::Joint6Dof{};
   arm->MoveJ(jog, 0.5, 0.3, 0);
 
   /* 处理 Ctrl + C 信号 */

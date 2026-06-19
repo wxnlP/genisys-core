@@ -8,8 +8,8 @@
 
 namespace {
 
-double JointPathLength(const ArmMotion::Joint6Dof_t& q0,
-                       const ArmMotion::Joint6Dof_t& q1) {
+double JointPathLength(const ArmMotion::Joint6Dof& q0,
+                       const ArmMotion::Joint6Dof& q1) {
   double sum = 0.0;
   for (int i = 0; i < 6; ++i) {
     const double d = q1.q[i] - q0.q[i];
@@ -18,8 +18,8 @@ double JointPathLength(const ArmMotion::Joint6Dof_t& q0,
   return std::sqrt(sum);
 }
 
-double CartesianPosDistance(const ArmMotion::Pose6Dof_t& p0,
-                            const ArmMotion::Pose6Dof_t& p1) {
+double CartesianPosDistance(const ArmMotion::Pose6Dof& p0,
+                            const ArmMotion::Pose6Dof& p1) {
   const double dx = p1.x - p0.x;
   const double dy = p1.y - p0.y;
   const double dz = p1.z - p0.z;
@@ -29,7 +29,7 @@ double CartesianPosDistance(const ArmMotion::Pose6Dof_t& p0,
 }  // namespace
 
 // ── 类型桥接：ArmMotion::* ↔ ArmCtrlBase::* ──────────────────────────
-bool ArmInstance::GetActuatorJointState(ArmMotion::JointState_t& state) {
+bool ArmInstance::GetActuatorJointState(ArmMotion::JointState& state) {
   ArmCtrlBase::JointState actuator_state;
   if (!arm_ctrl_.GetJointState(actuator_state)) {
     return false;
@@ -42,7 +42,7 @@ bool ArmInstance::GetActuatorJointState(ArmMotion::JointState_t& state) {
   return true;
 }
 
-bool ArmInstance::SetActuatorJointState(const ArmMotion::JointCommand_t& cmd) {
+bool ArmInstance::SetActuatorJointState(const ArmMotion::JointCommand& cmd) {
   ArmCtrlBase::JointCommand actuator_cmd;
   for (int i = 0; i < 6; ++i) {
     actuator_cmd.position[i]  = cmd.position.q[i];
@@ -55,9 +55,9 @@ bool ArmInstance::SetActuatorJointState(const ArmMotion::JointCommand_t& cmd) {
 }
 
 bool ArmInstance::SelectBestIKSolve(
-    const ArmMotion::IKSolves_t& ik_solves,
-    const ArmMotion::Joint6Dof_t& reference_joint,
-    ArmMotion::Joint6Dof_t& selected_joint) const {
+    const ArmMotion::IKSolves& ik_solves,
+    const ArmMotion::Joint6Dof& reference_joint,
+    ArmMotion::Joint6Dof& selected_joint) const {
   constexpr double kPi = M_PI;
   constexpr double kTwoPi = 2.0 * kPi;
 
@@ -118,12 +118,12 @@ bool ArmInstance::SelectBestIKSolve(
   return found_valid_solve;
 }
 
-void ArmInstance::SetMotorParams(ArmMotion::Joint6Dof_t stiffness, ArmMotion::Joint6Dof_t damping) {
+void ArmInstance::SetMotorParams(ArmMotion::Joint6Dof stiffness, ArmMotion::Joint6Dof damping) {
   motor_stiffness_ = stiffness;
   motor_damping_ = damping;
 }
 
-void ArmInstance::SetJointLimits(ArmMotion::Joint6Dof_t joint_min, ArmMotion::Joint6Dof_t joint_max) {
+void ArmInstance::SetJointLimits(ArmMotion::Joint6Dof joint_min, ArmMotion::Joint6Dof joint_max) {
   joint_min_ = joint_min;
   joint_max_ = joint_max;
 }
@@ -140,17 +140,17 @@ void ArmInstance::Enable() { arm_ctrl_.Enable(); }
 
 void ArmInstance::Disable() { arm_ctrl_.Disable(); }
 
-int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
+int ArmInstance::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a,
                        double t) {
   // 获取当前关节状态作为起始位置
-  ArmMotion::JointState_t current_state;
+  ArmMotion::JointState current_state;
   if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[MoveL] failed: GetJointState at start");
     return -1;
   }
 
   // 通过正运动学获取当前笛卡尔位置
-  ArmMotion::Pose6Dof_t current_pose;
+  ArmMotion::Pose6Dof current_pose;
   if (!kinematic_solver_->FK(current_state.position, current_pose)) {
     ARM_LOG_ERROR("[MoveL] failed: FK at start");
     return -1;
@@ -214,7 +214,7 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
     if (current_time > duration) {
       current_time = duration;
     }
-    ArmMotion::CartesianTrajectoryPoint_t cart_point;
+    ArmMotion::CartesianTrajectoryPoint cart_point;
     if (!cartesian_trajectory_->Sample(current_time, cart_point)) {
       // 处理采样失败的情况
       ARM_LOG_ERROR("[MoveL] failed: Sample at t={}", current_time);
@@ -222,7 +222,7 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
     }
 
     // 通过逆运动学求解目标关节角
-    ArmMotion::IKSolves_t ik_solves;
+    ArmMotion::IKSolves ik_solves;
     if (!kinematic_solver_->IK(cart_point.pose, current_state.position,
                                ik_solves)) {
       ARM_LOG_ERROR("[MoveL] failed: IK at t={}, pose=({}, {}, {})",
@@ -232,7 +232,7 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
     }
 
     // 选择最优逆解：过滤不可达解并优先选与当前姿态最接近的解。
-    ArmMotion::Joint6Dof_t target_joint;
+    ArmMotion::Joint6Dof target_joint;
     if (!SelectBestIKSolve(ik_solves, current_state.position, target_joint)) {
       ARM_LOG_ERROR("[MoveL] failed: no valid IK solve at t={}", current_time);
       return -1;
@@ -241,14 +241,14 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
     // 通过雅可比矩阵将笛卡尔速度/加速度转换为关节速度/加速度
     jacobian_->Update(target_joint, dt_);
 
-    ArmMotion::Joint6Dof_t joint_vel;
+    ArmMotion::Joint6Dof joint_vel;
     jacobian_->InverseVelocity(cart_point.velocity, joint_vel, 1e-6);
 
-    ArmMotion::Joint6Dof_t joint_acc;
+    ArmMotion::Joint6Dof joint_acc;
     jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6);
 
     // 发送控制命令到机械臂
-    ArmMotion::JointCommand_t joint_cmd;
+    ArmMotion::JointCommand joint_cmd;
     joint_cmd.position = target_joint;
     joint_cmd.velocity = joint_vel;
     joint_cmd.stiffness = motor_stiffness_;
@@ -269,7 +269,7 @@ int ArmInstance::MoveL(ArmMotion::Pose6Dof_t target_pose, double v, double a,
   return 0;
 }
 
-int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
+int ArmInstance::MoveJ(ArmMotion::Joint6Dof target_joint, double v,
                        double a, double t) {
   for (int i = 0; i < 6; i++) {
     if (target_joint.q[i] < joint_min_.q[i] || target_joint.q[i] > joint_max_.q[i]) {
@@ -279,13 +279,13 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
     }
   }
 
-  ArmMotion::JointState_t current_state;
+  ArmMotion::JointState current_state;
   if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[MoveJ] failed: GetJointState at start");
     return -1;
   }
 
-  ArmMotion::Joint6Dof_t start_joint = current_state.position;
+  ArmMotion::Joint6Dof start_joint = current_state.position;
   const double path_length = JointPathLength(start_joint, target_joint);
   if (path_length <= 1e-9) {
     ARM_LOG_WARN("[MoveJ] skip: path length too small");
@@ -341,13 +341,13 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
     if (current_time > duration) {
       current_time = duration;
     }
-    ArmMotion::JointTrajectoryPoint_t point;
+    ArmMotion::JointTrajectoryPoint point;
     if (!joint_trajectory_->Sample(current_time, point)) {
       ARM_LOG_ERROR("[MoveJ] failed: Sample at t={}", current_time);
       return -1;
     }
 
-    ArmMotion::JointCommand_t joint_cmd;
+    ArmMotion::JointCommand joint_cmd;
     joint_cmd.position = point.position;
     joint_cmd.velocity = point.velocity;
     joint_cmd.stiffness = motor_stiffness_;
@@ -377,7 +377,7 @@ int ArmInstance::MoveJ(ArmMotion::Joint6Dof_t target_joint, double v,
   return 0;
 }
 
-int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
+int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points,
                             double r, double v, double a, double t) {
   if (points.size() < 2) {
     ARM_LOG_ERROR("[MoveJMulti] failed: points size {} < 2", points.size());
@@ -396,13 +396,13 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
     }
   }
 
-  ArmMotion::JointState_t current_state;
+  ArmMotion::JointState current_state;
   if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[MoveJMulti] failed: GetJointState at start");
     return -1;
   }
 
-  std::vector<ArmMotion::Joint6Dof_t> path_points;
+  std::vector<ArmMotion::Joint6Dof> path_points;
   path_points.reserve(points.size() + 1);
   path_points.push_back(current_state.position);
   path_points.insert(path_points.end(), points.begin(), points.end());
@@ -462,7 +462,7 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
       current_time = duration;
     }
 
-    ArmMotion::JointTrajectoryPoint_t point;
+    ArmMotion::JointTrajectoryPoint point;
     if (!trajectory.Sample(current_time, point)) {
       ARM_LOG_ERROR("[MoveJMulti] failed: Sample at t={}", current_time);
       return -1;
@@ -477,7 +477,7 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
       }
     }
 
-    ArmMotion::JointCommand_t joint_cmd;
+    ArmMotion::JointCommand joint_cmd;
     joint_cmd.position = point.position;
     joint_cmd.velocity = point.velocity;
     joint_cmd.stiffness = motor_stiffness_;
@@ -494,26 +494,26 @@ int ArmInstance::MoveJMulti(const std::vector<ArmMotion::Joint6Dof_t>& points,
   return 0;
 }
 
-int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points,
+int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points,
                             double r, double v, double a, double t) {
   if (points.size() < 1) {
     ARM_LOG_ERROR("[MoveLMulti] failed: points size {} < 1", points.size());
     return -1;
   }
 
-  ArmMotion::JointState_t current_state;
+  ArmMotion::JointState current_state;
   if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[MoveLMulti] failed: GetJointState at start");
     return -1;
   }
 
-  ArmMotion::Pose6Dof_t current_pose;
+  ArmMotion::Pose6Dof current_pose;
   if (!kinematic_solver_->FK(current_state.position, current_pose)) {
     ARM_LOG_ERROR("[MoveLMulti] failed: FK at start");
     return -1;
   }
 
-  std::vector<ArmMotion::Pose6Dof_t> path_points;
+  std::vector<ArmMotion::Pose6Dof> path_points;
   path_points.reserve(points.size() + 1);
   path_points.push_back(current_pose);
   path_points.insert(path_points.end(), points.begin(), points.end());
@@ -573,20 +573,20 @@ int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points,
       current_time = duration;
     }
 
-    ArmMotion::CartesianTrajectoryPoint_t cart_point;
+    ArmMotion::CartesianTrajectoryPoint cart_point;
     if (!trajectory.Sample(current_time, cart_point)) {
       ARM_LOG_ERROR("[MoveLMulti] failed: Sample at t={}", current_time);
       return -1;
     }
 
-    ArmMotion::IKSolves_t ik_solves;
+    ArmMotion::IKSolves ik_solves;
     if (!kinematic_solver_->IK(cart_point.pose, current_state.position, ik_solves)) {
       ARM_LOG_ERROR("[MoveLMulti] failed: IK at t={}, pose=({}, {}, {})",
                     current_time, cart_point.pose.x, cart_point.pose.y, cart_point.pose.z);
       return -1;
     }
 
-    ArmMotion::Joint6Dof_t target_joint;
+    ArmMotion::Joint6Dof target_joint;
     if (!SelectBestIKSolve(ik_solves, current_state.position, target_joint)) {
       ARM_LOG_ERROR("[MoveLMulti] failed: no valid IK solve at t={}", current_time);
       return -1;
@@ -594,13 +594,13 @@ int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points,
 
     jacobian_->Update(target_joint, dt_);
 
-    ArmMotion::Joint6Dof_t joint_vel;
+    ArmMotion::Joint6Dof joint_vel;
     jacobian_->InverseVelocity(cart_point.velocity, joint_vel, 1e-6);
 
-    ArmMotion::Joint6Dof_t joint_acc;
+    ArmMotion::Joint6Dof joint_acc;
     jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6);
 
-    ArmMotion::JointCommand_t joint_cmd;
+    ArmMotion::JointCommand joint_cmd;
     joint_cmd.position = target_joint;
     joint_cmd.velocity = joint_vel;
     joint_cmd.stiffness = motor_stiffness_;
@@ -619,8 +619,8 @@ int ArmInstance::MoveLMulti(const std::vector<ArmMotion::Pose6Dof_t>& points,
   return 0;
 }
 
-int ArmInstance::GetCurrentPose(ArmMotion::Pose6Dof_t& current_pose) {
-  ArmMotion::JointState_t current_state;
+int ArmInstance::GetCurrentPose(ArmMotion::Pose6Dof& current_pose) {
+  ArmMotion::JointState current_state;
   if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[GetCurrentPose] failed: GetJointState");
     return -1;
@@ -632,8 +632,8 @@ int ArmInstance::GetCurrentPose(ArmMotion::Pose6Dof_t& current_pose) {
   return 0;
 }
 
-int ArmInstance::GetCurrentJoint(ArmMotion::Joint6Dof_t& current_joint) {
-  ArmMotion::JointState_t current_state;
+int ArmInstance::GetCurrentJoint(ArmMotion::Joint6Dof& current_joint) {
+  ArmMotion::JointState current_state;
   if (!GetActuatorJointState(current_state)) {
     ARM_LOG_ERROR("[GetCurrentJoint] failed: GetJointState");
     return -1;
@@ -642,7 +642,7 @@ int ArmInstance::GetCurrentJoint(ArmMotion::Joint6Dof_t& current_joint) {
   return 0;
 }
 
-void ArmInstance::SetToolPose(const ArmMotion::Pose6Dof_t& tool_pose) {
+void ArmInstance::SetToolPose(const ArmMotion::Pose6Dof& tool_pose) {
   kinematic_solver_->SetToolPose(tool_pose);
 }
 

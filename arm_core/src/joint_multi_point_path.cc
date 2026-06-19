@@ -4,8 +4,8 @@
 #include <cmath>
 
 /* 关节欧式距离计算 */
-double MultiPointJointPath::JointDistance(const ArmMotion::Joint6Dof_t& p1,
-                                          const ArmMotion::Joint6Dof_t& p2) const {
+double MultiPointJointPath::JointDistance(const ArmMotion::Joint6Dof& p1,
+                                          const ArmMotion::Joint6Dof& p2) const {
   double sum = 0.0;
   for (int i = 0; i < 6; ++i) {
     double d = p1.q[i] - p2.q[i];
@@ -18,7 +18,7 @@ double MultiPointJointPath::JointDistance(const ArmMotion::Joint6Dof_t& p1,
 // 构造 & 预计算
 // ─────────────────────────────────────────────────────────────────────────────
 
-MultiPointJointPath::MultiPointJointPath(std::vector<ArmMotion::Joint6Dof_t> points, double r)
+MultiPointJointPath::MultiPointJointPath(std::vector<ArmMotion::Joint6Dof> points, double r)
     : points_(std::move(points)), r_(r) {
   Precompute();
 }
@@ -68,7 +68,7 @@ void MultiPointJointPath::Precompute() {
 // 切向量（∂p/∂u 再乘以 total_length_ 换算到 ds）：
 //   dp/du = (d_in + d_out)/2 + (d_out - d_in)/(2*r) * u
 
-void MultiPointJointPath::EvaluatePos(double s, ArmMotion::Joint6Dof_t& point) const {
+void MultiPointJointPath::EvaluatePos(double s, ArmMotion::Joint6Dof& point) const {
   const int n = static_cast<int>(points_.size());
 
   // 只考虑2点以上的情况
@@ -136,6 +136,6 @@ void MultiPointJointPath::EvaluatePos(double s, ArmMotion::Joint6Dof_t& point) c
   }
 }
 
-void MultiPointJointPath::EvaluateTangent(ArmMotion::Joint6Dof_t& tangent) const {
+void MultiPointJointPath::EvaluateTangent(ArmMotion::Joint6Dof& tangent) const {
   tangent = last_tangent_;
 }

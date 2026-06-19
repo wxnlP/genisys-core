@@ -7,12 +7,12 @@
 
 namespace {
 
-std::array<double, 6> ToArray(const ArmMotion::Joint6Dof_t& joint) {
+std::array<double, 6> ToArray(const ArmMotion::Joint6Dof& joint) {
   return {joint.q[0], joint.q[1], joint.q[2],
           joint.q[3], joint.q[4], joint.q[5]};
 }
 
-std::array<double, 6> ToArray(const ArmMotion::CartesianTwist_t& twist) {
+std::array<double, 6> ToArray(const ArmMotion::CartesianTwist& twist) {
   return {twist.linear.x,  twist.linear.y,  twist.linear.z,
           twist.angular.x, twist.angular.y, twist.angular.z};
 }
@@ -27,11 +27,11 @@ double CalculateError(const std::array<double, 6>& lhs,
   return std::sqrt(squared_sum);
 }
 
-ArmMotion::Joint6Dof_t IntegratePosition(const ArmMotion::Joint6Dof_t& q,
-                                         const ArmMotion::Joint6Dof_t& dq,
-                                         const ArmMotion::Joint6Dof_t& ddq,
+ArmMotion::Joint6Dof IntegratePosition(const ArmMotion::Joint6Dof& q,
+                                         const ArmMotion::Joint6Dof& dq,
+                                         const ArmMotion::Joint6Dof& ddq,
                                          double dt) {
-  ArmMotion::Joint6Dof_t q_next;
+  ArmMotion::Joint6Dof q_next;
   for (int i = 0; i < 6; ++i) {
     q_next.q[i] =
         q.q[i] + dq.q[i] * dt + 0.5 * ddq.q[i] * dt * dt;
@@ -39,20 +39,20 @@ ArmMotion::Joint6Dof_t IntegratePosition(const ArmMotion::Joint6Dof_t& q,
   return q_next;
 }
 
-ArmMotion::Joint6Dof_t IntegrateVelocity(const ArmMotion::Joint6Dof_t& dq,
-                                         const ArmMotion::Joint6Dof_t& ddq,
+ArmMotion::Joint6Dof IntegrateVelocity(const ArmMotion::Joint6Dof& dq,
+                                         const ArmMotion::Joint6Dof& ddq,
                                          double dt) {
-  ArmMotion::Joint6Dof_t dq_next;
+  ArmMotion::Joint6Dof dq_next;
   for (int i = 0; i < 6; ++i) {
     dq_next.q[i] = dq.q[i] + ddq.q[i] * dt;
   }
   return dq_next;
 }
 
-ArmMotion::CartesianTwist_t DifferentiateTwist(
-    const ArmMotion::CartesianTwist_t& current,
-    const ArmMotion::CartesianTwist_t& previous, double dt) {
-  return ArmMotion::CartesianTwist_t(
+ArmMotion::CartesianTwist DifferentiateTwist(
+    const ArmMotion::CartesianTwist& current,
+    const ArmMotion::CartesianTwist& previous, double dt) {
+  return ArmMotion::CartesianTwist(
       (current.linear.x - previous.linear.x) / dt,
       (current.linear.y - previous.linear.y) / dt,
       (current.linear.z - previous.linear.z) / dt,
@@ -61,14 +61,14 @@ ArmMotion::CartesianTwist_t DifferentiateTwist(
       (current.angular.z - previous.angular.z) / dt);
 }
 
-void PrintTwist(const char* label, const ArmMotion::CartesianTwist_t& twist) {
+void PrintTwist(const char* label, const ArmMotion::CartesianTwist& twist) {
   std::cout << label << " linear = [" << twist.linear.x << ", "
             << twist.linear.y << ", " << twist.linear.z << "]"
             << ", angular = [" << twist.angular.x << ", " << twist.angular.y
             << ", " << twist.angular.z << "]" << std::endl;
 }
 
-void PrintJoint(const char* label, const ArmMotion::Joint6Dof_t& joint) {
+void PrintJoint(const char* label, const ArmMotion::Joint6Dof& joint) {
   std::cout << label << " [" << joint.q[0] << ", " << joint.q[1] << ", "
             << joint.q[2] << ", " << joint.q[3] << ", "
             << joint.q[4] << ", " << joint.q[5] << "]" << std::endl;
@@ -90,34 +90,34 @@ int main() {
       .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}};
   Jacobian6Dof jac(mdh_params);
 
-  const ArmMotion::Joint6Dof_t q_current{0.35, -0.65, 0.90, -0.40, 0.55, 0.25};
-  const ArmMotion::Joint6Dof_t dq{0.40, -0.25, 0.18, 0.12, -0.08, 0.15};
-  const ArmMotion::Joint6Dof_t ddq{0.30, -0.18, 0.12, -0.10, 0.06, 0.08};
+  const ArmMotion::Joint6Dof q_current{0.35, -0.65, 0.90, -0.40, 0.55, 0.25};
+  const ArmMotion::Joint6Dof dq{0.40, -0.25, 0.18, 0.12, -0.08, 0.15};
+  const ArmMotion::Joint6Dof ddq{0.30, -0.18, 0.12, -0.10, 0.06, 0.08};
 
   jac.Update(q_current, 0.0);
 
-  ArmMotion::CartesianTwist_t v_current;
+  ArmMotion::CartesianTwist v_current;
   jac.ForwardVelocity(dq, v_current);
 
-  ArmMotion::Joint6Dof_t dq_reconstructed;
+  ArmMotion::Joint6Dof dq_reconstructed;
   jac.InverseVelocity(v_current, dq_reconstructed, kDamping);
 
-  const ArmMotion::Joint6Dof_t q_next =
+  const ArmMotion::Joint6Dof q_next =
       IntegratePosition(q_current, dq, ddq, kDt);
-  const ArmMotion::Joint6Dof_t dq_next = IntegrateVelocity(dq, ddq, kDt);
+  const ArmMotion::Joint6Dof dq_next = IntegrateVelocity(dq, ddq, kDt);
 
   jac.Update(q_next, kDt);
 
-  ArmMotion::CartesianTwist_t v_next;
+  ArmMotion::CartesianTwist v_next;
   jac.ForwardVelocity(dq_next, v_next);
 
-  ArmMotion::CartesianTwist_t a_predicted;
+  ArmMotion::CartesianTwist a_predicted;
   jac.ForwardAccel(ddq, a_predicted);
 
-  ArmMotion::Joint6Dof_t ddq_reconstructed;
+  ArmMotion::Joint6Dof ddq_reconstructed;
   jac.InverseAccel(a_predicted, ddq_reconstructed, kDamping);
 
-  const ArmMotion::CartesianTwist_t a_finite_diff =
+  const ArmMotion::CartesianTwist a_finite_diff =
       DifferentiateTwist(v_next, v_current, kDt);
 
   const double velocity_inverse_error =

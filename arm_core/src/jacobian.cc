@@ -27,7 +27,7 @@ Jacobian6Dof::Jacobian6Dof(const ArmMotion::MDHParams& mdh_params)
   jointOffset_[5] = mdh_params.theta[5];
 }
 
-void Jacobian6Dof::Update(const ArmMotion::Joint6Dof_t& inputJoint, double dt) {
+void Jacobian6Dof::Update(const ArmMotion::Joint6Dof& inputJoint, double dt) {
   // 齐次矩阵
   Eigen::Matrix4d T_02, T_03, T_04, T_05, T_06;
   Eigen::Matrix4d T[6];
@@ -87,8 +87,8 @@ void Jacobian6Dof::Update(const ArmMotion::Joint6Dof_t& inputJoint, double dt) {
   }
 }
 
-bool Jacobian6Dof::ForwardVelocity(const ArmMotion::Joint6Dof_t& inputVel,
-                                   ArmMotion::CartesianTwist_t& outputVel) {
+bool Jacobian6Dof::ForwardVelocity(const ArmMotion::Joint6Dof& inputVel,
+                                   ArmMotion::CartesianTwist& outputVel) {
   Eigen::Matrix<double, 6, 1> jointVel;
   jointVel << inputVel.q[0], inputVel.q[1], 
               inputVel.q[2], inputVel.q[3], 
@@ -105,8 +105,8 @@ bool Jacobian6Dof::ForwardVelocity(const ArmMotion::Joint6Dof_t& inputVel,
   return true;
 }
 
-bool Jacobian6Dof::InverseVelocity(const ArmMotion::CartesianTwist_t& inputVel,
-                                   ArmMotion::Joint6Dof_t& outputVel,
+bool Jacobian6Dof::InverseVelocity(const ArmMotion::CartesianTwist& inputVel,
+                                   ArmMotion::Joint6Dof& outputVel,
                                    double damping) {
   Eigen::Matrix<double, 6, 1> cartesianVel;
   cartesianVel << inputVel.linear.x, inputVel.linear.y,inputVel.linear.z,
@@ -130,8 +130,8 @@ bool Jacobian6Dof::InverseVelocity(const ArmMotion::CartesianTwist_t& inputVel,
   return true;
 }
 
-bool Jacobian6Dof::ForwardAccel(const ArmMotion::Joint6Dof_t& inputAcc,
-                                ArmMotion::CartesianTwist_t& outputAcc) {
+bool Jacobian6Dof::ForwardAccel(const ArmMotion::Joint6Dof& inputAcc,
+                                ArmMotion::CartesianTwist& outputAcc) {
   Eigen::Matrix<double, 6, 1> jointAcc;
   jointAcc << inputAcc.q[0], inputAcc.q[1], inputAcc.q[2],
               inputAcc.q[3], inputAcc.q[4], inputAcc.q[5];
@@ -149,8 +149,8 @@ bool Jacobian6Dof::ForwardAccel(const ArmMotion::Joint6Dof_t& inputAcc,
   return true;
 }
 
-bool Jacobian6Dof::InverseAccel(const ArmMotion::CartesianTwist_t& inputAcc,
-                                ArmMotion::Joint6Dof_t& outputAcc,
+bool Jacobian6Dof::InverseAccel(const ArmMotion::CartesianTwist& inputAcc,
+                                ArmMotion::Joint6Dof& outputAcc,
                                 double damping) {
   Eigen::Matrix<double, 6, 1> cartesianAcc;
   cartesianAcc << inputAcc.linear.x, inputAcc.linear.y, inputAcc.linear.z,

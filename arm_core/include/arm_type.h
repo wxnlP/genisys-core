@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstddef>
+
 namespace ArmMotion {
 
 struct MDHParams {
@@ -29,6 +31,9 @@ struct Joint6Dof {
 
   Joint6Dof(double a1, double a2, double a3, double a4, double a5, double a6)
       : q{a1, a2, a3, a4, a5, a6} {}
+
+  double& operator[](size_t i) { return q[i]; }
+  const double& operator[](size_t i) const { return q[i]; }
 
   double q[6]{};
 };

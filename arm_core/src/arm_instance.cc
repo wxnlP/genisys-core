@@ -4,6 +4,7 @@
 #include <limits>
 #include <thread>
 #include <algorithm>
+#include <cstring>
 #include "arm_logger.h"
 
 namespace {
@@ -29,28 +30,24 @@ double CartesianPosDistance(const ArmMotion::Pose6Dof& p0,
 }  // namespace
 
 // ── 类型桥接：ArmMotion::* ↔ ArmCtrlBase::* ──────────────────────────
+// 两侧布局完全一致 (均为 3×6×double)，可直接 memcpy
+static_assert(sizeof(ArmMotion::JointState) == sizeof(ArmCtrlBase::JointState),
+              "JointState layout mismatch");
+static_assert(sizeof(ArmMotion::JointCommand) == sizeof(ArmCtrlBase::JointCommand),
+              "JointCommand layout mismatch");
+
 bool ArmInstance::GetActuatorJointState(ArmMotion::JointState& state) {
   ArmCtrlBase::JointState actuator_state;
   if (!arm_ctrl_.GetJointState(actuator_state)) {
     return false;
   }
-  for (int i = 0; i < 6; ++i) {
-    state.position.q[i] = actuator_state.position[i];
-    state.velocity.q[i] = actuator_state.velocity[i];
-    state.effort.q[i]   = actuator_state.effort[i];
-  }
+  std::memcpy(&state, &actuator_state, sizeof(state));
   return true;
 }
 
 bool ArmInstance::SetActuatorJointState(const ArmMotion::JointCommand& cmd) {
   ArmCtrlBase::JointCommand actuator_cmd;
-  for (int i = 0; i < 6; ++i) {
-    actuator_cmd.position[i]  = cmd.position.q[i];
-    actuator_cmd.velocity[i]  = cmd.velocity.q[i];
-    actuator_cmd.effort[i]    = cmd.effort.q[i];
-    actuator_cmd.stiffness[i] = cmd.stiffness.q[i];
-    actuator_cmd.damping[i]   = cmd.damping.q[i];
-  }
+  std::memcpy(&actuator_cmd, &cmd, sizeof(actuator_cmd));
   return arm_ctrl_.SetJointState(actuator_cmd);
 }
 

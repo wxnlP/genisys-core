@@ -9,16 +9,6 @@ target_include_directories(${TARGET_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# 仿真支持（可选，由顶层 BUILD_SIM_PROXY 控制）
-if(BUILD_SIM_PROXY)
-    target_include_directories(${TARGET_NAME} PRIVATE
-        ${CMAKE_SOURCE_DIR}/simulation/sim_adapter/include
-        ${CMAKE_SOURCE_DIR}/simulation/common_header/include
-    )
-    target_compile_definitions(${TARGET_NAME} PUBLIC BUILD_SIM_SUPPORT)
-    target_link_libraries(${TARGET_NAME} PUBLIC sim_adapter)
-endif()
-
 target_link_libraries(${TARGET_NAME} PUBLIC Eigen3::Eigen yaml-cpp)
 
 # 添加源文件
@@ -36,7 +26,7 @@ target_sources(${TARGET_NAME} PRIVATE
     src/arm_instance.cc
     src/joint_multi_point_path.cc
     src/cartesian_multi_point_path.cc
-    src/gripper_ctrl_base.cc
+    src/gripper_controller.cc
     src/geniarm_gripper.cc
     src/geniarm_ctrl.cc
     src/robo_manager.cc

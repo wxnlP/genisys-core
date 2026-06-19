@@ -3,6 +3,7 @@
 #include "arm_logger.h"
 #include "canfd_bus.h"
 #include "geniarm_gripper.h"
+#include "gripper_controller.h"
 
 int main() {
   /* Socket CAN Init */
@@ -22,6 +23,8 @@ int main() {
   gripper.SetMaxRange(-2.2);
   gripper.Init();
   gripper.Enable();
+
+  GripperController gripper_ctrl(gripper);
 
   std::jthread receive_thread([&gripper]() {
     double position, velocity, effort;
@@ -46,13 +49,13 @@ int main() {
   // gripper.Disable();
 
   /* 力控 */
-  gripper.SetPosition(0.4, 0.5, 1, 0);
+  gripper_ctrl.SetPosition(0.4, 0.5, 1, 0);
  
   ARM_LOG_INFO("=== Test 1: -3Nm torque ===");
-  gripper.SetTorque(-3.0, 1.0);   // 1Nm，2Nm/s 斜坡
+  gripper_ctrl.SetTorque(-3.0, 1.0);   // 1Nm，2Nm/s 斜坡
   std::this_thread::sleep_for(std::chrono::milliseconds(3000));
   ARM_LOG_INFO("回归零点......");
-  gripper.SetPosition(0.0, 0.5, 1, 0);
+  gripper_ctrl.SetPosition(0.0, 0.5, 1, 0);
   gripper.Disable();
   return 0;
 }

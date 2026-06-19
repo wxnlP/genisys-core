@@ -1,16 +1,12 @@
 #include "robo_manager.h"
-#include "arm_logger.h"
 #include "arm_ctrl_base.h"
 #include "arm_instance.h"
+#include "arm_logger.h"
 #include "canfd_bus.h"
 #include "dm_motor_driver.h"
 #include "geniarm_ctrl.h"
 #include "geniarm_gripper.h"
 #include "gripper_ctrl_base.h"
-#ifdef BUILD_SIM_SUPPORT
-  #include "sim_ctrl.h"
-  #include "sim_gripper.h"
-#endif
 #include "yaml-cpp/yaml.h"
 
 // 仅隔离真机硬件依赖，arm_core 自身类型直接放在 robo_manager.h 中
@@ -67,99 +63,81 @@ RoboManager::RoboManager(const std::string& yaml_file)
   std::vector<double> motor_stiffness;
   std::vector<double> motor_damping;
 
-  if (env == "real") {
-    std::string arm_port = config["robot"]["port"].as<std::string>();
-    impl_->can_bus_ = std::make_shared<SocketCANBus>(arm_port, true);
-    impl_->can_bus_->Init();
+  std::string arm_port = config["robot"]["port"].as<std::string>();
+  impl_->can_bus_ = std::make_shared<SocketCANBus>(arm_port, true);
+  impl_->can_bus_->Init();
 
-    std::vector<uint32_t> feedback_ids;
-    int count = 0;
-    for (const auto& joint : config["robot"]["joints"]) {
-      uint32_t motor_id = joint["motor_id"].as<uint32_t>();
-      uint32_t feedback_id = joint["feedback_id"].as<uint32_t>();
-      if (feedback_id != motor_id + 0x10) {
-        ARM_LOG_WARN("推荐feedback_id 配置为 motor_id + 0x10，当前 motor_id: {}，feedback_id: {}",
-                     motor_id, feedback_id);
-      }
-      feedback_ids.push_back(feedback_id);
-
-      std::string model_str = joint["model"].as<std::string>();
-      DmMotorDriver::MotorModel motor_model;
-      if (model_str == "DM4340P") {
-        motor_model = DmMotorDriver::MotorModel::DM4340P;
-      } else if (model_str == "DM4310") {
-        motor_model = DmMotorDriver::MotorModel::DM4310;
-      } else {
-        ARM_LOG_ERROR("电机型号目前仅支持 'DM4340P' 或 'DM4310'，请检查配置文件，当前值: {}", model_str);
-      }
-
-      double stiffness = joint["MIT"]["stiffness"].as<double>();
-      double damping = joint["MIT"]["damping"].as<double>();
-      motor_stiffness.push_back(stiffness);
-      motor_damping.push_back(damping);
-
-      impl_->arm_motors_.push_back(DmMotorDriver(*impl_->can_bus_, motor_id,
-                                                  limits_lower[count], limits_upper[count], motor_model));
-      count++;
-    }
-
-    if (impl_->arm_motors_.size() < 6) {
-      ARM_LOG_ERROR("请检查配置文件，至少需要6个电机配置");
-    }
-
-    arm_ctrl_ = std::make_shared<GeniArmCtrl>(impl_->arm_motors_);
-
-    // 夹爪
-    std::string gripper_port = config["gripper"]["port"].as<std::string>();
-    if (gripper_port != arm_port) {
-      ARM_LOG_ERROR("当前版本仅支持机械臂和夹爪共用一个CAN接口，请检查配置文件");
-    }
-    std::string gripper_model_str = config["gripper"]["model"].as<std::string>();
-    DmMotorDriver::MotorModel gripper_motor_model;
-    if (gripper_model_str == "DM4340P") {
-      gripper_motor_model = DmMotorDriver::MotorModel::DM4340P;
-    } else if (gripper_model_str == "DM4310") {
-      gripper_motor_model = DmMotorDriver::MotorModel::DM4310;
-    } else {
-      ARM_LOG_ERROR("夹爪电机型号目前仅支持 'DM4340P' 或 'DM4310'，请检查配置文件，当前值: {}", gripper_model_str);
-    }
-
-    uint32_t gripper_id = config["gripper"]["motor_id"].as<uint32_t>();
-    uint32_t gripper_feedback_id = config["gripper"]["feedback_id"].as<uint32_t>();
-    if (gripper_feedback_id != gripper_id + 0x10) {
+  std::vector<uint32_t> feedback_ids;
+  int count = 0;
+  for (const auto& joint : config["robot"]["joints"]) {
+    uint32_t motor_id = joint["motor_id"].as<uint32_t>();
+    uint32_t feedback_id = joint["feedback_id"].as<uint32_t>();
+    if (feedback_id != motor_id + 0x10) {
       ARM_LOG_WARN("推荐feedback_id 配置为 motor_id + 0x10，当前 motor_id: {}，feedback_id: {}",
-                   gripper_id, gripper_feedback_id);
+                   motor_id, feedback_id);
     }
-    feedback_ids.push_back(gripper_feedback_id);
-    impl_->gripper_motor_ = std::make_shared<DmMotorDriver>(*impl_->can_bus_, gripper_id, gripper_motor_model);
+    feedback_ids.push_back(feedback_id);
 
-    double gripper_stiffness = config["gripper"]["MIT"]["stiffness"].as<double>();
-    double gripper_damping = config["gripper"]["MIT"]["damping"].as<double>();
-    gripper_ = std::make_shared<GeniArmGripper>(*impl_->gripper_motor_, gripper_stiffness, gripper_damping);
-
-    impl_->can_bus_->SetReceiverId(feedback_ids.data(), feedback_ids.size());
-    gripper_->Init();
-
-  }
-#ifdef BUILD_SIM_SUPPORT
-  else if (env == "sim") {
-    for (size_t i = 0; i < 6; ++i) {
-      motor_stiffness.push_back(config["robot"]["MIT"]["stiffness"][i].as<double>());
-      motor_damping.push_back(config["robot"]["MIT"]["damping"][i].as<double>());
+    std::string model_str = joint["model"].as<std::string>();
+    DmMotorDriver::MotorModel motor_model;
+    if (model_str == "DM4340P") {
+      motor_model = DmMotorDriver::MotorModel::DM4340P;
+    } else if (model_str == "DM4310") {
+      motor_model = DmMotorDriver::MotorModel::DM4310;
+    } else {
+      ARM_LOG_ERROR("电机型号目前仅支持 'DM4340P' 或 'DM4310'，请检查配置文件，当前值: {}", model_str);
     }
 
-    arm_ctrl_ = std::make_shared<SimCtrl>();
+    double stiffness = joint["MIT"]["stiffness"].as<double>();
+    double damping = joint["MIT"]["damping"].as<double>();
+    motor_stiffness.push_back(stiffness);
+    motor_damping.push_back(damping);
 
-    double gripper_stiffness = config["gripper"]["MIT"]["stiffness"].as<double>();
-    double gripper_damping = config["gripper"]["MIT"]["damping"].as<double>();
-    gripper_ = std::make_shared<SimGripper>(gripper_stiffness, gripper_damping);
-  }
-#endif
-  else {
-    ARM_LOG_ERROR("env 应为 'real' 或 'sim'，当前值: {}", env);
+    impl_->arm_motors_.push_back(DmMotorDriver(*impl_->can_bus_, motor_id,
+                                               limits_lower[count], limits_upper[count], motor_model));
+    count++;
   }
 
-  // 3. 创建 ArmInstance 并初始化
+  if (impl_->arm_motors_.size() < 6) {
+    ARM_LOG_ERROR("请检查配置文件，至少需要6个电机配置");
+  }
+
+  arm_ctrl_ = std::make_shared<GeniArmCtrl>(impl_->arm_motors_);
+
+  // 夹爪
+  std::string gripper_port = config["gripper"]["port"].as<std::string>();
+  if (gripper_port != arm_port) {
+    ARM_LOG_ERROR("当前版本仅支持机械臂和夹爪共用一个CAN接口，请检查配置文件");
+  }
+  std::string gripper_model_str = config["gripper"]["model"].as<std::string>();
+  DmMotorDriver::MotorModel gripper_motor_model;
+  if (gripper_model_str == "DM4340P") {
+    gripper_motor_model = DmMotorDriver::MotorModel::DM4340P;
+  } else if (gripper_model_str == "DM4310") {
+    gripper_motor_model = DmMotorDriver::MotorModel::DM4310;
+  } else {
+    ARM_LOG_ERROR("夹爪电机型号目前仅支持 'DM4340P' 或 'DM4310'，请检查配置文件，当前值: {}", gripper_model_str);
+  }
+
+  uint32_t gripper_id = config["gripper"]["motor_id"].as<uint32_t>();
+  uint32_t gripper_feedback_id = config["gripper"]["feedback_id"].as<uint32_t>();
+  if (gripper_feedback_id != gripper_id + 0x10) {
+    ARM_LOG_WARN("推荐feedback_id 配置为 motor_id + 0x10，当前 motor_id: {}，feedback_id: {}",
+                 gripper_id, gripper_feedback_id);
+  }
+  feedback_ids.push_back(gripper_feedback_id);
+  impl_->gripper_motor_ = std::make_shared<DmMotorDriver>(*impl_->can_bus_, gripper_id, gripper_motor_model);
+
+  double gripper_stiffness = config["gripper"]["MIT"]["stiffness"].as<double>();
+  double gripper_damping = config["gripper"]["MIT"]["damping"].as<double>();
+  gripper_ = std::make_shared<GeniArmGripper>(*impl_->gripper_motor_, gripper_stiffness, gripper_damping);
+
+  impl_->can_bus_->SetReceiverId(feedback_ids.data(), feedback_ids.size());
+  gripper_->Init();
+
+  // 3. 创建 GripperController（夹爪算法）和 ArmInstance
+  gripper_controller_ = std::make_shared<GripperController>(*gripper_);
+
   arm_instance_ = std::make_shared<ArmInstance>(*arm_ctrl_, mdh_params, ik_mode);
 
   gripper_->SetMaxRange(gripper_max_range);

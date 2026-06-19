@@ -5,6 +5,7 @@
 
 #include "arm_ctrl_base.h"
 #include "arm_instance.h"
+#include "gripper_controller.h"
 #include "gripper_ctrl_base.h"
 
 class RoboManager {
@@ -20,12 +21,13 @@ class RoboManager {
   RoboManager& operator=(RoboManager&&) noexcept;
 
   std::shared_ptr<ArmInstance> GetArmInstance() { return arm_instance_; }
-  std::shared_ptr<GripperCtrlBase> GetGripper() { return gripper_; }
+  std::shared_ptr<GripperController> GetGripperController() { return gripper_controller_; }
 
  private:
   std::shared_ptr<ArmInstance> arm_instance_;
   std::shared_ptr<ArmCtrlBase> arm_ctrl_;
   std::shared_ptr<GripperCtrlBase> gripper_;
+  std::shared_ptr<GripperController> gripper_controller_;
 
   // Pimpl：隔离真机硬件依赖（dm_motor / canfd_bus）
   class Impl;

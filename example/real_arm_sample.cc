@@ -11,13 +11,12 @@ int main() {
   std::signal(SIGINT, SignalHandler);  // 注册 Ctrl+C 信号
   RoboManager robo_manger("geniarm_config.yaml");
   std::shared_ptr<ArmInstance> arm = robo_manger.GetArmInstance();
-  std::shared_ptr<GripperCtrlBase> gripper = robo_manger.GetGripper();
+  std::shared_ptr<GripperCtrlBase> gripper = robo_manger.GetGripper();、
 
   arm->Enable();
   // gripper->Enable();
 
-  
-  std::jthread arm_joint_thread([&arm, &gripper](std::stop_token stoken) {
+  std::jthread arm_joint_thread([arm, gripper](std::stop_token stoken) {
     ArmMotion::Pose6Dof_t pose{};
     ArmMotion::Joint6Dof_t jog{};
     double gripper_pos{};
@@ -93,12 +92,12 @@ int main() {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
-  ARM_LOG_INFO("回收线程中......");
+  // ARM_LOG_INFO("回收线程中......");
 
-  arm_joint_thread.request_stop();
-  arm_joint_thread.join();
+  // arm_joint_thread.request_stop();
+  // arm_joint_thread.join();
 
-  ARM_LOG_INFO("回收线程完成");
+  // ARM_LOG_INFO("回收线程完成");
 
   ARM_LOG_INFO("失能机械臂");
 

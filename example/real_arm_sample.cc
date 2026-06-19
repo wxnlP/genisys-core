@@ -11,12 +11,12 @@ int main() {
   std::signal(SIGINT, SignalHandler);  // 注册 Ctrl+C 信号
   RoboManager robo_manger("geniarm_config.yaml");
   std::shared_ptr<ArmInstance> arm = robo_manger.GetArmInstance();
-  std::shared_ptr<GripperController> gripper_ctrl = robo_manger.GetGripperController();
+  std::shared_ptr<GripperController> gripper = robo_manger.GetGripperController();
 
   arm->Enable();
-  // gripper->Enable();
+  gripper->Enable();
 
-  std::jthread arm_joint_thread([arm](std::stop_token stoken) {
+  std::jthread arm_joint_thread([arm, gripper](std::stop_token stoken) {
     ArmMotion::Pose6Dof pose{};
     ArmMotion::Joint6Dof jog{};
     double gripper_pos{};
@@ -36,17 +36,17 @@ int main() {
                     jog.q[0], jog.q[1], jog.q[2], jog.q[3], jog.q[4], jog.q[5]);
       // gripper->ReceiveState(gripper_pos, gripper_vel, gripper_effort);
       // ARM_LOG_INFO("\n-----\n gripper_pos: {}, gripper_effort: {}\n-----", gripper_pos, gripper_effort);
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      // std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
   });
 
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
   /* 任务测试 */
-  // ARM_LOG_INFO("开始夹爪测试");
-  // gripper->SetPosition(1, 0.5, 1.0, 0);
-  // std::this_thread::sleep_for(std::chrono::milliseconds(2000));
-  // gripper->SetPosition(0, 0.5, 1.0, 0);
+  ARM_LOG_INFO("开始夹爪测试");
+  gripper->SetPosition(1, 0.5, 1.0, 0);
+  std::this_thread::sleep_for(std::chrono::milliseconds(2000));
+  gripper->SetPosition(0, 0.5, 1.0, 0);
 
   ARM_LOG_INFO("开始关节Move测试");
   ArmMotion::Joint6Dof jog{ 0, 1.00, -1.00, 0.0, 0.0, 0.0};
@@ -92,17 +92,17 @@ int main() {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
-  // ARM_LOG_INFO("回收线程中......");
+  ARM_LOG_INFO("回收线程中......");
 
-  // arm_joint_thread.request_stop();
-  // arm_joint_thread.join();
+  arm_joint_thread.request_stop();
+  arm_joint_thread.join();
 
-  // ARM_LOG_INFO("回收线程完成");
+  ARM_LOG_INFO("回收线程完成");
 
   ARM_LOG_INFO("失能机械臂");
 
   arm->Disable();
-  // gripper->Disable();
+  gripper->Disable();
 
   return 0;
 }

@@ -24,7 +24,7 @@ target_link_libraries(${TRAJECTORY_TARGET_NAME} PRIVATE
 
 target_link_libraries(${REAL_GRIPPER_TARGET_NAME} PRIVATE
     robotic_arm_sdk    
-    dm_driver    
+    dm_driver
 )
 
 target_link_libraries(${REAL_ARM_TARGET_NAME} PRIVATE

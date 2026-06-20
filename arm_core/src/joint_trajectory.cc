@@ -8,9 +8,6 @@ bool JointTrajectory::Sample(double t,
   }
 
   point.t = state.t;
-  point.s = state.s;
-  point.sd = state.sd;
-  point.sdd = state.sdd;
 
   ArmMotion::Joint6Dof tangent;
   path_.EvaluatePos(state.s, point.position);

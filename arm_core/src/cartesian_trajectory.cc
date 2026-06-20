@@ -8,9 +8,6 @@ bool CartesianTrajectory::Sample(
   }
 
   point.t = state.t;
-  point.s = state.s;
-  point.sd = state.sd;
-  point.sdd = state.sdd;
 
   ArmMotion::Vector3d linear_tangent;
   ArmMotion::Vector3d angular_tangent;

@@ -70,9 +70,6 @@ struct CartesianTwist {
 
 struct JointTrajectoryPoint {
   double t{0.0};
-  double s{0.0};
-  double sd{0.0};
-  double sdd{0.0};
   Joint6Dof position{};
   Joint6Dof velocity{};
   Joint6Dof acceleration{};
@@ -80,9 +77,6 @@ struct JointTrajectoryPoint {
 
 struct CartesianTrajectoryPoint {
   double t{0.0};
-  double s{0.0};
-  double sd{0.0};
-  double sdd{0.0};
   Pose6Dof pose{};
   CartesianTwist velocity{};
   CartesianTwist acceleration{};

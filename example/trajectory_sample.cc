@@ -15,7 +15,7 @@
 namespace {
 
 void PrintJointPoint(const ArmMotion::JointTrajectoryPoint& point) {
-  std::cout << "t=" << std::setw(4) << point.t << "  s=" << point.s << "  q=[";
+  std::cout << "t=" << std::setw(4) << point.t << "  q=[";
   for (int i = 0; i < 6; ++i) {
     std::cout << point.position.q[i];
     if (i < 5) {
@@ -27,7 +27,7 @@ void PrintJointPoint(const ArmMotion::JointTrajectoryPoint& point) {
 }
 
 void PrintCartesianPoint(const ArmMotion::CartesianTrajectoryPoint& point) {
-  std::cout << "t=" << std::setw(4) << point.t << "  s=" << point.s << "  p=["
+  std::cout << "t=" << std::setw(4) << point.t << "  p=["
             << point.pose.x << ", " << point.pose.y << ", " << point.pose.z
             << "]"
             << "  v=[" << point.velocity.linear.x << ", "
@@ -58,13 +58,13 @@ void WriteJointRow(std::ofstream& stream,
 }
 
 void WriteCartesianHeader(std::ofstream& stream) {
-  stream << "t,s,sd,sdd,x,y,z,qw,qx,qy,qz,vx,vy,vz,wx,wy,wz,ax,ay,az,alphax,"
+  stream << "t,x,y,z,qw,qx,qy,qz,vx,vy,vz,wx,wy,wz,ax,ay,az,alphax,"
             "alphay,alphaz\n";
 }
 
 void WriteCartesianRow(std::ofstream& stream,
                        const ArmMotion::CartesianTrajectoryPoint& point) {
-  stream << point.t << ',' << point.s << ',' << point.sd << ',' << point.sdd
+  stream << point.t
          << ',' << point.pose.x << ',' << point.pose.y << ',' << point.pose.z
          << ',' << point.pose.quat.w << ',' << point.pose.quat.x << ','
          << point.pose.quat.y << ',' << point.pose.quat.z << ','

@@ -3,7 +3,7 @@
 bool CartesianTrajectory::Sample(
     double t, ArmMotion::CartesianTrajectoryPoint& point) const {
   TimeScalerBase::State state{};
-  if (!time_scaler_.Evaluate(t, state)) {
+  if (!time_scaler_->Evaluate(t, state)) {
     return false;
   }
 
@@ -11,8 +11,8 @@ bool CartesianTrajectory::Sample(
 
   ArmMotion::Vector3d linear_tangent;
   ArmMotion::Vector3d angular_tangent;
-  path_.EvaluatePos(state.s, point.pose);
-  path_.EvaluateTangent(linear_tangent, angular_tangent);
+  path_->EvaluatePos(state.s, point.pose);
+  path_->EvaluateTangent(linear_tangent, angular_tangent);
 
   point.velocity.linear.x = linear_tangent.x * state.sd;
   point.velocity.linear.y = linear_tangent.y * state.sd;
@@ -32,5 +32,5 @@ bool CartesianTrajectory::Sample(
 }
 
 double CartesianTrajectory::GetDuration() const {
-  return time_scaler_.GetDuration();
+  return time_scaler_->GetDuration();
 }

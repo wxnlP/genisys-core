@@ -7,7 +7,11 @@ void GeniArmGripper::Init() {
       motor_driver_.RequestState();
       {
         std::lock_guard<std::mutex> lock(state_mutex_);
-        motor_driver_.GetLatestState(latest_state_);
+        DmMotorDriver::MotorState state;
+        motor_driver_.GetLatestState(state);
+        last_gripper_state_.position = state.pos;
+        last_gripper_state_.velocity = state.vel;
+        last_gripper_state_.effort = state.torque;
       }
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
@@ -23,23 +27,23 @@ void GeniArmGripper::Disable() {
 }
 
 
-bool GeniArmGripper::SendCommand(double position, double velocity, double effort, double stiffness, double damping) {
+bool GeniArmGripper::SendCommand(const GripperCommand& command) {
   DmMotorDriver::CtrlCmd cmd;
-  cmd.pos = position;
-  cmd.vel = velocity;
-  cmd.torque = effort;
-  cmd.stiffness = stiffness;
-  cmd.damping = damping;
+  cmd.pos = command.position;
+  cmd.vel = command.velocity;
+  cmd.torque = command.effort;
+  cmd.stiffness = command.stiffness;
+  cmd.damping = command.damping;
   if (motor_driver_.MoveCtrl(cmd) == -1) {
     return false;
   }
   return true;
 }
 
-bool GeniArmGripper::ReceiveState(double& position, double& velocity, double& effort) {
+bool GeniArmGripper::ReceiveState(GripperState& state) {
   std::lock_guard<std::mutex> lock(state_mutex_);
-  position = latest_state_.pos;
-  velocity = latest_state_.vel;
-  effort = latest_state_.torque;
+  state.position = last_gripper_state_.position;
+  state.velocity = last_gripper_state_.velocity;
+  state.effort = last_gripper_state_.effort;
   return true;
 }

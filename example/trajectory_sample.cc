@@ -100,12 +100,12 @@ int main() {
 
   ArmMotion::Joint6Dof joint_start(0.0, 0.1, 0.2, 0.0, -0.1, 0.3);
   ArmMotion::Joint6Dof joint_target(0.5, -0.2, 0.4, 0.3, 0.2, -0.1);
-  JointPath joint_path(joint_start, joint_target);
+  auto joint_path = std::make_shared<JointPath>(joint_start, joint_target);
 
-  CubicTimeScaler joint_scaler;
+  auto joint_scaler = std::make_shared<CubicTimeScaler>();
   TimeScalerBase::PlanConfig joint_config;
   joint_config.T = 2.0;
-  if (!joint_scaler.Plan(joint_config)) {
+  if (!joint_scaler->Plan(joint_config)) {
     ARM_LOG_ERROR("joint time scaler plan failed");
     return 1;
   }
@@ -125,14 +125,14 @@ int main() {
   pose_target.quat.w = 0.9239;
   pose_target.quat.z = 0.3827;
 
-  CartesianLinearPath cartesian_path(pose_start, pose_target);
+  auto cartesian_path = std::make_shared<CartesianLinearPath>(pose_start, pose_target);
 
-  LSPBTimeScaler cartesian_scaler;
+  auto cartesian_scaler = std::make_shared<LSPBTimeScaler>();
   TimeScalerBase::PlanConfig cartesian_config;
   cartesian_config.T = 2.0;
   cartesian_config.v_max = 0.75;
   cartesian_config.a_max = 1.0;
-  if (!cartesian_scaler.Plan(cartesian_config)) {
+  if (!cartesian_scaler->Plan(cartesian_config)) {
     ARM_LOG_ERROR("cartesian time scaler plan failed");
     return 1;
   }

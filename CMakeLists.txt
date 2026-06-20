@@ -25,9 +25,13 @@ option(BUILD_EXAMPLES "Build examples" ON)
 
 
 add_subdirectory(actuator)
-add_subdirectory(arm_core)
+add_subdirectory(arm_control)
+add_subdirectory(robo_manager)
 
 if (BUILD_EXAMPLES)
     add_subdirectory(example)
 endif()
 
+install(DIRECTORY cfg/
+    DESTINATION ${CMAKE_BINARY_DIR}/cfg
+)

@@ -13,22 +13,22 @@ add_executable(${REAL_ARM_TARGET_NAME} real_arm_sample.cc)
 
 
 target_link_libraries(${KINEMATIC_TARGET_NAME} PRIVATE
-    robotic_arm_sdk
+    arm_controller
 )
 target_link_libraries(${JACOBIAN_TARGET_NAME} PRIVATE
-    robotic_arm_sdk
+    arm_controller
 )
 target_link_libraries(${TRAJECTORY_TARGET_NAME} PRIVATE
-    robotic_arm_sdk
+    arm_controller
 )
 
 target_link_libraries(${REAL_GRIPPER_TARGET_NAME} PRIVATE
-    robotic_arm_sdk    
-    dm_driver
+    arm_controller
+    actuator_controller
 )
 
 target_link_libraries(${REAL_ARM_TARGET_NAME} PRIVATE
-    robotic_arm_sdk    
-    dm_driver   
-    serial 
+    arm_controller
+    actuator_controller
+    robo_manager
 )

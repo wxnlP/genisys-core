@@ -1,4 +1,4 @@
-set(TARGET_NAME robotic_arm_sdk)
+set(TARGET_NAME arm_controller)
 
 add_library(${TARGET_NAME} STATIC)
 
@@ -9,7 +9,7 @@ target_include_directories(${TARGET_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-target_link_libraries(${TARGET_NAME} PUBLIC Eigen3::Eigen yaml-cpp actuator_controller)
+target_link_libraries(${TARGET_NAME} PUBLIC Eigen3::Eigen yaml-cpp)
 
 # 添加源文件
 target_sources(${TARGET_NAME} PRIVATE
@@ -22,11 +22,11 @@ target_sources(${TARGET_NAME} PRIVATE
     src/joint_path.cc
     src/cartesian_trajectory.cc
     src/joint_trajectory.cc
-    src/arm_instance.cc
     src/joint_multi_point_path.cc
     src/cartesian_multi_point_path.cc
+    src/arm_controller.cc
     src/gripper_controller.cc
-    src/robo_manager.cc
+    src/arm_manager.cc
 )
 
 # 安装静态库目标
@@ -39,8 +39,4 @@ install(TARGETS ${TARGET_NAME}
 # 安装头文件
 install(DIRECTORY include/
     DESTINATION include/${TARGET_NAME}
-)
-
-install(DIRECTORY cfg/
-    DESTINATION ${CMAKE_BINARY_DIR}/cfg
 )

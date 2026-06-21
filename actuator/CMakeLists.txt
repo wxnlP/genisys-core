@@ -1,10 +1,7 @@
 set(CUR_TARGET_NAME "actuator_controller")
 
 add_subdirectory(third_party/dm_driver)
-option(BUILD_DEFAULT_SERIAL "Build the default serial library" ON)
-if(BUILD_DEFAULT_SERIAL)
-    add_subdirectory(third_party/serial)
-endif()
+add_subdirectory(third_party/serial)
 
 add_library(${CUR_TARGET_NAME} STATIC)
 
@@ -14,7 +11,7 @@ target_sources(${CUR_TARGET_NAME} PRIVATE ${src})
 
 target_include_directories(${CUR_TARGET_NAME} PUBLIC 
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-  PRIVATE $<BUILD_INTERFACE:${CMAKE_SOURCE_DIR}/arm_core/include>
+  $<INSTALL_INTERFACE:include/${CUR_TARGET_NAME}>
 )
 
 target_link_libraries(${CUR_TARGET_NAME} PUBLIC 

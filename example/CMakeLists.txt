@@ -23,12 +23,9 @@ target_link_libraries(${TRAJECTORY_TARGET_NAME} PRIVATE
 )
 
 target_link_libraries(${REAL_GRIPPER_TARGET_NAME} PRIVATE
-    arm_controller
-    actuator_controller
+    robotic_arm_sdk
 )
 
 target_link_libraries(${REAL_ARM_TARGET_NAME} PRIVATE
-    arm_controller
-    actuator_controller
-    robo_manager
+    robotic_arm_sdk
 )

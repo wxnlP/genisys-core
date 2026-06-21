@@ -17,18 +17,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# 是否构建默认 serial 库
-option(BUILD_DEFAULT_SERIAL "Build the default serial library" ON)
-
 # 是否构建示例
-option(BUILD_EXAMPLES "Build examples" ON)
+option(SDK_BUILD_WITH_EXAMPLES "Build robotic arm examples" ON)
 
 
 add_subdirectory(actuator)
 add_subdirectory(arm_control)
 add_subdirectory(robo_manager)
 
-if (BUILD_EXAMPLES)
+if (SDK_BUILD_WITH_EXAMPLES)
     add_subdirectory(example)
 endif()
 

@@ -1,18 +1,19 @@
-set(TARGET_NAME arm_controller)
+set(CUR_TARGET_NAME arm_controller)
 
-add_library(${TARGET_NAME} STATIC)
+add_library(${CUR_TARGET_NAME} STATIC)
 
 find_package(Eigen3 REQUIRED)
 find_package(yaml-cpp REQUIRED)
 
-target_include_directories(${TARGET_NAME} PUBLIC
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+target_include_directories(${CUR_TARGET_NAME} PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include/${CUR_TARGET_NAME}>
 )
 
-target_link_libraries(${TARGET_NAME} PUBLIC Eigen3::Eigen yaml-cpp)
+target_link_libraries(${CUR_TARGET_NAME} PUBLIC Eigen3::Eigen yaml-cpp)
 
 # 添加源文件
-target_sources(${TARGET_NAME} PRIVATE
+target_sources(${CUR_TARGET_NAME} PRIVATE
     src/kinematic.cc
     src/jacobian.cc
     src/cubic_time_scaler.cc
@@ -30,7 +31,7 @@ target_sources(${TARGET_NAME} PRIVATE
 )
 
 # 安装静态库目标
-install(TARGETS ${TARGET_NAME}
+install(TARGETS ${CUR_TARGET_NAME}
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
     RUNTIME DESTINATION bin
@@ -38,5 +39,5 @@ install(TARGETS ${TARGET_NAME}
 
 # 安装头文件
 install(DIRECTORY include/
-    DESTINATION include/${TARGET_NAME}
+    DESTINATION include/${CUR_TARGET_NAME}
 )

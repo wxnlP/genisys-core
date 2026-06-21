@@ -28,6 +28,8 @@ class ArmController {
   void SetMotorParams(ArmMotion::Joint6Dof stiffness, ArmMotion::Joint6Dof damping);
   void SetJointLimits(ArmMotion::Joint6Dof joint_min, ArmMotion::Joint6Dof joint_max);
   void SetTrajectoryMode(TrajectoryMode mode);
+  void SetSampleFrequency(double hz) { sample_frequency_ = hz;}
+  double GetSampleFrequency() const { return sample_frequency_; }
 
   int GetCurrentPose(ArmMotion::Pose6Dof& current_pose);
   int GetCurrentJoint(ArmMotion::Joint6Dof& current_joint);

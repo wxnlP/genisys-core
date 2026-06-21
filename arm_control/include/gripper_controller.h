@@ -18,6 +18,8 @@ class GripperController {
   void SetGripperState(double position, double velocity, double effort);
   int GetGripperCommand(GripperCommand& command);
   void SetMaxRange(double max_range) { max_range_ = max_range; }
+  void SetSampleFrequency(double hz) { sample_frequency_ = hz; }
+  double GetSampleFrequency() const { return sample_frequency_; }
   void WaitForCompletion();
   bool PosControl(double position, double velocity, double accel, double effort);
   // bool TorqueControl(double effort, double ramp_rate = 3.0, double pos_limit = 0.0);

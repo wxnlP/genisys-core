@@ -1,16 +1,16 @@
 #pragma once
 
 #include <atomic>
+#include <chrono>
 #include <memory>
 #include <string>
 #include <thread>
-#include "arm_ctrl_base.h"
+#include "actuator_manager.h"
+#include "arm_manager.h"
 #include "arm_controller.h"
-#include "gripper_ctrl_base.h"
+#include "arm_ctrl_base.h"
 #include "gripper_controller.h"
-
-class ActuatorManager;
-class ArmManager;
+#include "gripper_ctrl_base.h"
 
 class RoboManager {
  public:
@@ -22,35 +22,29 @@ class RoboManager {
     ERROR,
   };
 
-  RoboManager(const std::string& actuator_yaml,
-              const std::string& arm_yaml);
+  explicit RoboManager(const std::string& config_yaml);
   ~RoboManager();
 
-  // ── 生命周期 ──
   void Start();
   void Stop();
   void EmergencyStop();
 
-  // ── 状态查询 ──
   State GetState() const;
   bool IsMoving() const;
 
-  // ── 使能 ──
   void Enable();
   void Disable();
 
-  // ── 控制频率 (Hz) ──
   void SetCycleFrequency(double hz);
 
-  // ── 控制器访问（供外部调用 MoveJ / MoveL / PosControl 等）──
-  ArmController* GetArmController();
-  GripperController* GetGripperController();
+  std::shared_ptr<ArmController> GetArmController();
+  std::shared_ptr<GripperController> GetGripperController();
 
  private:
   void ControlLoop();
   void WaitNextCycle(std::chrono::steady_clock::time_point t_start);
 
-  // 两层管理器（持有生命周期）
+  // 管理器
   std::shared_ptr<ActuatorManager> actuator_mgr_;
   std::shared_ptr<ArmManager> arm_mgr_;
 
@@ -66,5 +60,6 @@ class RoboManager {
   std::atomic<bool> stop_requested_{false};
   std::unique_ptr<std::jthread> control_thread_;
 
-  double dt_{0.005};  // 默认 200 Hz
+  double dt_{0.005};        // 默认 200 Hz
+  int overrun_counter_{0};  // 连续掉帧计数
 };

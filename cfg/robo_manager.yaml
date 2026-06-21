@@ -1,0 +1,4 @@
+# RoboManager 统一配置
+actuator_config: "actuator_config.yaml"  # 电机驱动层配置
+arm_config: "geniarm_config.yaml"        # 机械臂算法层配置
+control_frequency: 200.0                 # Hz，控制循环频率

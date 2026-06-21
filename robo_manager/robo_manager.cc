@@ -1,15 +1,21 @@
 #include "robo_manager.h"
 
-#include <chrono>
+#include <iostream>
 #include <cstring>
 
-#include "actuator_manager.h"
 #include "arm_logger.h"
-#include "arm_manager.h"
+#include "yaml-cpp/yaml.h"
 
-RoboManager::RoboManager(const std::string& actuator_yaml,
-                         const std::string& arm_yaml) {
-  // 1. 创建两层管理器（各自从 YAML 初始化）
+RoboManager::RoboManager(const std::string& config_yaml) {
+  std::string config_path = "./cfg/" + config_yaml;
+  YAML::Node config = YAML::LoadFile(config_path);
+
+  std::string actuator_yaml = config["actuator_config"].as<std::string>();
+  std::string arm_yaml = config["arm_config"].as<std::string>();
+  double frequency = config["control_frequency"].as<double>();
+  dt_ = 1.0 / frequency;
+
+  // 1. 创建管理器
   actuator_mgr_ = std::make_shared<ActuatorManager>(actuator_yaml);
   arm_mgr_ = std::make_shared<ArmManager>(arm_yaml);
 
@@ -21,12 +27,12 @@ RoboManager::RoboManager(const std::string& actuator_yaml,
   arm_controller_ = arm_mgr_->GetArmController();
   gripper_controller_ = arm_mgr_->GetGripperController();
 
-  ARM_LOG_INFO("[RoboManager] 初始化完成");
+  ARM_LOG_INFO("[RoboManager] 初始化完成, 控制频率 {:.0f} Hz, dt={:.4f} s",
+               frequency, dt_);
 }
 
 RoboManager::~RoboManager() { Stop(); }
 
-// ── 生命周期 ──────────────────────────────────────────────
 
 void RoboManager::Start() {
   if (state_ == State::DISABLED) {
@@ -68,7 +74,6 @@ void RoboManager::EmergencyStop() {
   ARM_LOG_WARN("[RoboManager] 紧急停机");
 }
 
-// ── 状态 ──────────────────────────────────────────────────
 
 RoboManager::State RoboManager::GetState() const {
   return state_.load();
@@ -78,7 +83,6 @@ bool RoboManager::IsMoving() const {
   return state_ == State::MOVING;
 }
 
-// ── 使能 ──────────────────────────────────────────────────
 
 void RoboManager::Enable() {
   actuator_->Enable();
@@ -100,23 +104,20 @@ void RoboManager::SetCycleFrequency(double hz) {
   ARM_LOG_INFO("[RoboManager] 控制频率设为 {:.1f} Hz, dt={:.4f} s", hz, dt_);
 }
 
-// ── 控制器访问 ────────────────────────────────────────────
 
-ArmController* RoboManager::GetArmController() {
-  return arm_controller_.get();
+std::shared_ptr<ArmController> RoboManager::GetArmController() {
+  return arm_controller_;
 }
 
-GripperController* RoboManager::GetGripperController() {
-  return gripper_controller_.get();
+std::shared_ptr<GripperController> RoboManager::GetGripperController() {
+  return gripper_controller_;
 }
 
-// ── 控制循环 ──────────────────────────────────────────────
 
 void RoboManager::ControlLoop() {
-  using namespace std::chrono;
 
   while (!stop_requested_) {
-    auto t_start = steady_clock::now();
+    auto t_start = std::chrono::steady_clock::now();
 
     // ── 1. 读取机械臂关节反馈 ──
     ArmCtrlBase::JointState actuator_state;
@@ -127,7 +128,7 @@ void RoboManager::ControlLoop() {
       continue;
     }
 
-    // 注入到 ArmController（供 GetCurrentJoint / GetCurrentPose 用）
+    // 更新状态
     ArmMotion::JointState motion_state;
     std::memcpy(&motion_state, &actuator_state, sizeof(motion_state));
     arm_controller_->SetJointState(motion_state);
@@ -146,6 +147,7 @@ void RoboManager::ControlLoop() {
     // ── 3. 读取夹爪反馈 ──
     GripperCtrlBase::GripperState gripper_state;
     if (gripper_actuator_->ReceiveState(gripper_state)) {
+      // 更新状态
       gripper_controller_->SetGripperState(gripper_state.position,
                                            gripper_state.velocity,
                                            gripper_state.effort);
@@ -167,20 +169,34 @@ void RoboManager::ControlLoop() {
   }
 }
 
-void RoboManager::WaitNextCycle(
-    std::chrono::steady_clock::time_point t_start) {
-  using namespace std::chrono;
-  auto target = t_start + duration<double>(dt_);
+void RoboManager::WaitNextCycle(std::chrono::steady_clock::time_point t_start) {
+  auto target = t_start + std::chrono::duration<double>(dt_);
+  auto now = std::chrono::steady_clock::now();
 
-  // 粗粒度 sleep（释放 CPU）
-  auto now = steady_clock::now();
-  if (target - now > microseconds(200)) {
-    std::this_thread::sleep_until(target - microseconds(150));
+  // ── 掉帧检测 ──
+  if (now > target) {
+    overrun_counter_++;
+    // 前 3 帧每次都报，之后每 100 帧报一次，避免刷屏
+    if (overrun_counter_ <= 3 || overrun_counter_ % 100 == 0) {
+      ARM_LOG_WARN("[RoboManager] 掉帧: 滞后 {:.0f} μs (连续 {} 帧)",
+                   (now - target).count() / 1e3, overrun_counter_);
+    }
+  } else {
+    overrun_counter_ = 0;
+  }
+
+  // 粗粒度 sleep
+  if (target - now > std::chrono::microseconds(200)) {
+    std::this_thread::sleep_until(target - std::chrono::microseconds(150));
   }
 
   // 细粒度自旋
-  while (steady_clock::now() < target) {
-    // spin
+  while (std::chrono::steady_clock::now() < target) {
+#if defined(__x86_64__) || defined(_M_X64) || defined(__i386__)
+    __builtin_ia32_pause();
+#elif defined(__aarch64__) || defined(__arm__)
+    __asm__ volatile("yield");
+#endif
   }
 }
 

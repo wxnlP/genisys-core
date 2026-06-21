@@ -87,7 +87,13 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   }
 
   // ============================================================
-  //  7. 夹爪控制器
+  //  7. 采样频率
+  // ============================================================
+  double sample_frequency = robot_cfg["sample_frequency"].as<double>();
+  arm_controller_->SetSampleFrequency(sample_frequency);
+
+  // ============================================================
+  //  8. 夹爪控制器
   // ============================================================
   auto gripper_cfg = config["gripper"];
   double gripper_stiffness = gripper_cfg["MIT"]["stiffness"].as<double>();
@@ -97,6 +103,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   gripper_controller_ =
       std::make_shared<GripperController>(gripper_stiffness, gripper_damping);
   gripper_controller_->SetMaxRange(gripper_max_range);
+  gripper_controller_->SetSampleFrequency(sample_frequency);
 
   // ============================================================
   //  8. 打印初始化参数

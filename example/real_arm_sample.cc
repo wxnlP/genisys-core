@@ -12,9 +12,9 @@ void SignalHandler(int) { g_running = false; }
 int main() {
   std::signal(SIGINT, SignalHandler);
 
-  RoboManager robo_manger("actuator_config.yaml", "geniarm_config.yaml");
-  ArmController* arm = robo_manger.GetArmController();
-  GripperController* gripper = robo_manger.GetGripperController();
+  RoboManager robo_manger("robo_manager.yaml");
+  auto arm = robo_manger.GetArmController();
+  auto gripper = robo_manger.GetGripperController();
 
   robo_manger.Enable();
   robo_manger.Start();

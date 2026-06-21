@@ -16,6 +16,7 @@ public:
     bool Init() override;
     void Enable() override;
     void Disable() override;
+    void Shutdown() override;
     bool SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) override;
     bool GetJointState(ArmCtrlBase::JointState& joint_state) override;
     bool SetCtrlMode(DmMotorDriver::CtrlMode mode);

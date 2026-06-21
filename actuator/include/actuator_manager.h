@@ -12,6 +12,8 @@ class ActuatorManager {
  public:
   ActuatorManager(std::string file);
 
+  void Shutdown();
+
   std::shared_ptr<ArmCtrlBase> GetArmController() { return arm_ctrl_; }
   std::shared_ptr<GripperCtrlBase> GetGripperController() { return gripper_ctrl_; }
 

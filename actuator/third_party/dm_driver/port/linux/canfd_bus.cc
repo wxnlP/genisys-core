@@ -7,6 +7,7 @@ SocketCANBus::SocketCANBus(const std::string &interface_name, bool fd_mode)
     : can_interface_(interface_name), fd_mode_(fd_mode) {}
 
 SocketCANBus::~SocketCANBus() {
+  Shutdown();
   SocketCAN_Close(socket_fd_);
 }
 
@@ -21,6 +22,10 @@ int SocketCANBus::Init() {
     }
   });
   return socket_fd_;
+}
+
+void SocketCANBus::Shutdown() {
+  sample_thread_.request_stop();
 }
 
 void SocketCANBus::SetReceiverId(uint32_t *id, uint8_t len) {

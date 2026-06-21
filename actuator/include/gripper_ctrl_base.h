@@ -22,6 +22,7 @@ class GripperCtrlBase {
   virtual void Init() {}
   virtual void Enable() {}
   virtual void Disable() {}
+  virtual void Shutdown() {}
 
   virtual bool SendCommand(const GripperCommand& command) = 0;
   virtual bool ReceiveState(GripperState& state) = 0;

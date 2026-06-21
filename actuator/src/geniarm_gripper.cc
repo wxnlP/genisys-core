@@ -26,6 +26,10 @@ void GeniArmGripper::Disable() {
   motor_driver_.Enable(false);
 }
 
+void GeniArmGripper::Shutdown() {
+  state_update_thread_.request_stop();
+}
+
 
 bool GeniArmGripper::SendCommand(const GripperCommand& command) {
   DmMotorDriver::CtrlCmd cmd;

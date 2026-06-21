@@ -24,6 +24,7 @@ public:
   ~SocketCANBus() override;
 
   int Init();
+  void Shutdown();
   void SetReceiverId(uint32_t *id, uint8_t len);
   void Sample();
   int Send(uint32_t id, const uint8_t *data, uint8_t len) override;

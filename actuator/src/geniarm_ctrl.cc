@@ -39,6 +39,10 @@ void GeniArmCtrl::Disable() {
   }
 }
 
+void GeniArmCtrl::Shutdown() {
+  state_update_thread_.request_stop();
+}
+
 bool GeniArmCtrl::SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) {
   for (int i = 0; i < motor_driver_.size(); ++i) {
     DmMotorDriver::CtrlCmd cmd(joint_cmd.position[i], joint_cmd.velocity[i], joint_cmd.effort[i], joint_cmd.stiffness[i], joint_cmd.damping[i]);

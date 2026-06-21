@@ -13,6 +13,7 @@ class GeniArmGripper : public GripperCtrlBase {
   void Init() override;
   void Enable() override;
   void Disable() override;
+  void Shutdown() override;
   bool ReceiveState(GripperState& state) override;
   bool SendCommand(const GripperCommand& command) override;
 

@@ -48,6 +48,7 @@ class ArmController {
   int MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, double r, double v, double a);
   int MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, double r, double v, double a);
 
+  void SetRobotName(std::string name) { robot_name_ = name; }
  private:
   bool SelectBestIKSolve(const ArmMotion::IKSolves& ik_solves,
                          const ArmMotion::Joint6Dof& reference_joint,
@@ -74,4 +75,6 @@ class ArmController {
   std::mutex command_mutex_;                           // 保护 command_queue_
   std::queue<ArmMotion::JointCommand> command_queue_;  // 待执行的关节命令队列
   std::condition_variable command_cv_;
+
+  std::string robot_name_;
 };

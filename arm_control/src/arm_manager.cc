@@ -7,6 +7,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   YAML::Node config = YAML::LoadFile(config_file_path);
 
   auto robot_cfg = config["robot"];
+  std::string robot_name = robot_cfg["name"].as<std::string>();
 
   // ============================================================
   //  1. 关节限位（YAML 使用角度，内部转为弧度）
@@ -48,6 +49,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   //  4. 创建 ArmController
   // ============================================================
   arm_controller_ = std::make_shared<ArmController>(mdh_params, ik_mode);
+  arm_controller_->SetRobotName(robot_name);
 
   // ============================================================
   //  5. MIT 参数 & 关节限位写入
@@ -58,13 +60,13 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   ArmMotion::Joint6Dof joint_max{};
 
   int count = 0;
-  joint_name_.clear();
+  joint_names_.clear();
   for (const auto& joint : robot_cfg["joints"]) {
     arm_stiffness[count] = joint["MIT"]["stiffness"].as<double>();
     arm_damping[count] = joint["MIT"]["damping"].as<double>();
     joint_min[count] = limits_lower[count];
     joint_max[count] = limits_upper[count];
-    joint_name_.push_back(joint["name"].as<std::string>());
+    joint_names_.push_back(joint["name"].as<std::string>());
     count++;
   }
   arm_controller_->SetJointLimits(joint_min, joint_max);
@@ -100,7 +102,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
     gripper_stiffness = gripper_cfg["MIT"]["stiffness"].as<double>();
     gripper_damping = gripper_cfg["MIT"]["damping"].as<double>();
     gripper_max_range = gripper_cfg["max_range"].as<double>();
-    joint_name_.push_back(gripper_cfg["name"].as<std::string>());
+    joint_names_.push_back(gripper_cfg["name"].as<std::string>());
 
     gripper_controller_ = std::make_shared<GripperController>(gripper_stiffness, gripper_damping);
     gripper_controller_->SetMaxRange(gripper_max_range);

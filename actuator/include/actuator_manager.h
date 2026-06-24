@@ -17,7 +17,7 @@ class ActuatorManager {
 
   std::shared_ptr<ArmCtrlBase> GetArmActuator() { return arm_ctrl_; }
   std::shared_ptr<GripperCtrlBase> GetGripperActuator() { return gripper_ctrl_; }
-  void GetJointName(std::vector<std::string>& joint_name) { joint_name = joint_name_; }
+  void GetJointNames(std::vector<std::string>& joint_names) { joint_names = joint_names_; }
 
  private:
   std::shared_ptr<ArmCtrlBase> arm_ctrl_;
@@ -26,5 +26,5 @@ class ActuatorManager {
   std::unique_ptr<serial::Serial> serial_;
   std::vector<DmMotorDriver> arm_motors_;
   std::shared_ptr<DmMotorDriver> gripper_motor_;
-  std::vector<std::string> joint_name_;
+  std::vector<std::string> joint_names_;
 };

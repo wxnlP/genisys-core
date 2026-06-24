@@ -15,7 +15,6 @@
 #include "quintic_time_scaler.h"
 #include "time_scaler_base.h"
 
-
 namespace {
 
 double JointPathLength(const ArmMotion::Joint6Dof& q0,
@@ -268,6 +267,10 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     joint_cmd.velocity = joint_vel;
     joint_cmd.stiffness = motor_stiffness_;
     joint_cmd.damping = motor_damping_;
+    // s6h4d特殊处理
+    if (robot_name_ == "s6h4d") {
+      joint_cmd.effort = joint_acc;
+    }
     // TODO: 力矩支持
 
     {
@@ -345,6 +348,10 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
     joint_cmd.velocity = point.velocity;
     joint_cmd.stiffness = motor_stiffness_;
     joint_cmd.damping = motor_damping_;
+    // s6h4d特殊处理
+    if (robot_name_ == "s6h4d") {
+      joint_cmd.effort = point.acceleration;
+    }
     // TODO: 力矩支持
 
     {
@@ -443,6 +450,10 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     joint_cmd.velocity = joint_vel;
     joint_cmd.stiffness = motor_stiffness_;
     joint_cmd.damping = motor_damping_;
+    // s6h4d特殊处理
+    if (robot_name_ == "s6h4d") {
+      joint_cmd.effort = joint_acc;
+    }
     // TODO: 力矩支持
 
     {
@@ -534,6 +545,10 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
     joint_cmd.velocity = point.velocity;
     joint_cmd.stiffness = motor_stiffness_;
     joint_cmd.damping = motor_damping_;
+    // s6h4d特殊处理
+    if (robot_name_ == "s6h4d") {
+      joint_cmd.effort = point.acceleration;
+    }
     // TODO: 力矩、刚度、阻尼支持
 
     {

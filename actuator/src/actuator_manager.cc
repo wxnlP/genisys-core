@@ -33,11 +33,12 @@ ActuatorManager::ActuatorManager(std::string file) {
 
     // 解析各关节电机
     int count = 0;
+    joint_names_.clear();
     for (const auto& joint : arm_cfg["joints"]) {
       uint32_t motor_id = joint["motor_id"].as<uint32_t>();
       uint32_t feedback_id = joint["feedback_id"].as<uint32_t>();
       feedback_ids.push_back(feedback_id);
-      joint_name_.push_back(joint["name"].as<std::string>());
+      joint_names_.push_back(joint["name"].as<std::string>());
 
       std::string model_str = joint["model"].as<std::string>();
       DmMotorDriver::MotorModel motor_model;
@@ -70,7 +71,7 @@ ActuatorManager::ActuatorManager(std::string file) {
     int baud_rate = proto["baud_rate"].as<int>();
     // 记录关节名称
     for (const auto& joint : arm_cfg["joints"]) {
-      joint_name_.push_back(joint["name"].as<std::string>());
+      joint_names_.push_back(joint["name"].as<std::string>());
     }
     // 创建串口
     serial_ = std::make_unique<serial::Serial>(arm_port, baud_rate, serial::Timeout::simpleTimeout(100));
@@ -85,7 +86,7 @@ ActuatorManager::ActuatorManager(std::string file) {
   if (actuator["gripper"]) {
     auto gripper_cfg = actuator["gripper"];
     std::string gripper_name = gripper_cfg["name"].as<std::string>();
-    joint_name_.push_back(gripper_name);
+    joint_names_.push_back(gripper_name);
 
     if (gripper_name == "geniarm_gripper") {
       if (!can_bus_) {

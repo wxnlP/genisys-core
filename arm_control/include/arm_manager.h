@@ -13,10 +13,10 @@ class ArmManager {
   std::shared_ptr<ArmController> GetArmController() { return arm_controller_; }
   std::shared_ptr<GripperController> GetGripperController() { return gripper_controller_; }
 
-  void GetJointName(std::vector<std::string>& joint_name) { joint_name = joint_name_; }
+  void GetJointNames(std::vector<std::string>& joint_names) { joint_names = joint_names_; }
 
  private:
   std::shared_ptr<ArmController> arm_controller_;
   std::shared_ptr<GripperController> gripper_controller_;
-  std::vector<std::string> joint_name_;
+  std::vector<std::string> joint_names_;
 };

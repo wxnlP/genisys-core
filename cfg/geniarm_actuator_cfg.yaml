@@ -3,6 +3,7 @@ actuator:
     name: "geniarm"
     protocol:
       port: "can0"
+    ctrl_mode: "MIT"    # 控制模式: MIT, POS, VEL
     joint_limits:
       lower: [-2.61, -0.001, -3.7, -1.5708, -1.5708, -1.5708]
       upper: [2.61, 3.7, 0.001, 1.5708, 1.5708, 1.5708]

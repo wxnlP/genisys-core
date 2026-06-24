@@ -19,7 +19,7 @@ public:
     void Shutdown() override;
     bool SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) override;
     bool GetJointState(ArmCtrlBase::JointState& joint_state) override;
-    bool SetCtrlMode(DmMotorDriver::CtrlMode mode);
+    bool SetCtrlMode(ArmCtrlBase::CtrlMode mode) override;
 
 private:
     std::vector<DmMotorDriver>& motor_driver_;

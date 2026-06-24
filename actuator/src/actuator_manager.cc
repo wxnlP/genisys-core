@@ -55,6 +55,15 @@ ActuatorManager::ActuatorManager(std::string file) {
 
     arm_ctrl_ = std::make_shared<GeniArmCtrl>(arm_motors_);
 
+    // 设置控制模式（默认 MIT）
+    std::string ctrl_mode_str = arm_cfg["ctrl_mode"].as<std::string>();
+    if (ctrl_mode_str == "POS") {
+      arm_ctrl_->SetCtrlMode(ArmCtrlBase::CtrlMode::POS);
+    } else if (ctrl_mode_str == "VEL") {
+      arm_ctrl_->SetCtrlMode(ArmCtrlBase::CtrlMode::VEL);
+    }
+    // "MIT" 或不指定时保持默认
+
   } else if (arm_name == "s6h4d") {
     auto proto = arm_cfg["protocol"];
     std::string arm_port = proto["port"].as<std::string>();

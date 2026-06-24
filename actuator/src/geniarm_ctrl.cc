@@ -59,9 +59,21 @@ bool GeniArmCtrl::GetJointState(ArmCtrlBase::JointState& joint_state) {
   return true;
 }
 
-bool GeniArmCtrl::SetCtrlMode(DmMotorDriver::CtrlMode mode) {
+bool GeniArmCtrl::SetCtrlMode(ArmCtrlBase::CtrlMode mode) {
+  DmMotorDriver::CtrlMode dm_mode;
+  switch (mode) {
+    case ArmCtrlBase::CtrlMode::POS:
+      dm_mode = DmMotorDriver::CtrlMode::POS;
+      break;
+    case ArmCtrlBase::CtrlMode::VEL:
+      dm_mode = DmMotorDriver::CtrlMode::VEL;
+      break;
+    default:
+      dm_mode = DmMotorDriver::CtrlMode::MIT;
+      break;
+  }
   for (auto& motor : motor_driver_) {
-    if (motor.SetCtrlMode(mode, false) == -1) {
+    if (motor.SetCtrlMode(dm_mode, false) == -1) {
       return false;
     }
   }

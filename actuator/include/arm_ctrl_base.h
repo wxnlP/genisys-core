@@ -3,6 +3,12 @@
 
 class ArmCtrlBase {
  public:
+  enum class CtrlMode {
+    MIT = 1,
+    POS,
+    VEL,
+  };
+
   struct JointCommand {
     double position[6]{};
     double velocity[6]{};
@@ -25,4 +31,5 @@ class ArmCtrlBase {
   virtual void Shutdown() {};
   virtual bool SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) = 0;
   virtual bool GetJointState(ArmCtrlBase::JointState& joint_state) = 0;
+  virtual bool SetCtrlMode(ArmCtrlBase::CtrlMode /*mode*/) { return true; };
 };

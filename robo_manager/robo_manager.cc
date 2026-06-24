@@ -20,8 +20,8 @@ RoboManager::RoboManager(const std::string& config_yaml) {
   arm_mgr_ = std::make_shared<ArmManager>(arm_yaml);
 
   // 2. 取出驱动层指针
-  actuator_ = actuator_mgr_->GetArmController();
-  gripper_actuator_ = actuator_mgr_->GetGripperController();
+  actuator_ = actuator_mgr_->GetArmActuator();
+  gripper_actuator_ = actuator_mgr_->GetGripperActuator();
 
   // 3. 取出算法层指针
   arm_controller_ = arm_mgr_->GetArmController();
@@ -86,7 +86,9 @@ bool RoboManager::IsMoving() const {
 
 void RoboManager::Enable() {
   actuator_->Enable();
-  gripper_actuator_->Enable();
+  if (gripper_actuator_) {
+    gripper_actuator_->Enable();
+  }
   state_ = State::IDLE;
   ARM_LOG_INFO("[RoboManager] 已使能");
 }
@@ -94,7 +96,9 @@ void RoboManager::Enable() {
 void RoboManager::Disable() {
   Stop();
   actuator_->Disable();
-  gripper_actuator_->Disable();
+  if (gripper_actuator_) {
+    gripper_actuator_->Disable();
+  }
   state_ = State::DISABLED;
   ARM_LOG_INFO("[RoboManager] 已去使能");
 }
@@ -145,24 +149,26 @@ void RoboManager::ControlLoop() {
     }
 
     // ── 3. 读取夹爪反馈 ──
-    GripperCtrlBase::GripperState gripper_state;
-    if (gripper_actuator_->ReceiveState(gripper_state)) {
-      // 更新状态
-      gripper_controller_->SetGripperState(gripper_state.position,
-                                           gripper_state.velocity,
-                                           gripper_state.effort);
-    }
+    if (gripper_actuator_) {
+      GripperCtrlBase::GripperState gripper_state;
+      if (gripper_actuator_->ReceiveState(gripper_state)) {
+        // 更新状态
+        gripper_controller_->SetGripperState(gripper_state.position,
+                                             gripper_state.velocity,
+                                             gripper_state.effort);
+      }
 
-    // ── 4. 消费夹爪指令队列 ──
-    GripperController::GripperCommand gripper_cmd;
-    if (gripper_controller_->GetGripperCommand(gripper_cmd) == 0) {
-      GripperCtrlBase::GripperCommand actuator_gripper_cmd;
-      actuator_gripper_cmd.position = gripper_cmd.position;
-      actuator_gripper_cmd.velocity = gripper_cmd.velocity;
-      actuator_gripper_cmd.effort = gripper_cmd.effort;
-      actuator_gripper_cmd.stiffness = gripper_cmd.stiffness;
-      actuator_gripper_cmd.damping = gripper_cmd.damping;
-      gripper_actuator_->SendCommand(actuator_gripper_cmd);
+      // ── 4. 消费夹爪指令队列 ──
+      GripperController::GripperCommand gripper_cmd;
+      if (gripper_controller_->GetGripperCommand(gripper_cmd) == 0) {
+        GripperCtrlBase::GripperCommand actuator_gripper_cmd;
+        actuator_gripper_cmd.position = gripper_cmd.position;
+        actuator_gripper_cmd.velocity = gripper_cmd.velocity;
+        actuator_gripper_cmd.effort = gripper_cmd.effort;
+        actuator_gripper_cmd.stiffness = gripper_cmd.stiffness;
+        actuator_gripper_cmd.damping = gripper_cmd.damping;
+        gripper_actuator_->SendCommand(actuator_gripper_cmd);
+      }
     }
 
     WaitNextCycle(t_start);

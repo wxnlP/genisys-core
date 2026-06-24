@@ -9,12 +9,12 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   auto robot_cfg = config["robot"];
 
   // ============================================================
-  //  1. 关节限位
+  //  1. 关节限位（YAML 使用角度，内部转为弧度）
   // ============================================================
-  std::vector<double> limits_lower =
-      robot_cfg["joint_limits"]["lower"].as<std::vector<double>>();
-  std::vector<double> limits_upper =
-      robot_cfg["joint_limits"]["upper"].as<std::vector<double>>();
+  std::vector<double> limits_lower = robot_cfg["joint_limits"]["lower"].as<std::vector<double>>();
+  std::vector<double> limits_upper = robot_cfg["joint_limits"]["upper"].as<std::vector<double>>();
+  for (auto& v : limits_lower) v *= M_PI / 180.0;
+  for (auto& v : limits_upper) v *= M_PI / 180.0;
 
   // ============================================================
   //  2. MDH 参数
@@ -34,8 +34,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   // ============================================================
   //  3. 逆解模式
   // ============================================================
-  std::string ik_mode_str =
-      robot_cfg["kinematics"]["ik_mode"].as<std::string>();
+  std::string ik_mode_str = robot_cfg["kinematics"]["ik_mode"].as<std::string>();
   KinematicSolver::IKMode ik_mode;
   if (ik_mode_str == "Piper") {
     ik_mode = KinematicSolver::IKMode::SphericalWrist;
@@ -59,11 +58,13 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   ArmMotion::Joint6Dof joint_max{};
 
   int count = 0;
+  joint_name_.clear();
   for (const auto& joint : robot_cfg["joints"]) {
-    arm_stiffness.q[count] = joint["MIT"]["stiffness"].as<double>();
-    arm_damping.q[count] = joint["MIT"]["damping"].as<double>();
-    joint_min.q[count] = limits_lower[count];
-    joint_max.q[count] = limits_upper[count];
+    arm_stiffness[count] = joint["MIT"]["stiffness"].as<double>();
+    arm_damping[count] = joint["MIT"]["damping"].as<double>();
+    joint_min[count] = limits_lower[count];
+    joint_max[count] = limits_upper[count];
+    joint_name_.push_back(joint["name"].as<std::string>());
     count++;
   }
   arm_controller_->SetJointLimits(joint_min, joint_max);
@@ -81,9 +82,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   } else if (traj_mode_str == "lspb") {
     arm_controller_->SetTrajectoryMode(ArmController::TrajectoryMode::LSPB);
   } else {
-    ARM_LOG_WARN(
-        "轨迹模式 '{}' 不在可选范围内 ['quintic', 'cubic', 'lspb']，默认使用 quintic",
-        traj_mode_str);
+    ARM_LOG_WARN("轨迹模式 '{}' 不在可选范围内 ['quintic', 'cubic', 'lspb']，默认使用 quintic", traj_mode_str);
   }
 
   // ============================================================
@@ -93,20 +92,23 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   arm_controller_->SetSampleFrequency(sample_frequency);
 
   // ============================================================
-  //  8. 夹爪控制器
+  //  8. 夹爪控制器 — 仅在配置中存在时创建
   // ============================================================
-  auto gripper_cfg = config["gripper"];
-  double gripper_stiffness = gripper_cfg["MIT"]["stiffness"].as<double>();
-  double gripper_damping = gripper_cfg["MIT"]["damping"].as<double>();
-  double gripper_max_range = gripper_cfg["max_range"].as<double>();
+  double gripper_stiffness = 0.0, gripper_damping = 0.0, gripper_max_range = 0.0;
+  if (config["gripper"]) {
+    auto gripper_cfg = config["gripper"];
+    gripper_stiffness = gripper_cfg["MIT"]["stiffness"].as<double>();
+    gripper_damping = gripper_cfg["MIT"]["damping"].as<double>();
+    gripper_max_range = gripper_cfg["max_range"].as<double>();
+    joint_name_.push_back(gripper_cfg["name"].as<std::string>());
 
-  gripper_controller_ =
-      std::make_shared<GripperController>(gripper_stiffness, gripper_damping);
-  gripper_controller_->SetMaxRange(gripper_max_range);
-  gripper_controller_->SetSampleFrequency(sample_frequency);
+    gripper_controller_ = std::make_shared<GripperController>(gripper_stiffness, gripper_damping);
+    gripper_controller_->SetMaxRange(gripper_max_range);
+    gripper_controller_->SetSampleFrequency(sample_frequency);
+  }
 
   // ============================================================
-  //  8. 打印初始化参数
+  //  9. 打印初始化参数
   // ============================================================
   {
     constexpr auto kSepH =
@@ -144,14 +146,18 @@ ArmManager::ArmManager(const std::string& yaml_file) {
       ARM_LOG_INFO("  {:>3} │ {:>9.3f} {:>9.3f} {:>9.3f} {:>8.3f}",
                    i + 1,
                    limits_lower[i], limits_upper[i],
-                   arm_stiffness.q[i], arm_damping.q[i]);
+                   arm_stiffness[i], arm_damping[i]);
     }
 
     // 轨迹 & 夹爪
     ARM_LOG_INFO("{}", kSepM);
     ARM_LOG_INFO("  Trajectory: {}", traj_mode_str);
-    ARM_LOG_INFO("  Gripper:    range={:.3f}, K={:.1f}, D={:.1f}",
-                 gripper_max_range, gripper_stiffness, gripper_damping);
+    if (gripper_controller_) {
+      ARM_LOG_INFO("  Gripper:    range={:.3f}, K={:.1f}, D={:.1f}",
+                   gripper_max_range, gripper_stiffness, gripper_damping);
+    } else {
+      ARM_LOG_INFO("  Gripper:    (未配置)");
+    }
     ARM_LOG_INFO("{}", kSepH);
   }
 }

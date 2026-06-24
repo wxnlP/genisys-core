@@ -6,7 +6,7 @@
 
 int main() {
   ActuatorManager actuator("actuator_config.yaml");
-  auto gripper = actuator.GetGripperController();
+  auto gripper = actuator.GetGripperActuator();
 
   GripperController gripper_ctrl(8.0, 1.0);  // stiffness, damping
   gripper_ctrl.SetMaxRange(1.95);

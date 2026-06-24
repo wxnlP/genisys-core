@@ -1,0 +1,16 @@
+actuator:
+  arm:
+    name: s6h4d
+    protocol:
+      port: ttyUSB0
+      baud_rate: 9600
+    joint_limits:
+      lower: [-150, 0, -212, -90, -90, -90]
+      upper: [150, 212, 0, 90, 90, 90]
+    joints:
+      - name: "joint1"
+      - name: "joint2"
+      - name: "joint3"
+      - name: "joint4"
+      - name: "joint5"
+      - name: "joint6"

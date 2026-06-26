@@ -8,7 +8,7 @@
 #include <fmt/format.h>
 
 #include <atomic>
-#include <iostream>
+#include <cstdio>
 #include <string_view>
 
 // 加到文件顶部
@@ -64,10 +64,10 @@ class ArmLogger {
     if (level == LogLevel::ERROR) { color = Ansi::kRed; }
 
     const auto message = fmt::format(fmt_str, std::forward<Args>(args)...);
-    std::ostream& output = (level == LogLevel::WARN || level == LogLevel::ERROR)
-                               ? std::cerr
-                               : std::cout;
-    output << color << '[' << LevelName(level) << "] " << message << Ansi::kReset << '\n';
+    FILE* output = (level == LogLevel::WARN || level == LogLevel::ERROR)
+                       ? stderr
+                       : stdout;
+    fmt::print(output, "{}[{}] {} {}\n", color, LevelName(level), message, Ansi::kReset);
   }
 
  private:

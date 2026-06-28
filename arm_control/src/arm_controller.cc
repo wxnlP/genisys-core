@@ -172,6 +172,8 @@ void ArmController::SetJointState(const ArmMotion::JointState& joint_state) {
 bool ArmController::GetJointCommand(ArmMotion::JointCommand& joint_command) {
   std::lock_guard<std::mutex> lock(command_mutex_);
   if (command_queue_.empty()) {
+    joint_command.damping = motor_damping_;
+    joint_command.stiffness = motor_stiffness_;
     return false;
   }
   joint_command = command_queue_.front();

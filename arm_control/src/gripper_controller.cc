@@ -15,6 +15,8 @@ void GripperController::SetGripperState(double position, double velocity, double
 int GripperController::GetGripperCommand(GripperCommand& command) {
   std::lock_guard<std::mutex> lock(state_mutex_);
   if (command_queue_.empty()) {
+    command.damping = damping_;
+    command.stiffness = stiffness_;
     return -1;
   }
   command = command_queue_.front();

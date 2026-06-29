@@ -156,6 +156,14 @@ int ArmController::GetCurrentJoint(ArmMotion::Joint6Dof& current_joint) {
   return 0;
 }
 
+int ArmController::JointToPose(const ArmMotion::Joint6Dof& joint, ArmMotion::Pose6Dof& pose) {
+  if (!kinematic_solver_->FK(joint, pose)) {
+    ARM_LOG_ERROR("[JointToPose] failed: FK");
+    return -1;
+  }
+  return 0;
+}
+
 void ArmController::SetToolPose(const ArmMotion::Pose6Dof& tool_pose) {
   kinematic_solver_->SetToolPose(tool_pose);
 }

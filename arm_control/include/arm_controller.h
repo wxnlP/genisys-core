@@ -33,6 +33,7 @@ class ArmController {
 
   int GetCurrentPose(ArmMotion::Pose6Dof& current_pose);
   int GetCurrentJoint(ArmMotion::Joint6Dof& current_joint);
+  int JointToPose(const ArmMotion::Joint6Dof& joint, ArmMotion::Pose6Dof& pose);
 
   void SetToolPose(const ArmMotion::Pose6Dof& tool_pose);
   void ClearToolPose();

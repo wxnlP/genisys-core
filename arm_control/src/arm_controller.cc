@@ -18,7 +18,7 @@
 namespace {
 
 // 限位检查浮点容差 (rad)，防止关节正好卡在极限位置时因精度问题误报
-constexpr double kLimitEps = 1e-4;
+constexpr double kLimitEps = 1e-3;
 
 double JointPathLength(const ArmMotion::Joint6Dof& q0,
                        const ArmMotion::Joint6Dof& q1) {

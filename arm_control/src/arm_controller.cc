@@ -17,6 +17,9 @@
 
 namespace {
 
+// 限位检查浮点容差 (rad)，防止关节正好卡在极限位置时因精度问题误报
+constexpr double kLimitEps = 1e-4;
+
 double JointPathLength(const ArmMotion::Joint6Dof& q0,
                        const ArmMotion::Joint6Dof& q1) {
   double sum = 0.0;
@@ -296,7 +299,7 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
 
 int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) {
   for (int i = 0; i < 6; i++) {
-    if (target_joint[i] < joint_min_.q[i] || target_joint[i] > joint_max_.q[i]) {
+    if (target_joint[i] < joint_min_.q[i] - kLimitEps || target_joint[i] > joint_max_.q[i] + kLimitEps) {
       ARM_LOG_ERROR("[MoveJ] target joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
                     i, target_joint[i], joint_min_.q[i], joint_max_.q[i]);
       return -1;
@@ -345,7 +348,7 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
 
     // 采样后
     for (int i = 0; i < 6; ++i) {
-      if (point.position.q[i] < joint_min_.q[i] || point.position.q[i] > joint_max_.q[i]) {
+      if (point.position.q[i] < joint_min_.q[i] - kLimitEps || point.position.q[i] > joint_max_.q[i] + kLimitEps) {
         ARM_LOG_WARN("[MoveJ] trajectory point joint[{}]={:.4f} out of limit at t={}",
                      i, point.position.q[i], current_time);
         return -1;
@@ -486,7 +489,7 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
   // 检查输入点关节限位
   for (size_t p = 0; p < points.size(); ++p) {
     for (int i = 0; i < 6; ++i) {
-      if (points[p][i] < joint_min_.q[i] || points[p][i] > joint_max_.q[i]) {
+      if (points[p][i] < joint_min_.q[i] - kLimitEps || points[p][i] > joint_max_.q[i] + kLimitEps) {
         ARM_LOG_ERROR(
             "[MoveJMulti] input point {} joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
             p, i, points[p][i], joint_min_.q[i], joint_max_.q[i]);
@@ -542,7 +545,7 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
 
     // 轨迹点限位保护
     for (int i = 0; i < 6; ++i) {
-      if (point.position.q[i] < joint_min_.q[i] || point.position.q[i] > joint_max_.q[i]) {
+      if (point.position.q[i] < joint_min_.q[i] - kLimitEps || point.position.q[i] > joint_max_.q[i] + kLimitEps) {
         ARM_LOG_ERROR("[MoveJMulti] failed: sampled joint[{}]={:.4f} out of limit at t={}",
                       i, point.position.q[i], current_time);
         return -1;

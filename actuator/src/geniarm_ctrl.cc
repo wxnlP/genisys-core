@@ -7,21 +7,27 @@ GeniArmCtrl::~GeniArmCtrl() = default;
 
 bool GeniArmCtrl::Init() {
   state_update_thread_ = std::jthread([this](std::stop_token stoken) {
+    uint64_t cycle_count = 0;
     while (!stoken.stop_requested()) {
-      for (auto& motor : motor_driver_) {
-        motor.RequestState();
+      // 每 100ms 发一次 RequestState
+      if (cycle_count % 100 == 0) {
+        for (auto& motor : motor_driver_) {
+          motor.RequestState();
+        }
       }
+      cycle_count++;
       {
         std::lock_guard<std::mutex> lock(state_mutex_);
         for (int i = 0; i < motor_driver_.size(); ++i) {
           DmMotorDriver::MotorState state;
-          motor_driver_[i].GetLatestState(state);
-          latest_joint_state_.position[i] = state.pos;
-          latest_joint_state_.velocity[i] = state.vel;
-          latest_joint_state_.effort[i] = state.torque;
+          if (motor_driver_[i].GetLatestState(state) == 0) {
+            latest_joint_state_.position[i] = state.pos;
+            latest_joint_state_.velocity[i] = state.vel;
+            latest_joint_state_.effort[i] = state.torque;
+          }
         }
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   }); 
   return true;

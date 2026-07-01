@@ -3,8 +3,13 @@
 
 void GeniArmGripper::Init() {
   state_update_thread_ = std::jthread([this] (std::stop_token stoken) {
+    uint64_t cycle_count = 0;
     while (!stoken.stop_requested()) {
-      motor_driver_.RequestState();
+      // 每 100ms 发一次 RequestState
+      if (cycle_count % 100 == 0) {
+        motor_driver_.RequestState();
+      }
+      cycle_count++;
       {
         std::lock_guard<std::mutex> lock(state_mutex_);
         DmMotorDriver::MotorState state;
@@ -13,7 +18,7 @@ void GeniArmGripper::Init() {
         last_gripper_state_.velocity = state.vel;
         last_gripper_state_.effort = state.torque;
       }
-      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
   });
 }

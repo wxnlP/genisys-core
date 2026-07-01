@@ -6,11 +6,11 @@
 class GripperController {
  public:
   struct GripperCommand {
-    double position;
-    double velocity;
-    double effort;
-    double stiffness;
-    double damping;
+    double position{};
+    double velocity{};
+    double effort{};
+    double stiffness{};
+    double damping{};
   };
   GripperController(double stiffness, double damping) : stiffness_(stiffness), damping_(damping) {}
 

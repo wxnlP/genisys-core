@@ -1,12 +1,11 @@
 #pragma once
 
-#include <condition_variable>
 #include <memory>
 #include <mutex>
-#include <queue>
 #include <vector>
 #include "jacobian.h"
 #include "kinematic.h"
+#include "spsc_ring_buffer.h"
 #include "time_scaler_base.h"
 
 class ArmController {
@@ -73,9 +72,7 @@ class ArmController {
 
   double sample_frequency_ = 100.0;                    // 采样频率（Hz）
   std::mutex state_mutex_;                             // 保护 current_state_
-  std::mutex command_mutex_;                           // 保护 command_queue_
-  std::queue<ArmMotion::JointCommand> command_queue_;  // 待执行的关节命令队列
-  std::condition_variable command_cv_;
+  SPSCRingBuffer<ArmMotion::JointCommand> command_queue_{8192};  // 待执行的关节命令队列
 
   std::string robot_name_;
 };

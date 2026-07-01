@@ -1,8 +1,7 @@
 #pragma once
 
-#include <condition_variable>
 #include <mutex>
-#include <queue>
+#include "spsc_ring_buffer.h"
 
 class GripperController {
  public:
@@ -36,6 +35,5 @@ class GripperController {
   double current_effort_{0.0};
 
   std::mutex state_mutex_;
-  std::queue<GripperCommand> command_queue_;
-  std::condition_variable command_cv_;
+  SPSCRingBuffer<GripperCommand> command_queue_{4096};
 };

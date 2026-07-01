@@ -1,6 +1,7 @@
 #include "gripper_controller.h"
 
 #include <cmath>
+#include <thread>
 #include "arm_logger.h"
 #include "lspb_time_scaler.h"
 
@@ -12,23 +13,18 @@ void GripperController::SetGripperState(double position, double velocity, double
 }
 
 int GripperController::GetGripperCommand(GripperCommand& command) {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  if (command_queue_.empty()) {
-    command.damping = damping_;
-    command.stiffness = stiffness_;
-    return -1;
+  if (command_queue_.Pop(command)) {
+    return 0;
   }
-  command = command_queue_.front();
-  command_queue_.pop();
-  if (command_queue_.empty()) {
-    command_cv_.notify_all();
-  }
-  return 0;
+  command.damping = damping_;
+  command.stiffness = stiffness_;
+  return -1;
 }
 
 void GripperController::WaitForCompletion() {
-  std::unique_lock<std::mutex> lock(state_mutex_);
-  command_cv_.wait(lock, [this] { return command_queue_.empty(); });
+  while (!command_queue_.IsEmpty()) {
+    std::this_thread::yield();
+  }
 }
 
 bool GripperController::PosControl(double position, double velocity, double accel, double effort) {
@@ -60,8 +56,6 @@ bool GripperController::PosControl(double position, double velocity, double acce
   }
 
   const double duration = scaler.GetDuration();
-  std::vector<GripperCommand> batch;
-  batch.reserve(static_cast<std::size_t>(duration * sample_frequency_) + 1);
   double t = 0.0;
   while (t <= duration + 1e-7) {
     if (t > duration) {
@@ -81,16 +75,11 @@ bool GripperController::PosControl(double position, double velocity, double acce
     cmd.stiffness = stiffness_;
     cmd.damping = damping_;
 
-    batch.push_back(cmd);
+    if (!command_queue_.Push(cmd)) {
+      ARM_LOG_ERROR("[Gripper] Command queue full! Dropping trajectory point.");
+    }
 
     t += 1.0 / sample_frequency_;
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(state_mutex_);
-    for (auto& cmd : batch) {
-      command_queue_.push(std::move(cmd));
-    }
   }
 
   return true;

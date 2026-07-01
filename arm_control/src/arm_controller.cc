@@ -18,7 +18,7 @@
 namespace {
 
 // 限位检查浮点容差 (rad)，防止关节正好卡在极限位置时因精度问题误报
-constexpr double kLimitEps = 1e-3;
+constexpr double kLimitEps = 0.1;
 
 double JointPathLength(const ArmMotion::Joint6Dof& q0,
                        const ArmMotion::Joint6Dof& q1) {
@@ -96,6 +96,15 @@ bool ArmController::SelectBestIKSolve(
         diff += kTwoPi;
       }
       score += diff * diff;
+
+      // 对接近限位的解增加惩罚，优先选择远离限位的解
+      double val = ik_solves.solves[i].q[j];
+      double margin_lower = val - joint_min_.q[j];
+      double margin_upper = joint_max_.q[j] - val;
+      double min_margin = std::min(margin_lower, margin_upper);
+      if (min_margin < 0.2) {  // 距离限位小于 0.2 rad (~11°)
+        score += 10.0 * (0.2 - min_margin);  // 越接近限位惩罚越大
+      }
     }
 
     // 对奇异位形解加入轻微惩罚，优先选择常规可逆解。
@@ -181,23 +190,18 @@ void ArmController::SetJointState(const ArmMotion::JointState& joint_state) {
 }
 
 bool ArmController::GetJointCommand(ArmMotion::JointCommand& joint_command) {
-  std::lock_guard<std::mutex> lock(command_mutex_);
-  if (command_queue_.empty()) {
-    joint_command.damping = motor_damping_;
-    joint_command.stiffness = motor_stiffness_;
-    return false;
+  if (command_queue_.Pop(joint_command)) {
+    return true;
   }
-  joint_command = command_queue_.front();
-  command_queue_.pop();
-  if (command_queue_.empty()) {
-    command_cv_.notify_all();
-  }
-  return true;
+  joint_command.damping = motor_damping_;
+  joint_command.stiffness = motor_stiffness_;
+  return false;
 }
 
 void ArmController::WaitForCompletion() {
-  std::unique_lock<std::mutex> lock(command_mutex_);
-  command_cv_.wait(lock, [this] { return command_queue_.empty(); });
+  while (!command_queue_.IsEmpty()) {
+    std::this_thread::yield();
+  }
 }
 
 int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
@@ -237,8 +241,6 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
   CartesianTrajectory trajectory(path, std::move(time_scaler));
   double duration = trajectory.GetDuration();
 
-  std::vector<ArmMotion::JointCommand> batch;
-  batch.reserve(static_cast<std::size_t>(duration * sample_frequency_) + 1);
   double current_time = 0.0;
   while (current_time <= (duration + 1e-7)) {
     if (current_time > duration) {
@@ -267,6 +269,15 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
       return -1;
     }
 
+    // 检查 IK 结果是否在关节限位内
+    for (int i = 0; i < 6; ++i) {
+      if (target_joint[i] < joint_min_.q[i] - kLimitEps || target_joint[i] > joint_max_.q[i] + kLimitEps) {
+        ARM_LOG_WARN("[MoveL] trajectory point joint[{}]={:.4f} out of limit at t={}",
+                      i, target_joint[i], current_time);
+        return -1;
+      }
+    }
+
     // 通过雅可比矩阵将笛卡尔速度/加速度转换为关节速度/加速度
     jacobian_->Update(target_joint, 1.0 / sample_frequency_);
 
@@ -288,16 +299,12 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     }
     // TODO: 力矩支持
 
-    batch.push_back(joint_cmd);
+    if (!command_queue_.Push(joint_cmd)) {
+      ARM_LOG_ERROR("[MoveL] Command queue full! Dropping trajectory point.");
+    }
 
     current_joint = target_joint;
     current_time += 1.0 / sample_frequency_;  // 采样频率（Hz）转换为秒
-  }
-  {
-    std::lock_guard<std::mutex> lock(command_mutex_);  // 只锁一次!
-    for (auto& cmd : batch) {
-      command_queue_.push(std::move(cmd));
-    }
   }
   return 0;
 }
@@ -340,8 +347,6 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
   JointTrajectory trajectory(path, std::move(time_scaler));
   double duration = trajectory.GetDuration();
 
-  std::vector<ArmMotion::JointCommand> batch;
-  batch.reserve(static_cast<std::size_t>(duration * sample_frequency_) + 1);
   double current_time = 0.0;
   while (current_time <= (duration + 1e-7)) {
     if (current_time > duration) {
@@ -374,18 +379,14 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
     }
     // TODO: 力矩支持
 
-    batch.push_back(joint_cmd);
+    if (!command_queue_.Push(joint_cmd)) {
+      ARM_LOG_ERROR("[MoveJ] Command queue full! Dropping trajectory point.");
+    }
 
     current_joint = point.position;
     current_time += 1.0 / sample_frequency_;  // 采样频率（Hz）转换为秒
   }
 
-  {
-    std::lock_guard<std::mutex> lock(command_mutex_);
-    for (auto& cmd : batch) {
-      command_queue_.push(std::move(cmd));
-    }
-  }
   return 0;
 }
 
@@ -434,8 +435,6 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
   CartesianTrajectory trajectory(path, std::move(time_scaler));
   double duration = trajectory.GetDuration();
 
-  std::vector<ArmMotion::JointCommand> batch;
-  batch.reserve(static_cast<std::size_t>(duration * sample_frequency_) + 1);
   double current_time = 0.0;
   while (current_time <= (duration + 1e-7)) {
     if (current_time > duration) {
@@ -461,6 +460,15 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
       return -1;
     }
 
+    // 检查 IK 结果是否在关节限位内
+    for (int i = 0; i < 6; ++i) {
+      if (target_joint[i] < joint_min_.q[i] - kLimitEps || target_joint[i] > joint_max_.q[i] + kLimitEps) {
+        ARM_LOG_WARN("[MoveLMulti] trajectory point joint[{}]={:.4f} out of limit at t={}",
+                      i, target_joint[i], current_time);
+        return -1;
+      }
+    }
+
     jacobian_->Update(target_joint, 1.0 / sample_frequency_);
 
     ArmMotion::Joint6Dof joint_vel;
@@ -481,17 +489,12 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     }
     // TODO: 力矩支持
 
-    batch.push_back(joint_cmd);
+    if (!command_queue_.Push(joint_cmd)) {
+      ARM_LOG_ERROR("[MoveLMulti] Command queue full! Dropping trajectory point.");
+    }
 
     current_joint = target_joint;
     current_time += 1.0 / sample_frequency_;  // 采样频率（Hz）转换为秒
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(command_mutex_);
-    for (auto& cmd : batch) {
-      command_queue_.push(std::move(cmd));
-    }
   }
 
   return 0;
@@ -548,8 +551,6 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
   JointTrajectory trajectory(path, std::move(time_scaler));
   double duration = trajectory.GetDuration();
 
-  std::vector<ArmMotion::JointCommand> batch;
-  batch.reserve(static_cast<std::size_t>(duration * sample_frequency_) + 1);
   double current_time = 0.0;
   while (current_time <= (duration + 1e-7)) {
     if (current_time > duration) {
@@ -583,17 +584,12 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
     }
     // TODO: 力矩、刚度、阻尼支持
 
-    batch.push_back(joint_cmd);
+    if (!command_queue_.Push(joint_cmd)) {
+      ARM_LOG_ERROR("[MoveJMulti] Command queue full! Dropping trajectory point.");
+    }
 
     current_joint = point.position;
     current_time += 1.0 / sample_frequency_;  // 采样频率（Hz）转换为秒
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(command_mutex_);
-    for (auto& cmd : batch) {
-      command_queue_.push(std::move(cmd));
-    }
   }
 
   return 0;

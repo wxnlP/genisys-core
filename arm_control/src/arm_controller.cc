@@ -237,6 +237,8 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
   CartesianTrajectory trajectory(path, std::move(time_scaler));
   double duration = trajectory.GetDuration();
 
+  std::vector<ArmMotion::JointCommand> batch;
+  batch.reserve(static_cast<std::size_t>(duration * sample_frequency_) + 1);
   double current_time = 0.0;
   while (current_time <= (duration + 1e-7)) {
     if (current_time > duration) {
@@ -286,13 +288,16 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     }
     // TODO: 力矩支持
 
-    {
-      std::lock_guard<std::mutex> lock(command_mutex_);
-      command_queue_.push(joint_cmd);
-    }
+    batch.push_back(joint_cmd);
 
     current_joint = target_joint;
     current_time += 1.0 / sample_frequency_;  // 采样频率（Hz）转换为秒
+  }
+  {
+    std::lock_guard<std::mutex> lock(command_mutex_);  // 只锁一次!
+    for (auto& cmd : batch) {
+      command_queue_.push(std::move(cmd));
+    }
   }
   return 0;
 }
@@ -335,6 +340,8 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
   JointTrajectory trajectory(path, std::move(time_scaler));
   double duration = trajectory.GetDuration();
 
+  std::vector<ArmMotion::JointCommand> batch;
+  batch.reserve(static_cast<std::size_t>(duration * sample_frequency_) + 1);
   double current_time = 0.0;
   while (current_time <= (duration + 1e-7)) {
     if (current_time > duration) {
@@ -367,15 +374,18 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
     }
     // TODO: 力矩支持
 
-    {
-      std::lock_guard<std::mutex> lock(command_mutex_);
-      command_queue_.push(joint_cmd);
-    }
+    batch.push_back(joint_cmd);
 
     current_joint = point.position;
     current_time += 1.0 / sample_frequency_;  // 采样频率（Hz）转换为秒
   }
 
+  {
+    std::lock_guard<std::mutex> lock(command_mutex_);
+    for (auto& cmd : batch) {
+      command_queue_.push(std::move(cmd));
+    }
+  }
   return 0;
 }
 
@@ -424,6 +434,8 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
   CartesianTrajectory trajectory(path, std::move(time_scaler));
   double duration = trajectory.GetDuration();
 
+  std::vector<ArmMotion::JointCommand> batch;
+  batch.reserve(static_cast<std::size_t>(duration * sample_frequency_) + 1);
   double current_time = 0.0;
   while (current_time <= (duration + 1e-7)) {
     if (current_time > duration) {
@@ -469,14 +481,19 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     }
     // TODO: 力矩支持
 
-    {
-      std::lock_guard<std::mutex> lock(command_mutex_);
-      command_queue_.push(joint_cmd);
-    }
+    batch.push_back(joint_cmd);
 
     current_joint = target_joint;
     current_time += 1.0 / sample_frequency_;  // 采样频率（Hz）转换为秒
   }
+
+  {
+    std::lock_guard<std::mutex> lock(command_mutex_);
+    for (auto& cmd : batch) {
+      command_queue_.push(std::move(cmd));
+    }
+  }
+
   return 0;
 }
 
@@ -531,6 +548,8 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
   JointTrajectory trajectory(path, std::move(time_scaler));
   double duration = trajectory.GetDuration();
 
+  std::vector<ArmMotion::JointCommand> batch;
+  batch.reserve(static_cast<std::size_t>(duration * sample_frequency_) + 1);
   double current_time = 0.0;
   while (current_time <= (duration + 1e-7)) {
     if (current_time > duration) {
@@ -564,13 +583,17 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
     }
     // TODO: 力矩、刚度、阻尼支持
 
-    {
-      std::lock_guard<std::mutex> lock(command_mutex_);
-      command_queue_.push(joint_cmd);
-    }
+    batch.push_back(joint_cmd);
 
     current_joint = point.position;
     current_time += 1.0 / sample_frequency_;  // 采样频率（Hz）转换为秒
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(command_mutex_);
+    for (auto& cmd : batch) {
+      command_queue_.push(std::move(cmd));
+    }
   }
 
   return 0;

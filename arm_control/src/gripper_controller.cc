@@ -1,9 +1,8 @@
 #include "gripper_controller.h"
 
-#include "lspb_time_scaler.h"
-#include "arm_logger.h"
 #include <cmath>
-
+#include "arm_logger.h"
+#include "lspb_time_scaler.h"
 
 void GripperController::SetGripperState(double position, double velocity, double effort) {
   std::lock_guard<std::mutex> lock(state_mutex_);
@@ -61,6 +60,8 @@ bool GripperController::PosControl(double position, double velocity, double acce
   }
 
   const double duration = scaler.GetDuration();
+  std::vector<GripperCommand> batch;
+  batch.reserve(static_cast<std::size_t>(duration * sample_frequency_) + 1);
   double t = 0.0;
   while (t <= duration + 1e-7) {
     if (t > duration) {
@@ -80,12 +81,16 @@ bool GripperController::PosControl(double position, double velocity, double acce
     cmd.stiffness = stiffness_;
     cmd.damping = damping_;
 
-    {
-      std::lock_guard<std::mutex> lock(state_mutex_);
-      command_queue_.push(cmd);
-    }
+    batch.push_back(cmd);
 
     t += 1.0 / sample_frequency_;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(state_mutex_);
+    for (auto& cmd : batch) {
+      command_queue_.push(std::move(cmd));
+    }
   }
 
   return true;

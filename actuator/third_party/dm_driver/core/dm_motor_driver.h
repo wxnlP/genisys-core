@@ -3,7 +3,7 @@
 #include "canfd_bus_base.h"
 #include <cstdint>
 
-using MotorType = float;
+using MotorType = double;
 
 class DmMotorDriver {
 public:

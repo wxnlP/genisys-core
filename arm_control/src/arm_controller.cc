@@ -17,11 +17,10 @@
 
 namespace {
 
-// 限位检查浮点容差 (rad)，防止关节正好卡在极限位置时因精度问题误报
-constexpr double kLimitEps = 0.1;
+// 限位检查浮点容差 (rad)
+constexpr double kLimitEps = 0.01;
 
-double JointPathLength(const ArmMotion::Joint6Dof& q0,
-                       const ArmMotion::Joint6Dof& q1) {
+double JointPathLength(const ArmMotion::Joint6Dof& q0, const ArmMotion::Joint6Dof& q1) {
   double sum = 0.0;
   for (int i = 0; i < 6; ++i) {
     const double d = q1.q[i] - q0.q[i];
@@ -30,8 +29,7 @@ double JointPathLength(const ArmMotion::Joint6Dof& q0,
   return std::sqrt(sum);
 }
 
-double CartesianPosDistance(const ArmMotion::Pose6Dof& p0,
-                            const ArmMotion::Pose6Dof& p1) {
+double CartesianPosDistance(const ArmMotion::Pose6Dof& p0, const ArmMotion::Pose6Dof& p1) {
   const double dx = p1.x - p0.x;
   const double dy = p1.y - p0.y;
   const double dz = p1.z - p0.z;
@@ -102,7 +100,7 @@ bool ArmController::SelectBestIKSolve(
       double margin_lower = val - joint_min_.q[j];
       double margin_upper = joint_max_.q[j] - val;
       double min_margin = std::min(margin_lower, margin_upper);
-      if (min_margin < 0.2) {  // 距离限位小于 0.2 rad (~11°)
+      if (min_margin < 0.2) {                // 距离限位小于 0.2 rad (~11°)
         score += 10.0 * (0.2 - min_margin);  // 越接近限位惩罚越大
       }
     }
@@ -207,6 +205,15 @@ void ArmController::WaitForCompletion() {
 int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
   ArmMotion::Joint6Dof current_joint;
   GetCurrentJoint(current_joint);
+
+  for (int i = 0; i < 6; ++i) {
+    if (current_joint[i] < joint_min_[i]) {
+      current_joint[i] = joint_min_[i];
+    } else if (current_joint[i] > joint_max_[i]) {
+      current_joint[i] = joint_max_[i];
+    }
+  }
+
   // 通过正运动学获取当前笛卡尔位置
   ArmMotion::Pose6Dof current_pose;
   if (!kinematic_solver_->FK(current_joint, current_pose)) {
@@ -248,7 +255,6 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     }
     ArmMotion::CartesianTrajectoryPoint cart_point;
     if (!trajectory.Sample(current_time, cart_point)) {
-      // 处理采样失败的情况
       ARM_LOG_ERROR("[MoveL] failed: Sample at t={}", current_time);
       return -1;
     }
@@ -271,8 +277,8 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
 
     // 检查 IK 结果是否在关节限位内
     for (int i = 0; i < 6; ++i) {
-      if (target_joint[i] < joint_min_.q[i] - kLimitEps || target_joint[i] > joint_max_.q[i] + kLimitEps) {
-        ARM_LOG_WARN("[MoveL] trajectory point joint[{}]={:.4f} out of limit at t={}",
+      if (target_joint[i] < joint_min_[i] - kLimitEps || target_joint[i] > joint_max_[i] + kLimitEps) {
+        ARM_LOG_ERROR("[MoveL] trajectory point joint[{}]={:.4f} out of limit at t={}",
                       i, target_joint[i], current_time);
         return -1;
       }
@@ -287,7 +293,6 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     ArmMotion::Joint6Dof joint_acc;
     jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6);
 
-    // TODO: 写入队列
     ArmMotion::JointCommand joint_cmd;
     joint_cmd.position = target_joint;
     joint_cmd.velocity = joint_vel;
@@ -311,15 +316,23 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
 
 int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) {
   for (int i = 0; i < 6; i++) {
-    if (target_joint[i] < joint_min_.q[i] - kLimitEps || target_joint[i] > joint_max_.q[i] + kLimitEps) {
+    if (target_joint[i] < joint_min_[i] - kLimitEps || target_joint[i] > joint_max_[i] + kLimitEps) {
       ARM_LOG_ERROR("[MoveJ] target joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
-                    i, target_joint[i], joint_min_.q[i], joint_max_.q[i]);
+                    i, target_joint[i], joint_min_[i], joint_max_[i]);
       return -1;
     }
   }
 
   ArmMotion::Joint6Dof current_joint;
   GetCurrentJoint(current_joint);
+
+  for (int i = 0; i < 6; ++i) {
+    if (current_joint[i] < joint_min_[i]) {
+      current_joint[i] = joint_min_[i];
+    } else if (current_joint[i] > joint_max_[i]) {
+      current_joint[i] = joint_max_[i];
+    }
+  }
 
   const double path_length = JointPathLength(current_joint, target_joint);
   if (path_length <= 1e-7) {
@@ -361,13 +374,12 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
     // 采样后
     for (int i = 0; i < 6; ++i) {
       if (point.position.q[i] < joint_min_.q[i] - kLimitEps || point.position.q[i] > joint_max_.q[i] + kLimitEps) {
-        ARM_LOG_WARN("[MoveJ] trajectory point joint[{}]={:.4f} out of limit at t={}",
-                     i, point.position.q[i], current_time);
+        ARM_LOG_ERROR("[MoveJ] trajectory point joint[{}]={:.4f} out of limit at t={}",
+                      i, point.position.q[i], current_time);
         return -1;
       }
     }
 
-    // TODO: 写入队列
     ArmMotion::JointCommand joint_cmd;
     joint_cmd.position = point.position;
     joint_cmd.velocity = point.velocity;
@@ -398,6 +410,14 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
 
   ArmMotion::Joint6Dof current_joint;
   GetCurrentJoint(current_joint);
+
+  for (int i = 0; i < 6; ++i) {
+    if (current_joint[i] < joint_min_[i]) {
+      current_joint[i] = joint_min_[i];
+    } else if (current_joint[i] > joint_max_[i]) {
+      current_joint[i] = joint_max_[i];
+    }
+  }
 
   ArmMotion::Pose6Dof current_pose;
   if (!kinematic_solver_->FK(current_joint, current_pose)) {
@@ -462,8 +482,8 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
 
     // 检查 IK 结果是否在关节限位内
     for (int i = 0; i < 6; ++i) {
-      if (target_joint[i] < joint_min_.q[i] - kLimitEps || target_joint[i] > joint_max_.q[i] + kLimitEps) {
-        ARM_LOG_WARN("[MoveLMulti] trajectory point joint[{}]={:.4f} out of limit at t={}",
+      if (target_joint[i] < joint_min_[i] - kLimitEps || target_joint[i] > joint_max_[i] + kLimitEps) {
+        ARM_LOG_ERROR("[MoveLMulti] trajectory point joint[{}]={:.4f} out of limit at t={}",
                       i, target_joint[i], current_time);
         return -1;
       }
@@ -477,7 +497,6 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     ArmMotion::Joint6Dof joint_acc;
     jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6);
 
-    // TODO: 写入队列
     ArmMotion::JointCommand joint_cmd;
     joint_cmd.position = target_joint;
     joint_cmd.velocity = joint_vel;
@@ -509,10 +528,10 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
   // 检查输入点关节限位
   for (size_t p = 0; p < points.size(); ++p) {
     for (int i = 0; i < 6; ++i) {
-      if (points[p][i] < joint_min_.q[i] - kLimitEps || points[p][i] > joint_max_.q[i] + kLimitEps) {
+      if (points[p][i] < joint_min_[i] - kLimitEps || points[p][i] > joint_max_[i] + kLimitEps) {
         ARM_LOG_ERROR(
             "[MoveJMulti] input point {} joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
-            p, i, points[p][i], joint_min_.q[i], joint_max_.q[i]);
+            p, i, points[p][i], joint_min_[i], joint_max_[i]);
         return -1;
       }
     }
@@ -520,6 +539,14 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
 
   ArmMotion::Joint6Dof current_joint;
   GetCurrentJoint(current_joint);
+
+  for (int i = 0; i < 6; ++i) {
+    if (current_joint[i] < joint_min_[i]) {
+      current_joint[i] = joint_min_[i];
+    } else if (current_joint[i] > joint_max_[i]) {
+      current_joint[i] = joint_max_[i];
+    }
+  }
 
   std::vector<ArmMotion::Joint6Dof> path_points;
   path_points.reserve(points.size() + 1);
@@ -565,14 +592,13 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
 
     // 轨迹点限位保护
     for (int i = 0; i < 6; ++i) {
-      if (point.position.q[i] < joint_min_.q[i] - kLimitEps || point.position.q[i] > joint_max_.q[i] + kLimitEps) {
+      if (point.position.q[i] < joint_min_[i] - kLimitEps || point.position.q[i] > joint_max_[i] + kLimitEps) {
         ARM_LOG_ERROR("[MoveJMulti] failed: sampled joint[{}]={:.4f} out of limit at t={}",
-                      i, point.position.q[i], current_time);
+                      i, point.position[i], current_time);
         return -1;
       }
     }
 
-    // TODO: 写入队列
     ArmMotion::JointCommand joint_cmd;
     joint_cmd.position = point.position;
     joint_cmd.velocity = point.velocity;

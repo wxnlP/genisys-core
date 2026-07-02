@@ -35,6 +35,15 @@ class SPSCRingBuffer {
     return (tail_.load() + 1) % (capacity_ + 1) == head_.load();
   }
 
+  size_t Size() const {
+    size_t h = head_.load();
+    size_t t = tail_.load();
+    if (t >= h)
+      return t - h;
+    else
+      return (capacity_ + 1) - h + t;
+  }
+
   void Reset() {
     head_.store(0);
     tail_.store(0);

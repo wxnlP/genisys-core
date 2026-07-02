@@ -92,7 +92,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   // ============================================================
   double sample_frequency = robot_cfg["sample_frequency"].as<double>();
   arm_controller_->SetSampleFrequency(sample_frequency);
-
+  arm_controller_->StartSampleThread();
   // ============================================================
   //  8. 夹爪控制器 — 仅在配置中存在时创建
   // ============================================================

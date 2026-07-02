@@ -1,9 +1,15 @@
 #pragma once
 
+#include <condition_variable>
+#include <functional>
 #include <memory>
 #include <mutex>
+#include <queue>
+#include <thread>
 #include <vector>
+#include "cartesian_trajectory.h"
 #include "jacobian.h"
+#include "joint_trajectory.h"
 #include "kinematic.h"
 #include "spsc_ring_buffer.h"
 #include "time_scaler_base.h"
@@ -27,7 +33,9 @@ class ArmController {
   void SetMotorParams(ArmMotion::Joint6Dof stiffness, ArmMotion::Joint6Dof damping);
   void SetJointLimits(ArmMotion::Joint6Dof joint_min, ArmMotion::Joint6Dof joint_max);
   void SetTrajectoryMode(TrajectoryMode mode);
-  void SetSampleFrequency(double hz) { sample_frequency_ = hz;}
+  void StartSampleThread();
+  void StopSampleThread();
+  void SetSampleFrequency(double hz) { sample_frequency_ = hz; }
   double GetSampleFrequency() const { return sample_frequency_; }
 
   int GetCurrentPose(ArmMotion::Pose6Dof& current_pose);
@@ -49,6 +57,7 @@ class ArmController {
   int MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, double r, double v, double a);
 
   void SetRobotName(std::string name) { robot_name_ = name; }
+
  private:
   bool SelectBestIKSolve(const ArmMotion::IKSolves& ik_solves,
                          const ArmMotion::Joint6Dof& reference_joint,
@@ -57,6 +66,11 @@ class ArmController {
   std::unique_ptr<TimeScalerBase> CreateTimeScaler(double normalized_v,
                                                    double normalized_a,
                                                    TimeScalerBase::PlanConfig& config);
+  using SampleTask = std::function<bool(double t, ArmMotion::JointCommand& cmd)>;
+  struct SampleContext {
+    SampleTask task;
+    double duration;
+  };
 
  private:
   std::unique_ptr<KinematicSolver> kinematic_solver_;
@@ -70,9 +84,16 @@ class ArmController {
 
   TrajectoryMode traj_planning_mode{TrajectoryMode::QUINTIC};
 
-  double sample_frequency_ = 100.0;                    // 采样频率（Hz）
-  std::mutex state_mutex_;                             // 保护 current_state_
+  double sample_frequency_{};                                    // 采样频率（Hz）
+  bool is_cartesian_trajectory_{false};                          // 当前轨迹类型标志
+  std::mutex state_mutex_;                                       // 保护 current_state_
+  std::mutex sample_mutex_;                                      // 保护 sample_queue_
+  std::condition_variable sample_cv_;                            // 采样线程条件变量
+  std::jthread sampling_thread_;                                 // 采样线程
+  enum class MotionState : uint8_t { IDLE, ACTIVE };
+  std::atomic<MotionState> motion_state_{MotionState::IDLE};     // 采样线程运动状态
   SPSCRingBuffer<ArmMotion::JointCommand> command_queue_{8192};  // 待执行的关节命令队列
+  std::deque<SampleContext> sample_queue_;                       // 待采样的轨迹队列
 
   std::string robot_name_;
 };

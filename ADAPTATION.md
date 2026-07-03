@@ -2,12 +2,13 @@
 
 适配一个新的六轴机械臂需要完成以下工作：
 
-## 1️⃣ 实现驱动层（若硬件协议不兼容）
+## 实现驱动层
 
-如果新机械臂的通信协议与现有的 `GeniArmCtrl`（CAN FD / DM 电机）或 `S6h4dCtrl`（串口）均不兼容，需要继承 `ArmCtrlBase` 实现新驱动类：
+继承 `ArmCtrlBase` 实现机械臂本体驱动：
 
 ```cpp
 class MyRobotArmCtrl : public ArmCtrlBase {
+  public:
     bool Init() override;
     void Enable() override;
     void Disable() override;
@@ -17,13 +18,29 @@ class MyRobotArmCtrl : public ArmCtrlBase {
 };
 ```
 
-同时，在 `ActuatorManager::ActuatorManager()` 的工厂逻辑中增加对 `name == "my_robot"` 的分支。
+若夹爪也需适配，同理继承 `GripperCtrlBase`：
 
-若夹爪也需适配，同理继承 `GripperCtrlBase`。
+```c++
+class MyGripperCtrl : public GripperCtrlBase {
+  public:
+    void Init() override;
+    void Enable() override;
+    void Disable() override;
+    void Shutdown() override;
+    bool ReceiveState(GripperState& state) override;
+    bool SendCommand(const GripperCommand& command) override;
 
-## 2️⃣ 配置驱动参数
+    // ...
+};
+```
 
-创建 `my_robot_actuator_cfg.yaml`，按实际硬件填写：
+
+
+## 适配 yaml 管理
+
+如果你希望与 geniarm 一样可以通过 yaml 配置完成硬件初始化，必须在 `ActuatorManager::ActuatorManager()` 中增加 `name == "my_robot"` 的分支以辨识自定义机械臂。
+
+同时，创建 `my_robot_actuator_cfg.yaml`，按实际硬件填写：
 
 ```yaml
 actuator:
@@ -41,7 +58,7 @@ actuator:
         # ...
 ```
 
-## 3️⃣ 配置运动学参数
+## 配置运动学参数
 
 创建 `my_robot_body_cfg.yaml`，填写 MDH 参数和关节限位：
 
@@ -59,7 +76,9 @@ robot:
 
 MDH 参数坐标系定义遵循标准改进型 Denavit-Hartenberg 约定。
 
-## 4️⃣ 创建顶层配置
+## 创建顶层配置
+
+> 如果直接使用[robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)那么该步骤可以跳过。
 
 ```yaml
 # cfg/my_robo_manager.yaml
@@ -68,6 +87,6 @@ arm_config: "my_robot_body_cfg.yaml"
 control_frequency: 200.0
 ```
 
-## 5️⃣ （可选）配置动力学参数
+## 配置动力学参数
 
-编辑 `dynamics.yaml` 填写各连杆质量、质心、惯性张量及关节摩擦参数，用于力矩前馈/重力补偿。
+编辑 `dynamics.yaml` 填写各连杆质量、质心、惯性张量及关节摩擦参数，用于力矩前馈。

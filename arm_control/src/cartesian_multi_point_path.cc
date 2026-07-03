@@ -125,9 +125,9 @@ static void Precompute(CartesianMultiPointPathImpl& impl) {
 
     if (beta < 1e-6) { b = {}; continue; }
 
-    double d = impl.r_ / std::tan(beta * 0.5);
+    double d = impl.r_ * std::tan(beta * 0.5);
     d = std::min({d, impl.seg_lengths_[j - 1] * 0.499, impl.seg_lengths_[j] * 0.499});
-    const double r_eff = d * std::tan(beta * 0.5);
+    const double r_eff = d / std::tan(beta * 0.5);
 
     Eigen::Vector3d n1 = e_out - dot * e_in;
     if (n1.norm() < 1e-12) { b = {}; continue; }

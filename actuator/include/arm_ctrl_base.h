@@ -28,7 +28,6 @@ class ArmCtrlBase {
   virtual bool Init() { return true; };
   virtual void Enable() { return; };
   virtual void Disable() { return; };
-  virtual void Shutdown() {};
   virtual bool SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) = 0;
   virtual bool GetJointState(ArmCtrlBase::JointState& joint_state) = 0;
   virtual bool SetCtrlMode(ArmCtrlBase::CtrlMode /*mode*/) { return true; };

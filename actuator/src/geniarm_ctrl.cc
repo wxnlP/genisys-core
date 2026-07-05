@@ -1,4 +1,5 @@
 #include "geniarm_ctrl.h"
+#include <chrono>
 
 
 GeniArmCtrl::GeniArmCtrl(std::vector<DmMotorDriver>& motor_driver) : motor_driver_(motor_driver) {}
@@ -6,30 +7,6 @@ GeniArmCtrl::GeniArmCtrl(std::vector<DmMotorDriver>& motor_driver) : motor_drive
 GeniArmCtrl::~GeniArmCtrl() = default;
 
 bool GeniArmCtrl::Init() {
-  state_update_thread_ = std::jthread([this](std::stop_token stoken) {
-    uint64_t cycle_count = 0;
-    while (!stoken.stop_requested()) {
-      // 每 100ms 发一次 RequestState
-      if (cycle_count % 100 == 0) {
-        for (auto& motor : motor_driver_) {
-          motor.RequestState();
-        }
-      }
-      cycle_count++;
-      {
-        std::lock_guard<std::mutex> lock(state_mutex_);
-        for (int i = 0; i < motor_driver_.size(); ++i) {
-          DmMotorDriver::MotorState state;
-          if (motor_driver_[i].GetLatestState(state) == 0) {
-            latest_joint_state_.position[i] = state.pos;
-            latest_joint_state_.velocity[i] = state.vel;
-            latest_joint_state_.effort[i] = state.torque;
-          }
-        }
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-  }); 
   return true;
 }
 
@@ -45,10 +22,6 @@ void GeniArmCtrl::Disable() {
   }
 }
 
-void GeniArmCtrl::Shutdown() {
-  state_update_thread_.request_stop();
-}
-
 bool GeniArmCtrl::SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) {
   for (int i = 0; i < motor_driver_.size(); ++i) {
     DmMotorDriver::CtrlCmd cmd(joint_cmd.position[i], joint_cmd.velocity[i], joint_cmd.effort[i], joint_cmd.stiffness[i], joint_cmd.damping[i]);
@@ -60,8 +33,23 @@ bool GeniArmCtrl::SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) {
 }
 
 bool GeniArmCtrl::GetJointState(ArmCtrlBase::JointState& joint_state) {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  joint_state = latest_joint_state_;
+  static auto last_request_time = std::chrono::steady_clock::now();
+  auto now = std::chrono::steady_clock::now();
+  if (now - last_request_time > std::chrono::milliseconds(100)) {
+    for (auto& motor : motor_driver_) {
+      motor.RequestState();
+    }
+    last_request_time = now;
+  }
+
+  for (int i = 0; i < motor_driver_.size(); ++i) {
+    DmMotorDriver::MotorState state;
+    if (motor_driver_[i].GetLatestState(state) == 0) {
+      joint_state.position[i] = state.pos;
+      joint_state.velocity[i] = state.vel;
+      joint_state.effort[i] = state.torque;
+    }
+  }
   return true;
 }
 

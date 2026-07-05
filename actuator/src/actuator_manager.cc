@@ -120,8 +120,5 @@ ActuatorManager::ActuatorManager(std::string file) {
 }
 
 void ActuatorManager::Shutdown() {
-  // 通知各内部线程退出，实际 join 和资源释放由各 jthread 析构函数完成
-  if (arm_ctrl_)     arm_ctrl_->Shutdown();
-  if (gripper_ctrl_) gripper_ctrl_->Shutdown();
-  if (can_bus_)      can_bus_->Shutdown();
+  if (can_bus_) { can_bus_->Shutdown(); }
 }

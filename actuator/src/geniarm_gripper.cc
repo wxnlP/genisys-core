@@ -1,26 +1,8 @@
 #include "geniarm_gripper.h"
+#include <chrono>
 
 
 void GeniArmGripper::Init() {
-  state_update_thread_ = std::jthread([this] (std::stop_token stoken) {
-    uint64_t cycle_count = 0;
-    while (!stoken.stop_requested()) {
-      // 每 100ms 发一次 RequestState
-      if (cycle_count % 100 == 0) {
-        motor_driver_.RequestState();
-      }
-      cycle_count++;
-      {
-        std::lock_guard<std::mutex> lock(state_mutex_);
-        DmMotorDriver::MotorState state;
-        motor_driver_.GetLatestState(state);
-        last_gripper_state_.position = state.pos;
-        last_gripper_state_.velocity = state.vel;
-        last_gripper_state_.effort = state.torque;
-      }
-      std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    }
-  });
 }
 
 void GeniArmGripper::Enable() {
@@ -29,10 +11,6 @@ void GeniArmGripper::Enable() {
 
 void GeniArmGripper::Disable() {
   motor_driver_.Enable(false);
-}
-
-void GeniArmGripper::Shutdown() {
-  state_update_thread_.request_stop();
 }
 
 
@@ -50,9 +28,18 @@ bool GeniArmGripper::SendCommand(const GripperCommand& command) {
 }
 
 bool GeniArmGripper::ReceiveState(GripperState& state) {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  state.position = last_gripper_state_.position;
-  state.velocity = last_gripper_state_.velocity;
-  state.effort = last_gripper_state_.effort;
+  static auto last_request_time = std::chrono::steady_clock::now();
+  auto now = std::chrono::steady_clock::now();
+  if (now - last_request_time > std::chrono::milliseconds(100)) {
+    motor_driver_.RequestState();
+    last_request_time = now;
+  }
+
+  DmMotorDriver::MotorState motor_state;
+  if (motor_driver_.GetLatestState(motor_state) == 0) {
+    state.position = motor_state.pos;
+    state.velocity = motor_state.vel;
+    state.effort = motor_state.torque;
+  }
   return true;
 }

@@ -1,7 +1,5 @@
 #pragma once
 
-#include <mutex>
-#include <thread>
 #include "dm_motor_driver.h"
 #include "gripper_ctrl_base.h"
 
@@ -13,13 +11,9 @@ class GeniArmGripper : public GripperCtrlBase {
   void Init() override;
   void Enable() override;
   void Disable() override;
-  void Shutdown() override;
   bool ReceiveState(GripperState& state) override;
   bool SendCommand(const GripperCommand& command) override;
 
  private:
   DmMotorDriver& motor_driver_;
-  GripperState last_gripper_state_{};
-  std::mutex state_mutex_;
-  std::jthread state_update_thread_;
 };

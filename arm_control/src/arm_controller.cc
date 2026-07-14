@@ -149,6 +149,10 @@ void ArmController::SetTrajectoryMode(TrajectoryMode mode) {
   traj_planning_mode = mode;
 }
 
+void ArmController::SetDynamicsModel(const std::vector<Dynamics::Link>& links, const std::vector<double>& g) {
+  dynamics_ = std::make_unique<Dynamics>(mdh_params_, links, g);
+}
+
 void ArmController::StopSampleThread() {
   if (sampling_thread_.joinable()) {
     sampling_thread_.request_stop();
@@ -244,8 +248,9 @@ void ArmController::StartSampleThread() {
 }
 
 int ArmController::GetCurrentPose(ArmMotion::Pose6Dof& current_pose) {
-  std::lock_guard<std::mutex> lock(state_mutex_);
-  if (!kinematic_solver_->FK(current_state_.position, current_pose)) {
+  ArmMotion::Joint6Dof current_joint;
+  GetCurrentJoint(current_joint);
+  if (!kinematic_solver_->FK(current_joint, current_pose)) {
     ARM_LOG_ERROR("[GetCurrentPose] failed: FK");
     return -1;
   }
@@ -288,10 +293,53 @@ bool ArmController::GetJointCommand(ArmMotion::JointCommand& joint_command) {
   return false;
 }
 
-void ArmController::WaitForCompletion() {
+int ArmController::WaitForCompletion() {
   while (motion_state_.load() != MotionState::IDLE || !command_queue_.IsEmpty()) {
     std::this_thread::yield();
   }
+  return 0;
+}
+
+int ArmController::WaitForCompletion(ArmMotion::Joint6Dof& target, uint32_t timeout_ms) {
+  auto t0 = std::chrono::steady_clock::now();
+  double period = 1.0 / sample_frequency_;
+  ArmMotion::Joint6Dof current;
+  for (int i=0; i < timeout_ms; ++i) {
+    GetCurrentJoint(current);
+    if (JointPathLength(current, target) < 0.01) {
+      return 0;
+    }
+    auto t1 = std::chrono::steady_clock::now();
+    auto ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+    if (ms > timeout_ms) {
+      ARM_LOG_WARN("[WaitForCompletion] timeout: current joint={:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}",
+                   current[0], current[1], current[2], current[3], current[4], current[5]);
+      return -1;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(period * 1000)));
+  }
+  return -1;
+}
+
+int ArmController::WaitForCompletion(ArmMotion::Pose6Dof& target, uint32_t timeout_ms) {
+  auto t0 = std::chrono::steady_clock::now();
+  double period = 1.0 / sample_frequency_;
+  ArmMotion::Pose6Dof current;
+  for (int i=0; i < timeout_ms; ++i) {
+    GetCurrentPose(current);
+    if (CartesianPosDistance(current, target) < 0.005) {
+      return 0;
+    }
+    auto t1 = std::chrono::steady_clock::now();
+    auto ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
+    if (ms > timeout_ms) {
+      ARM_LOG_WARN("[WaitForCompletion] timeout: current pose={:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}",
+                   current.x, current.y, current.z, current.quat.x, current.quat.y, current.quat.z, current.quat.w);
+      return -1;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(period * 1000)));
+  }
+  return -1;
 }
 
 int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
@@ -387,8 +435,11 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     // s6h4d特殊处理
     if (robot_name_ == "s6h4d") {
       cmd.effort = joint_acc;
+    } else {
+      // 重力补偿
+      dynamics_->GravityVector(target_joint, cmd.effort);
     }
-    // 本地更新参考关节角，避免下个采样点再读锁
+    // 本地更新参考关节角
     current_joint = target_joint;
     return true;
   };
@@ -468,8 +519,10 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
     cmd.damping = motor_damping_;
     if (robot_name_ == "s6h4d") {
       cmd.effort = point.acceleration;
+    } else {
+      // 重力补偿
+      dynamics_->GravityVector(point.position, cmd.effort);
     }
-    // TODO: 力矩支持
     return true;
   };
 
@@ -575,8 +628,10 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     cmd.damping = motor_damping_;
     if (robot_name_ == "s6h4d") {
       cmd.effort = joint_acc;
+    } else {
+      dynamics_->GravityVector(target_joint, cmd.effort);
     }
-    // 本地更新参考关节角，避免下个采样点再读锁
+    // 本地更新参考关节角
     current_joint = target_joint;
     return true;
   };
@@ -670,6 +725,8 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
     cmd.damping = motor_damping_;
     if (robot_name_ == "s6h4d") {
       cmd.effort = point.acceleration;
+    } else {
+      dynamics_->GravityVector(point.position, cmd.effort);
     }
     return true;
   };

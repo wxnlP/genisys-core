@@ -1,4 +1,5 @@
 #include "arm_manager.h"
+#include <Eigen/Geometry>
 #include "arm_logger.h"
 #include "yaml-cpp/yaml.h"
 
@@ -51,6 +52,12 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   arm_controller_ = std::make_shared<ArmController>(mdh_params, ik_mode);
   arm_controller_->SetRobotName(robot_name);
 
+  // Tool 配置缓存（用于后续统一打印）
+  bool tool_configured = false;
+  std::string tool_frame = "tcp";
+  double tool_xyz_cache[3] = {0.0, 0.0, 0.0};
+  double tool_rpy_cache_deg[3] = {0.0, 0.0, 0.0};
+
   // ============================================================
   //  5. MIT 参数 & 关节限位写入
   // ============================================================
@@ -71,6 +78,117 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   }
   arm_controller_->SetJointLimits(joint_min, joint_max);
   arm_controller_->SetMotorParams(arm_stiffness, arm_damping);
+
+  // ============================================================
+  //  Dynamics 配置（可选：从 YAML 文件或内联 node 读取）
+  // ============================================================
+  try {
+    std::vector<Dynamics::Link> links;
+    Dynamics::Link base{};
+    links.push_back(base);
+    std::vector<double> gravity;
+    if (robot_cfg["dynamics"]) {
+      if (!robot_cfg["dynamics"].IsScalar()) {
+        ARM_LOG_WARN("请输入正确的 Dynamics 配置文件名");
+      } else {
+        std::string dyn_file = "./cfg/" + robot_cfg["dynamics"].as<std::string>();
+        YAML::Node dyn_root = YAML::LoadFile(dyn_file)["dynamics"];
+
+        if (dyn_root["gravity"]) {
+          gravity = dyn_root["gravity"].as<std::vector<double>>();
+        }
+
+        if (dyn_root["links"]) {
+          for (const auto& l : dyn_root["links"]) {
+            Dynamics::Link link{};
+            link.mass = l["mass"].as<double>();
+            auto com = l["com"].as<std::vector<double>>();
+            if (com.size() != 3) {
+              ARM_LOG_ERROR("Dynamics 配置中 link 的 com 必须为 3 元素向量");
+              continue;
+            }
+            for (int i = 0; i < 3; ++i) {
+              link.com[i] = com[i];
+            }
+
+            auto inertia = l["inertia"];
+            double ixx = inertia["ixx"] ? inertia["ixx"].as<double>() : 0.0;
+            double iyy = inertia["iyy"] ? inertia["iyy"].as<double>() : 0.0;
+            double izz = inertia["izz"] ? inertia["izz"].as<double>() : 0.0;
+            double ixy = inertia["ixy"] ? inertia["ixy"].as<double>() : 0.0;
+            double ixz = inertia["ixz"] ? inertia["ixz"].as<double>() : 0.0;
+            double iyz = inertia["iyz"] ? inertia["iyz"].as<double>() : 0.0;
+            // 填充为行优先的 3x3 矩阵
+            link.inertia[0] = ixx;
+            link.inertia[1] = ixy;
+            link.inertia[2] = ixz;
+            link.inertia[3] = ixy;
+            link.inertia[4] = iyy;
+            link.inertia[5] = iyz;
+            link.inertia[6] = ixz;
+            link.inertia[7] = iyz;
+            link.inertia[8] = izz;
+            links.push_back(link);
+          }
+        }
+
+        if (!links.empty() || !gravity.empty()) {
+          arm_controller_->SetDynamicsModel(links, gravity);
+          ARM_LOG_INFO("Dynamics 初始化: links={}, gravity=[{:.3f}, {:.3f}, {:.3f}]",
+                       links.size(), gravity.size() > 0 ? gravity[0] : 0.0, gravity.size() > 1 ? gravity[1] : 0.0, gravity.size() > 2 ? gravity[2] : 0.0);
+        }
+      }
+    }
+  } catch (const std::exception& e) {
+    ARM_LOG_ERROR("加载 dynamics 配置失败: {}", e.what());
+    return;
+  }
+
+  // ============================================================
+  //  Tool 配置
+  // ============================================================
+  try {
+    YAML::Node tool_node;
+    if (robot_cfg["tool"]) {
+      tool_node = robot_cfg["tool"];
+    }
+
+    if (tool_node) {
+      if (tool_node["xyz"] && tool_node["rpy"]) {
+        auto xyz = tool_node["xyz"].as<std::vector<double>>();
+        auto rpy_deg = tool_node["rpy"].as<std::vector<double>>();
+        if (xyz.size() == 3 && rpy_deg.size() == 3) {
+          const double kDeg2Rad = M_PI / 180.0;
+          double roll = rpy_deg[0] * kDeg2Rad;   // Rx
+          double pitch = rpy_deg[1] * kDeg2Rad;  // Ry
+          double yaw = rpy_deg[2] * kDeg2Rad;    // Rz
+
+          Eigen::AngleAxisd rx(roll, Eigen::Vector3d::UnitX());
+          Eigen::AngleAxisd ry(pitch, Eigen::Vector3d::UnitY());
+          Eigen::AngleAxisd rz(yaw, Eigen::Vector3d::UnitZ());
+          Eigen::Quaterniond q = rz * ry * rx;  // ZYX sequence
+
+          ArmMotion::Pose6Dof tool_pose{};
+          tool_pose.x = xyz[0];
+          tool_pose.y = xyz[1];
+          tool_pose.z = xyz[2];
+          tool_pose.quat = ArmMotion::Quaternion(q.w(), q.x(), q.y(), q.z());
+
+          arm_controller_->SetToolPose(tool_pose);
+
+          // 缓存配置，延迟到初始化打印中统一输出
+          tool_configured = true;
+          tool_frame = tool_node["frame"] ? tool_node["frame"].as<std::string>() : std::string("tcp");
+          tool_xyz_cache[0] = xyz[0]; tool_xyz_cache[1] = xyz[1]; tool_xyz_cache[2] = xyz[2];
+          tool_rpy_cache_deg[0] = rpy_deg[0]; tool_rpy_cache_deg[1] = rpy_deg[1]; tool_rpy_cache_deg[2] = rpy_deg[2];
+        } else {
+          ARM_LOG_WARN("tool.xyz 或 tool.rpy 长度不为 3，忽略 Tool 设置");
+        }
+      }
+    }
+  } catch (const std::exception& e) {
+    ARM_LOG_ERROR("解析 tool 配置失败: {}", e.what());
+  }
 
   // ============================================================
   //  6. 轨迹模式
@@ -97,8 +215,8 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   //  8. 夹爪控制器 — 仅在配置中存在时创建
   // ============================================================
   double gripper_stiffness = 0.0, gripper_damping = 0.0, gripper_max_range = 0.0;
-  if (config["gripper"]) {
-    auto gripper_cfg = config["gripper"];
+  if (robot_cfg["gripper"]) {
+    auto gripper_cfg = robot_cfg["gripper"];
     gripper_stiffness = gripper_cfg["MIT"]["stiffness"].as<double>();
     gripper_damping = gripper_cfg["MIT"]["damping"].as<double>();
     gripper_max_range = gripper_cfg["max_range"].as<double>();
@@ -155,12 +273,20 @@ ArmManager::ArmManager(const std::string& yaml_file) {
     ARM_LOG_INFO("{}", kSepM);
     ARM_LOG_INFO("  Trajectory: {}", traj_mode_str);
     if (gripper_controller_) {
-      ARM_LOG_INFO("  Gripper:    range={:.3f}, K={:.1f}, D={:.1f}",
+      ARM_LOG_INFO("  Gripper:    range={:.3f}, stiffness={:.1f}, damping={:.1f}",
                    gripper_max_range, gripper_stiffness, gripper_damping);
     } else {
       ARM_LOG_INFO("  Gripper:    (未配置)");
     }
+    // Tool 信息（如果配置则打印）
+    if (tool_configured) {
+      ARM_LOG_INFO("  TCP:       frame={}, xyz=[{:.3f}, {:.3f}, {:.3f}], rpy(deg)=[{:.3f}, {:.3f}, {:.3f}]",
+                   tool_frame,
+                   tool_xyz_cache[0], tool_xyz_cache[1], tool_xyz_cache[2],
+                   tool_rpy_cache_deg[0], tool_rpy_cache_deg[1], tool_rpy_cache_deg[2]);
+    } else {
+      ARM_LOG_INFO("  Tool:       (未配置)");
+    }
     ARM_LOG_INFO("{}", kSepH);
   }
 }
-

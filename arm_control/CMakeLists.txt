@@ -16,6 +16,7 @@ target_link_libraries(${CUR_TARGET_NAME} PUBLIC Eigen3::Eigen yaml-cpp)
 target_sources(${CUR_TARGET_NAME} PRIVATE
     src/kinematic.cc
     src/jacobian.cc
+    src/dynamics.cc
     src/cubic_time_scaler.cc
     src/lspb_time_scaler.cc
     src/quintic_time_scaler.cc

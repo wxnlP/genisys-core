@@ -11,6 +11,7 @@
 #include "jacobian.h"
 #include "joint_trajectory.h"
 #include "kinematic.h"
+#include "dynamics.h"
 #include "spsc_ring_buffer.h"
 #include "time_scaler_base.h"
 
@@ -24,6 +25,7 @@ class ArmController {
 
   ArmController(const ArmMotion::MDHParams& mdh_params,
                 KinematicSolver::IKMode ik_mode = KinematicSolver::IKMode::SphericalWrist) {
+    mdh_params_ = mdh_params;
     kinematic_solver_ = std::make_unique<KinematicSolver>(mdh_params);
     kinematic_solver_->SetIKMode(ik_mode);
     jacobian_ = std::make_unique<Jacobian6Dof>(mdh_params);
@@ -37,6 +39,7 @@ class ArmController {
   void StopSampleThread();
   void SetSampleFrequency(double hz) { sample_frequency_ = hz; }
   double GetSampleFrequency() const { return sample_frequency_; }
+  void SetDynamicsModel(const std::vector<Dynamics::Link>& links, const std::vector<double>& g);
 
   int GetCurrentPose(ArmMotion::Pose6Dof& current_pose);
   int GetCurrentJoint(ArmMotion::Joint6Dof& current_joint);
@@ -49,7 +52,9 @@ class ArmController {
   void SetJointState(const ArmMotion::JointState& joint_state);
   bool GetJointCommand(ArmMotion::JointCommand& joint_command);
 
-  void WaitForCompletion();
+  int WaitForCompletion();
+  int WaitForCompletion(ArmMotion::Joint6Dof& target, uint32_t timeout_ms);
+  int WaitForCompletion(ArmMotion::Pose6Dof& target, uint32_t timeout_ms);
 
   int MoveL(ArmMotion::Pose6Dof target_pose, double v, double a);
   int MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a);
@@ -75,6 +80,9 @@ class ArmController {
  private:
   std::unique_ptr<KinematicSolver> kinematic_solver_;
   std::unique_ptr<Jacobian6Dof> jacobian_;
+  std::unique_ptr<Dynamics> dynamics_;
+
+  ArmMotion::MDHParams mdh_params_;
 
   ArmMotion::Joint6Dof motor_stiffness_{};
   ArmMotion::Joint6Dof motor_damping_{};

@@ -59,9 +59,12 @@ class ArmController {
 
   int MoveL(ArmMotion::Pose6Dof target_pose, double v, double a);
   int MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a);
+  int MoveJ(ArmMotion::Pose6Dof target_pose, double v, double a);
   int MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, double r, double v, double a);
   int MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, double r, double v, double a);
+  int MoveJMulti(const std::vector<ArmMotion::Pose6Dof>& points, double r, double v, double a);
   int ServoJ(const ArmMotion::Joint6Dof& target_joint, double dt);
+  int ServoJ(const ArmMotion::Pose6Dof& target_pose, double dt);
   int ServoL(const ArmMotion::Pose6Dof& target_pose, double dt);
   void ServoStop();
 

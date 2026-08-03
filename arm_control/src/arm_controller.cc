@@ -536,6 +536,27 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
   return 0;
 }
 
+int ArmController::MoveJ(ArmMotion::Pose6Dof target_pose, double v, double a) {
+  ArmMotion::Joint6Dof current_joint;
+  GetCurrentJoint(current_joint);
+
+  // 逆解得到目标关节角，优先选择接近当前关节角的解
+  ArmMotion::IKSolves ik_solves;
+  if (!kinematic_solver_->IK(target_pose, current_joint, ik_solves)) {
+    ARM_LOG_ERROR("[MoveJ] failed: IK at target pose=({}, {}, {})",
+                  target_pose.x, target_pose.y, target_pose.z);
+    return -1;
+  }
+  ArmMotion::Joint6Dof target_joint;
+  if (!SelectBestIKSolve(ik_solves, current_joint, target_joint)) {
+    ARM_LOG_ERROR("[MoveJ] failed: no valid IK solve at target pose=({}, {}, {})",
+                  target_pose.x, target_pose.y, target_pose.z);
+    return -1;
+  }
+
+  return MoveJ(target_joint, v, a);
+}
+
 int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, double r, double v, double a) {
   if (points.size() < 1) {
     ARM_LOG_ERROR("[MoveLMulti] failed: points size {} < 1", points.size());
@@ -741,6 +762,37 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
   return 0;
 }
 
+int ArmController::MoveJMulti(const std::vector<ArmMotion::Pose6Dof>& points, double r, double v, double a) {
+  if (points.size() < 2) {
+    ARM_LOG_ERROR("[MoveJMulti] failed: points size {} < 2", points.size());
+    return -1;
+  }
+
+  ArmMotion::Joint6Dof current_joint;
+  GetCurrentJoint(current_joint);
+
+  // 逐个位姿逆解，每个点以上一个点的关节解作为参考，保证路径连续性
+  std::vector<ArmMotion::Joint6Dof> joint_points;
+  joint_points.reserve(points.size());
+  ArmMotion::Joint6Dof reference_joint = current_joint;
+  for (size_t p = 0; p < points.size(); ++p) {
+    ArmMotion::IKSolves ik_solves;
+    if (!kinematic_solver_->IK(points[p], reference_joint, ik_solves)) {
+      ARM_LOG_ERROR("[MoveJMulti] failed: IK at point {}", p);
+      return -1;
+    }
+    ArmMotion::Joint6Dof target_joint;
+    if (!SelectBestIKSolve(ik_solves, reference_joint, target_joint)) {
+      ARM_LOG_ERROR("[MoveJMulti] failed: no valid IK solve at point {}", p);
+      return -1;
+    }
+    joint_points.push_back(target_joint);
+    reference_joint = target_joint;
+  }
+
+  return MoveJMulti(joint_points, r, v, a);
+}
+
 int ArmController::ServoJ(const ArmMotion::Joint6Dof& target_joint, double dt) {
   if (dt <= 0.0) {
     ARM_LOG_ERROR("[ServoJ] failed: duration must be positive");
@@ -784,6 +836,36 @@ int ArmController::ServoJ(const ArmMotion::Joint6Dof& target_joint, double dt) {
   }
   sample_cv_.notify_one();
   return 0;
+}
+
+int ArmController::ServoJ(const ArmMotion::Pose6Dof& target_pose, double dt) {
+  if (dt <= 0.0) {
+    ARM_LOG_ERROR("[ServoJ] failed: duration must be positive");
+    return -1;
+  }
+
+  // 优先用上一次 servo 的目标关节作为逆解参考，保证连续 servo 时解分支稳定
+  ArmMotion::Joint6Dof reference_joint;
+  if (prev_servo_joint_.has_value()) {
+    reference_joint = prev_servo_joint_.value();
+  } else {
+    GetCurrentJoint(reference_joint);
+  }
+
+  ArmMotion::IKSolves ik_solves;
+  if (!kinematic_solver_->IK(target_pose, reference_joint, ik_solves)) {
+    ARM_LOG_ERROR("[ServoJ] failed: IK at target pose=({}, {}, {})",
+                  target_pose.x, target_pose.y, target_pose.z);
+    return -1;
+  }
+  ArmMotion::Joint6Dof target_joint;
+  if (!SelectBestIKSolve(ik_solves, reference_joint, target_joint)) {
+    ARM_LOG_ERROR("[ServoJ] failed: no valid IK solve at target pose=({}, {}, {})",
+                  target_pose.x, target_pose.y, target_pose.z);
+    return -1;
+  }
+
+  return ServoJ(target_joint, dt);
 }
 
 int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {

@@ -7,6 +7,7 @@
 #include <queue>
 #include <thread>
 #include <vector>
+#include <optional>
 #include "cartesian_trajectory.h"
 #include "jacobian.h"
 #include "joint_trajectory.h"
@@ -60,6 +61,9 @@ class ArmController {
   int MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a);
   int MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, double r, double v, double a);
   int MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, double r, double v, double a);
+  int ServoJ(const ArmMotion::Joint6Dof& target_joint, double dt);
+  int ServoL(const ArmMotion::Pose6Dof& target_pose, double dt);
+  void ServoStop();
 
   void SetRobotName(std::string name) { robot_name_ = name; }
 
@@ -102,6 +106,8 @@ class ArmController {
   std::atomic<MotionState> motion_state_{MotionState::IDLE};     // 采样线程运动状态
   SPSCRingBuffer<ArmMotion::JointCommand> command_queue_{8192};  // 待执行的关节命令队列
   std::deque<SampleContext> sample_queue_;                       // 待采样的轨迹队列
+  std::optional<ArmMotion::Joint6Dof> prev_servo_joint_;
+  std::optional<ArmMotion::Pose6Dof> prev_servo_pose_;
 
   std::string robot_name_;
 };

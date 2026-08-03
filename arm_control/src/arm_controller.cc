@@ -3,6 +3,7 @@
 #include <cmath>
 #include <cstring>
 #include <thread>
+#include <Eigen/Dense>
 #include "arm_logger.h"
 #include "cartesian_linear_path.h"
 #include "cartesian_multi_point_path.h"
@@ -738,4 +739,143 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
   }
   sample_cv_.notify_one();
   return 0;
+}
+
+int ArmController::ServoJ(const ArmMotion::Joint6Dof& target_joint, double dt) {
+  if (dt <= 0.0) {
+    ARM_LOG_ERROR("[ServoJ] failed: duration must be positive");
+    return -1;
+  }
+
+  for (int i = 0; i < 6; ++i) {
+    if (target_joint[i] < joint_min_[i] - kLimitEps || target_joint[i] > joint_max_[i] + kLimitEps) {
+      ARM_LOG_ERROR("[ServoJ] target joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
+                    i, target_joint[i], joint_min_[i], joint_max_[i]);
+      return -1;
+    }
+  }
+
+  // 单独处理首次servo
+  if (!prev_servo_joint_.has_value()) {
+    ArmMotion::Joint6Dof current_joint;
+    GetCurrentJoint(current_joint);
+    prev_servo_joint_ = current_joint;
+  } 
+
+  ArmMotion::Joint6Dof q_prev = prev_servo_joint_.value();
+  ArmMotion::Joint6Dof q_now = target_joint;
+  prev_servo_joint_ = q_now;
+
+  SampleTask task = [this, q_prev, q_now, dt](double t, ArmMotion::JointCommand& cmd) {
+    for (int i = 0; i < 6; ++i) {
+      // 线性插值
+      cmd.position[i] = q_prev[i] + (q_now[i] - q_prev[i]) * t / dt;
+      cmd.velocity[i] = (q_now[i] - q_prev[i]) / dt;
+      cmd.stiffness[i] = motor_stiffness_[i];
+      cmd.damping[i] = motor_damping_[i];
+    }
+    return true;
+  };
+
+  {
+    std::lock_guard<std::mutex> lock(sample_mutex_);
+    sample_queue_.emplace_back(std::move(task), dt);
+    motion_state_.store(MotionState::ACTIVE);
+  }
+  sample_cv_.notify_one();
+  return 0;
+}
+
+int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
+  if (dt <= 0.0) {
+    ARM_LOG_ERROR("[ServoL] failed: duration must be positive");
+    return -1;
+  }
+
+  ArmMotion::Joint6Dof current_joint;
+  GetCurrentJoint(current_joint);
+  for (int i = 0; i < 6; ++i) {
+    if (current_joint[i] < joint_min_[i]) {
+      current_joint[i] = joint_min_[i];
+    } else if (current_joint[i] > joint_max_[i]) {
+      current_joint[i] = joint_max_[i];
+    }
+  }
+
+  // 单独处理首次servo
+  if (!prev_servo_pose_.has_value()) {
+    ArmMotion::Pose6Dof current_pose;
+    GetCurrentPose(current_pose);
+    prev_servo_pose_ = current_pose;
+  }
+
+  ArmMotion::Pose6Dof p_prev = prev_servo_pose_.value();
+  ArmMotion::Pose6Dof p_now = target_pose;
+  prev_servo_pose_ = p_now;
+
+  SampleTask task = [this, p_prev, p_now, dt, current_joint](double t, ArmMotion::JointCommand& cmd) mutable {
+    ArmMotion::Pose6Dof interp_pose;
+    // 线性插值（位置）
+    const double s = std::clamp(t / dt, 0.0, 1.0);
+    interp_pose.x = p_prev.x + (p_now.x - p_prev.x) * s;
+    interp_pose.y = p_prev.y + (p_now.y - p_prev.y) * s;
+    interp_pose.z = p_prev.z + (p_now.z - p_prev.z) * s;
+
+    // 球面线性插值 (Slerp) 四元数
+    Eigen::Quaterniond q0(p_prev.quat.w, p_prev.quat.x, p_prev.quat.y, p_prev.quat.z);
+    Eigen::Quaterniond q1(p_now.quat.w, p_now.quat.x, p_now.quat.y, p_now.quat.z);
+    q0.normalize();
+    q1.normalize();
+    Eigen::Quaterniond qi = q0.slerp(s, q1);
+    interp_pose.quat.x = qi.x();
+    interp_pose.quat.y = qi.y();
+    interp_pose.quat.z = qi.z();
+    interp_pose.quat.w = qi.w();
+
+    ArmMotion::IKSolves ik_solves;
+    if (!kinematic_solver_->IK(interp_pose, current_joint, ik_solves)) {
+      ARM_LOG_ERROR("[ServoL] failed: IK at t={}, pose=({}, {}, {})",
+                    t, interp_pose.x, interp_pose.y, interp_pose.z);
+      return false;
+    }
+
+    ArmMotion::Joint6Dof target_joint;
+    if (!SelectBestIKSolve(ik_solves, current_joint, target_joint)) {
+      ARM_LOG_ERROR("[ServoL] failed: no valid IK solve at t={}", t);
+      return false;
+    }
+
+    for (int i = 0; i < 6; ++i) {
+      if (target_joint[i] < joint_min_[i] - kLimitEps || target_joint[i] > joint_max_[i] + kLimitEps) {
+        ARM_LOG_ERROR("[ServoL] trajectory point joint[{}]={:.4f} out of limit at t={}",
+                      i, target_joint[i], t);
+        return false;
+      }
+    }
+
+    // 差分：速度 = 相邻参考解之差 × 采样频率
+    for (int i = 0; i < 6; ++i) {
+      cmd.position[i] = target_joint[i];
+      cmd.velocity[i] = (target_joint[i] - current_joint[i]) * sample_frequency_;
+      cmd.stiffness[i] = motor_stiffness_[i];
+      cmd.damping[i] = motor_damping_[i];
+    }
+    // 本地更新参考关节角
+    current_joint = target_joint;
+    return true;
+  };
+
+  {
+    std::lock_guard<std::mutex> lock(sample_mutex_);
+    sample_queue_.emplace_back(std::move(task), dt);
+    motion_state_.store(MotionState::ACTIVE);
+  }
+  sample_cv_.notify_one();
+  return 0;
+}
+
+
+void ArmController::ServoStop() {
+  prev_servo_joint_.reset();
+  prev_servo_pose_.reset();
 }

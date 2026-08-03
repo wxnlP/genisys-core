@@ -1,6 +1,16 @@
 # Robotic Arm SDK
 
-> 面向六轴协作机械臂的模块化运动控制 SDK，提供从**硬件驱动 → 运动规划 → 实时控制**的完整软件栈。核心设计理念为**分层抽象与接口解耦**，支持适配不同构型的机械臂硬件。
+> 面向六轴协作机械臂的模块化运动控制 SDK，覆盖从**硬件驱动 → 运动规划 → 实时控制**的完整软件栈。核心设计目标：**层间解耦、算法可插拔、配置驱动装配**——新增机械臂硬件、轨迹算法、机器人构型时，尽量不触碰已有代码。
+
+---
+
+## 设计理念
+
+SDK 围绕三个原则构建：
+
+1. **接口解耦**：层与层之间只依赖纯虚接口（`ArmCtrlBase`、`JointPathBase`、`TimeScalerBase` 等），不依赖具体实现；集成调度层只持有接口指针，不认识任何具体类。
+2. **策略化算法**：路径、时间缩放等算法以策略模式组合进轨迹，新增一种算法 = 继承抽象基类 + 注册一个工厂分支，两处改动、零侵入。
+3. **配置驱动装配**：对象由 YAML 描述装配，同一套运动规划代码只需更换配置文件即可适配不同机械臂。
 
 ---
 
@@ -8,100 +18,189 @@
 
 ```
 robotic_arm_sdk
-├── actuator                   # ── 驱动抽象层 ──
-│   ├── include
-│   │   ├── arm_ctrl_base.h      # 机械臂驱动抽象基类
-│   │   ├── gripper_ctrl_base.h  # 夹爪驱动抽象基类
-│   │   ├── actuator_manager.h   # 执行器管理
-│   ├── src                      # 各驱动实现
-│   └── third_party							 # 第三方依赖
+├── actuator/                     # ── 驱动抽象层（静态库 actuator_controller）──
+│   ├── include/
+│   │   ├── arm_ctrl_base.h           # 机械臂驱动纯虚接口
+│   │   ├── gripper_ctrl_base.h       # 夹爪驱动纯虚接口
+│   │   ├── actuator_manager.h        # 驱动层 YAML 工厂
+│   │   ├── geniarm_ctrl.h            # GeniArm 驱动实现（CAN FD / DM 电机）
+│   │   ├── s6h4d_ctrl.h              # S6H4D 驱动实现（串口）
+│   │   └── geniarm_gripper.h         # GeniArm 夹爪驱动实现
+│   ├── src/
+│   └── third_party/                  # dm_driver / serial 等第三方依赖
 │
-├── arm_control                # ── 运动规划层 ──
-│   ├── include
-│   │   ├── arm_type.h           			# 公共数据结构
-│   │   ├── kinematic.h          			# 运动学求解器（FK / IK）
-│   │   ├── jacobian.h           			# 雅可比矩阵（速度/加速度正逆解）
-│   │   ├── arm_controller.h     			# 高层运动接口
-│   │   ├── gripper_controller.h 			# 夹爪位置控制
-│   │   ├── joint_path_base.h    			# 关节空间路径抽象基类
-│   │   ├── joint_path.h         			# 单段关节直线路径
+├── arm_control/                  # ── 运动规划层（静态库 arm_controller）──
+│   ├── include/
+│   │   ├── arm_type.h                # 公共数据结构（Joint6Dof / Pose6Dof ...）
+│   │   ├── kinematic.h               # 运动学求解器（FK / IK，双 IK 模式）
+│   │   ├── jacobian.h                # 雅可比矩阵（速度/加速度正逆解）
+│   │   ├── arm_controller.h          # 高层运动接口（MoveJ/L/Multi/Servo ...）
+│   │   ├── gripper_controller.h      # 夹爪位置控制
+│   │   ├── joint_path_base.h         # 关节路径抽象基类
+│   │   ├── joint_path.h              # 单段关节直线路径
 │   │   ├── joint_multi_point_path.h  # 多点关节路径（抛物线融合）
-│   │   ├── cartesian_path_base.h     # 笛卡尔空间路径抽象基类
+│   │   ├── cartesian_path_base.h     # 笛卡尔路径抽象基类
 │   │   ├── cartesian_linear_path.h   # 单段笛卡尔直线路径
-│   │   ├── cartesian_multi_point_path.h  # 多点笛卡尔路径（圆弧融合 + Slerp）
-│   │   ├── joint_trajectory.h         # 关节轨迹（路径 + 时间缩放）
-│   │   ├── cartesian_trajectory.h     # 笛卡尔轨迹（路径 + 时间缩放）
-│   │   ├── time_scaler_base.h         # 时间缩放抽象基类
-│   │   ├── cubic_time_scaler.h        # 三次多项式时间缩放
-│   │   ├── lspb_time_scaler.h         # 梯形加减速时间缩放
-│   │   ├── quintic_time_scaler.h      # 五次多项式时间缩放
-│   │   └── arm_manager.h             
-│   └── src
-├── cfg/                       # ── 配置文件 ──
-│   ├── robo_manager.yaml        	 # 顶层配置（引用 actuator + arm 配置）
-│   ├── geniarm_actuator_cfg.yaml  # GeniArm 电机驱动参数
-│   ├── geniarm_body_cfg.yaml      # GeniArm 运动学/动力学参数
-│   ├── s6h4d_actuator_cfg.yaml    # S6H4D 串口驱动参数
-│   ├── s6h4d_body_cfg.yaml        # S6H4D 运动学参数
-│   └── dynamics.yaml              # 动力学参数（质量/惯量/摩擦）
+│   │   ├── cartesian_multi_point_path.h # 多点笛卡尔路径（圆弧融合 + Slerp）
+│   │   ├── joint_trajectory.h        # 关节轨迹 = 路径 + 时间缩放
+│   │   ├── cartesian_trajectory.h    # 笛卡尔轨迹 = 路径 + 时间缩放
+│   │   ├── time_scaler_base.h        # 时间缩放抽象基类
+│   │   ├── cubic_time_scaler.h       # 三次多项式时间缩放
+│   │   ├── lspb_time_scaler.h        # 梯形加减速时间缩放
+│   │   ├── quintic_time_scaler.h     # 五次多项式时间缩放
+│   │   └── arm_manager.h             # 规划层 YAML 工厂
+│   └── src/
 │
-├── example/                   # 使用示例
+├── robo_manager/                 # ── 集成调度层（静态库 robotic_arm_sdk）──
+│   ├── robo_manager.h
+│   └── robo_manager.cc               # 实时控制循环（默认 200 Hz）
 │
-├── tools/                     # 辅助工具
-│   ├── cartesian_plot.py      # 笛卡尔轨迹可视化
-│   └── joints_pos_plot.py     # 关节轨迹可视化
-│
-└── VERSION                    # 版本号
+├── cfg/                          # 配置文件（驱动参数 + 机械臂参数）
+├── example/                      # 使用示例
+├── tools/                        # 轨迹可视化脚本
+├── ADAPTATION.md                 # 机械臂适配指南
+└── VERSION
 ```
 
 ---
 
-## 程序架构
+## 架构与依赖方向
 
-SDK 采用**三层纵向解耦**设计，层间通过纯虚接口与 YAML 工厂解耦，每一层均可独立扩展。
+SDK 采用**纵向三层解耦**结构，层间只通过接口与布局一致的数据结构通信：
 
 ```
- ┌──────────────────────────────────────────────────┐
- │              集成调度层 robo_manager               │
- │  RoboManager 协调驱动层与规划层，驱动实时控制循环      │
- ├──────────────────────────────────────────────────┤
- │              运动规划层 arm_control                │
- │  ArmController 运动学 + 路径 + 轨迹规划算法          │
- ├──────────────────────────────────────────────────┤
- │              驱动抽象层 actuator                   │
- │  ArmCtrlBase / GripperCtrlBase 硬件抽象接口        │
- └──────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│           集成调度层  RoboManager（可整体替换）                   │
+│   实时控制循环：读取驱动反馈 → 取规划指令 → 下发驱动指令              │
+└───────────────┬────────────────────────────────┬──────────────┘
+                │ 依赖接口 / 高层类                 │ 依赖纯虚接口
+        ┌───────▼──────────┐          ┌───────────▼───────────┐
+        │   运动规划层       │          │     驱动抽象层         │
+        │   arm_controller  │          │  actuator_controller  │
+        │   静态库           │          │      静态库            │
+        └───────────────────┘          └───────────────────────┘
+
+     规划层 ⇄ 驱动层：零编译期依赖，仅通过内存布局一致的数据结构交换
 ```
 
-**扩展切入点：**
-
-| 层 | 扩展方向 | 难度 |
-|----|----------|------|
-| 驱动抽象层 | 适配不同机械臂硬件（CAN FD / 串口 / EtherCAT ...） | ★★☆ |
-| 运动规划层 | 新增路径/时间缩放算法，运动学求解器 | ★☆☆ |
-| 集成调度层 | 原则上无需修改，直接复用 | — |
+最关键的约束是：**`arm_control` 与 `actuator` 是两个完全独立的静态库**。规划层不知道 CAN、串口、EtherCAT 的存在；驱动层不知道路径、轨迹、运动学的存在。两者通过布局一致的数据结构（`JointCommand` / `JointState`）交换数据，某一层内部演进不影响另一层重新编译。
 
 ---
 
-### 驱动抽象层 — 适配不同硬件
+## 核心解耦设计
 
-`ArmCtrlBase` 定义机械臂驱动的纯虚接口，`GripperCtrlBase` 定义夹爪接口。现有 `GeniArmCtrl`（CAN FD / DM 电机）和 `S6h4dCtrl`（串口）两种实现。
+### 1. 接口解耦：层间只见抽象
 
-**扩展方式：** 继承 `ArmCtrlBase` 实现核心方法，在 `ActuatorManager` 中增加 `name` 分支即可。详情见 [`ADAPTATION.md`](./ADAPTATION.md)。
+SDK 中所有可替换组件都收敛到一组抽象接口：
 
-### 运动规划层 — 可插拔算法
+| 抽象接口 | 所属层 | 职责 |
+|----------|--------|------|
+| `ArmCtrlBase` | 驱动层 | 机械臂指令下发 / 状态读取（`SetJointState` / `GetJointState` / `SetCtrlMode`） |
+| `GripperCtrlBase` | 驱动层 | 夹爪指令下发 / 状态读取 |
+| `JointPathBase` / `CartesianPathBase` | 规划层 | 路径几何（`EvaluatePos` / `EvaluateTangent`） |
+| `TimeScalerBase` | 规划层 | 时间分配（`Plan` / `Evaluate` / `GetDuration`） |
+| `KinematicSolver` | 规划层 | 运动学求解（FK / IK），内置双 IK 模式 |
 
-`ArmController` 对外暴露 `MoveJ` / `MoveL` / `MoveJMulti` / `MoveLMulti` 等接口。内部通过策略模式组合：
+集成层（`RoboManager`）通过 `shared_ptr` 持有这些接口，控制循环里只做三件事——读反馈、取指令、发指令——从不关心具体驱动走的是 CAN 还是串口，也不关心轨迹是如何规划的。
 
-- **路径**：`JointPathBase` / `CartesianPathBase` 抽象，现有直线、多点抛物线融合、圆弧融合实现；
-- **时间缩放**：`TimeScalerBase` 抽象，现有 Cubic / LSPB / Quintic 实现，可自由拓展其他轨迹平滑算法；
-- **运动学**：`KinematicSolver` 支持 `SphericalWrist` 和 `ParallelWrist` 两种 IK 模式。
+### 2. 策略模式：算法可插拔
 
-### 集成调度层 — 实时控制循环
+轨迹由**路径**与**时间缩放**两个策略对象组合而成：
 
-`RoboManager` 原则上只是一个调度层示例，强烈推荐使用基于AimRT实现的[robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)通信系统。
+```
+JointPathBase ─────┐
+                   ├──▶ JointTrajectory ──▶ ArmController 采样线程 ──▶ JointCommand
+TimeScalerBase ────┘
 
-### 配置文件体系
+CartesianPathBase ─┐
+                   ├──▶ CartesianTrajectory ──▶ IK ──▶ JointCommand
+TimeScalerBase ────┘
+```
+
+- **路径**：关节空间直线、多点抛物线融合；笛卡尔空间直线、多点圆弧融合 + Slerp，各自独立实现；
+- **时间缩放**：Cubic / LSPB / Quintic 三种，由 `ArmController::CreateTimeScaler()` 工厂按 `TrajectoryMode` 选择，新增平滑算法只需加一个枚举值和一个工厂分支；
+- **运动学**：`KinematicSolver` 内置 `SphericalWrist` / `ParallelWrist` 两种 IK 求解模式，可继续扩展新的求解器。
+
+所有现有路径与轨迹类只依赖抽象基类，因此新增算法对已有代码零侵入。
+
+### 3. 配置驱动：YAML 工厂装配
+
+对象装配链路如下：
+
+```
+robo_manager.yaml ──▶ RoboManager
+    ├── actuator_config ──▶ ActuatorManager ──▶ name 分支 ──▶ ArmCtrlBase 实现
+    └── arm_config     ──▶ ArmManager ──▶ KinematicSolver + ArmController
+```
+
+- `ActuatorManager` 依据 YAML 中 `actuator.arm.name` 选择驱动实现（`geniarm` / `s6h4d`），新增硬件只需新增一个 name 分支；
+- `ArmManager` 读取 MDH 参数、关节限位、IK 模式、控制参数并构造规划器；
+- 换一台不同构型的机械臂，通常**只改 YAML、不改代码**。
+
+### 4. 构建级解耦：集成层可整体替换
+
+SDK 产出三个独立静态库目标：
+
+| 目标 | 内容 | 依赖关系 |
+|------|------|----------|
+| `actuator_controller` | 驱动实现 + 工厂 | 不依赖规划层 |
+| `arm_controller` | 运动学 + 路径 + 轨迹 + 规划器 | 不依赖驱动层 |
+| `robotic_arm_sdk` | RoboManager 集成层 | 链接以上两者 |
+
+`RoboManager` 只是集成调度层的**参考实现**。接入 ROS2、AimRT 等通信中间件时，可以完全抛弃它，直接复用 `arm_controller` 与 `actuator_controller` 两个底层库自行编写通信适配层（参考 [robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)）。
+
+---
+
+## 可拓展性速查
+
+| 想做什么 | 需要改哪里 | 影响范围 | 难度 |
+|----------|-----------|----------|------|
+| 适配新的机械臂硬件 | 继承 `ArmCtrlBase` / `GripperCtrlBase`，`ActuatorManager` 加 name 分支，新增 YAML | 仅驱动层 | ★★☆ |
+| 新增轨迹平滑算法 | 继承 `TimeScalerBase`，加 `TrajectoryMode` 枚举值与工厂分支 | 仅规划层 | ★☆☆ |
+| 新增路径类型 | 继承 `JointPathBase` / `CartesianPathBase` | 仅规划层 | ★★☆ |
+| 适配新构型机械臂 | 配置 MDH / 限位 / IK 模式，必要时扩展 `KinematicSolver` | 配置文件或规划层 | ★★☆ |
+| 接入 ROS2 / AimRT 中间件 | 不链接 `robotic_arm_sdk`，复用两个底层库写通信层 | 仅集成层 | ★☆☆ |
+
+机械臂硬件适配的详细步骤见 [ADAPTATION.md](./ADAPTATION.md)。
+
+---
+
+## 扩展示例：新增一个时间缩放算法
+
+以新增"Jerk 限制"平滑算法为例，只需两步：
+
+1. 继承 `TimeScalerBase` 实现算法：
+
+```cpp
+class JerkLimitedTimeScaler : public TimeScalerBase {
+ public:
+  bool Plan(const PlanConfig& config) override { /* ... */ }
+  bool Evaluate(double t, State& state) const override { /* ... */ }
+  double GetDuration() const override { /* ... */ }
+};
+```
+
+2. 在 `ArmController` 中注册（新增枚举值 + 工厂分支）：
+
+```cpp
+enum class TrajectoryMode { LSPB, CUBIC, QUINTIC, JERK_LIMITED /* 新增 */ };
+
+std::unique_ptr<TimeScalerBase> ArmController::CreateTimeScaler(...) {
+  switch (traj_planning_mode) {
+    /* ... 已有分支 ... */
+    case TrajectoryMode::JERK_LIMITED:
+      return std::make_unique<JerkLimitedTimeScaler>();
+  }
+}
+```
+
+调用方无需任何改动：`arm->MoveJ(target, v, a)` 依旧生效。
+
+---
+
+## 配置文件体系
+
+驱动层与算法层配置分离，是"同代码、多机型"的基础。
 
 **驱动层 `xxx_actuator_cfg.yaml`：**
 
@@ -143,7 +242,7 @@ robot:
 | 库 | 用途 | 获取方式 |
 |----|------|----------|
 | Eigen3 | 矩阵运算 | 系统安装（`apt install libeigen3-dev`） |
-| yaml-cpp | YAML解析 | 系统安装（`apt install libyaml-cpp-dev`） |
+| yaml-cpp | YAML 解析 | 系统安装（`apt install libyaml-cpp-dev`） |
 
 编译：
 
@@ -171,12 +270,12 @@ int main() {
     gripper->PosControl(1.0, 0.5, 1.0, 0.0);
     gripper->WaitForCompletion();
 
-    // 关节运动
+    // 关节空间运动（MoveJ / MoveJMulti / ServoJ 同时支持位姿重载）
     ArmMotion::Joint6Dof target{0, 1.0, -1.0, 0, 0, 0};
     arm->MoveJ(target, 0.5, 0.3);
     arm->WaitForCompletion();
 
-    // 笛卡尔运动
+    // 笛卡尔空间运动
     ArmMotion::Pose6Dof pose;
     arm->GetCurrentPose(pose);
     pose.y += 0.1;
@@ -194,5 +293,5 @@ int main() {
 
 ## 项目引用与使用方式
 
-1. 直接使用纯 CPP SDK（即使用`RoboManager`），直接链接静态库`robotic_arm_sdk`;
-2. 适配 ROS2、AimRT等通信中间件，抛弃`RoboManager`，基于单独的静态库目标`arm_controller`和`actuator_controller`做通信架构适配。（参考[robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)）
+1. **纯 CPP 集成**：直接链接静态库 `robotic_arm_sdk`，使用 `RoboManager` 作为集成层；
+2. **中间件集成**：适配 ROS2、AimRT 等通信中间件时，抛弃 `RoboManager`，基于 `arm_controller` 与 `actuator_controller` 两个独立库目标自行实现通信架构（参考 [robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)）。

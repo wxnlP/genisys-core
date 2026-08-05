@@ -198,13 +198,16 @@ void ArmController::StartSampleThread() {
       auto t_last_push = std::chrono::steady_clock::now();
 
       while (t <= context.duration + 1e-7 && !stoken.stop_requested()) {
-        // 采样
-        if (!context.task(t, cmd)) break;
+        // 跳过 t=0 采样点
+        if (t > 1e-9) {
+          // 采样
+          if (!context.task(t, cmd)) break;
 
-        // 入队（满则重试，永不丢点）
-        while (!command_queue_.Push(cmd) && !stoken.stop_requested()) {
-          phase = Phase::BACKOFF;
-          std::this_thread::sleep_for(std::chrono::milliseconds(2));
+          // 入队（满则重试，永不丢点）
+          while (!command_queue_.Push(cmd) && !stoken.stop_requested()) {
+            phase = Phase::BACKOFF;
+            std::this_thread::sleep_for(std::chrono::milliseconds(2));
+          }
         }
         t += dt;
 

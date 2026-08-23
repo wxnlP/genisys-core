@@ -67,7 +67,7 @@ void SocketCANBus::Sample() {
 
 int SocketCANBus::Send(uint32_t id, const uint8_t *data, uint8_t len) {
   if (fd_mode_) {
-    return SocketCANFD_Send(socket_fd_, id, len, false, data);
+    return SocketCANFD_Send(socket_fd_, id, len, true, data);
   } else {
     return SocketCAN_Send(socket_fd_, id, len, data);
   }

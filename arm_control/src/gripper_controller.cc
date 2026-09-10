@@ -12,6 +12,12 @@ void GripperController::SetGripperState(double position, double velocity, double
   current_effort_ = effort;
 }
 
+int GripperController::GetCurrentPosition(double& position) {
+  std::lock_guard<std::mutex> lock(state_mutex_);
+  position = current_position_;
+  return 0;
+}
+
 int GripperController::GetGripperCommand(GripperCommand& command) {
   if (command_queue_.Pop(command)) {
     return 0;

@@ -15,6 +15,7 @@ class GripperController {
   GripperController(double stiffness, double damping) : stiffness_(stiffness), damping_(damping) {}
 
   void SetGripperState(double position, double velocity, double effort);
+  int GetCurrentPosition(double& position);
   int GetGripperCommand(GripperCommand& command);
   void SetMaxRange(double max_range) { max_range_ = max_range; }
   void SetSampleFrequency(double hz) { sample_frequency_ = hz; }

@@ -1,10 +1,15 @@
 #include <atomic>
+#include <chrono>
 #include <csignal>
+#include <cstring>
 #include <thread>
-#include "arm_logger.h"
+#include <vector>
+
+#include "actuator_manager.h"
 #include "arm_controller.h"
+#include "arm_logger.h"
+#include "arm_manager.h"
 #include "gripper_controller.h"
-#include "robo_manager.h"
 
 std::atomic<bool> g_running{true};
 void SignalHandler(int) { g_running = false; }
@@ -12,94 +17,112 @@ void SignalHandler(int) { g_running = false; }
 int main() {
   std::signal(SIGINT, SignalHandler);
 
-  RoboManager robo_manger("robo_manager.yaml");
-  auto arm = robo_manger.GetArmController();
-  auto gripper = robo_manger.GetGripperController();
+  ActuatorManager actuator_manager("geniarm_actuator_cfg.yaml");
+  ArmManager arm_manager("geniarm_body_cfg.yaml");
 
-  robo_manger.Enable();
-  robo_manger.Start();
+  auto arm_ctrl = actuator_manager.GetArmActuator();
+  auto gripper_ctrl = actuator_manager.GetGripperActuator();
+  auto arm = arm_manager.GetArmController();
+  auto gripper = arm_manager.GetGripperController();
 
-  std::jthread arm_joint_thread([arm, gripper](std::stop_token stoken) {
-    ArmMotion::Pose6Dof pose{};
-    ArmMotion::Joint6Dof jog{};
-    while (!stoken.stop_requested()) {
-      // if (arm->GetCurrentPose(pose) == -1) {
-      //   ARM_LOG_WARN("获取姿态失败");
-      // }
-      // ARM_LOG_INFO("\n---\n x: {}, y: {}, z: {}",
-      //               pose.x, pose.y, pose.z);
-      if (arm->GetCurrentJoint(jog) == -1) {
-        ARM_LOG_WARN("获取关节角失败");
+  arm_ctrl->Enable();
+  if (gripper_ctrl) gripper_ctrl->Enable();
+
+  // 控制回路：读反馈 → 取指令 → 下发；无轨迹时保持当前姿态
+  std::jthread loop([&](std::stop_token stoken) {
+    auto next = std::chrono::steady_clock::now();
+    while (!stoken.stop_requested() && g_running) {
+      ArmCtrlBase::JointState actuator_state;
+      if (arm_ctrl->GetJointState(actuator_state)) {
+        ArmMotion::JointState motion_state;
+        std::memcpy(&motion_state, &actuator_state, sizeof(motion_state));
+        arm->SetJointState(motion_state);
       }
-      ARM_LOG_INFO("\n-----\n j1: {:.4f}, j2: {:.4f}, j3: {:.4f}, j4: {:.4f}, j5: {:.4f}, j6: {:.4f}\n-----",
-                   jog.q[0], jog.q[1], jog.q[2], jog.q[3], jog.q[4], jog.q[5]);
-      std::this_thread::sleep_for(std::chrono::milliseconds(100));
+      ArmMotion::JointCommand motion_cmd;
+      ArmCtrlBase::JointCommand actuator_cmd;
+      if (arm->GetJointCommand(motion_cmd)) {
+        std::memcpy(&actuator_cmd, &motion_cmd, sizeof(actuator_cmd));
+      } else {
+        actuator_cmd = ArmCtrlBase::JointCommand{};
+        std::memcpy(&actuator_cmd.position, &actuator_state.position, sizeof(actuator_cmd.position));
+        std::memcpy(&actuator_cmd.stiffness, &motion_cmd.stiffness, sizeof(actuator_cmd.stiffness));
+        std::memcpy(&actuator_cmd.damping, &motion_cmd.damping, sizeof(actuator_cmd.damping));
+      }
+      arm_ctrl->SetJointState(actuator_cmd);
+
+      if (gripper_ctrl) {
+        GripperCtrlBase::GripperState gripper_state;
+        if (gripper_ctrl->ReceiveState(gripper_state)) {
+          gripper->SetGripperState(gripper_state.position, gripper_state.velocity, gripper_state.effort);
+        }
+        GripperController::GripperCommand gripper_cmd;
+        if (gripper->GetGripperCommand(gripper_cmd) == 0) {
+          GripperCtrlBase::GripperCommand out;
+          out.position = gripper_cmd.position;
+          out.velocity = gripper_cmd.velocity;
+          out.effort = gripper_cmd.effort;
+          out.stiffness = gripper_cmd.stiffness;
+          out.damping = gripper_cmd.damping;
+          gripper_ctrl->SendCommand(out);
+        }
+      }
+      next += std::chrono::milliseconds(5);  // 200 Hz
+      std::this_thread::sleep_until(next);
     }
   });
 
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  // 关节角监视
+  std::jthread monitor([&](std::stop_token stoken) {
+    while (!stoken.stop_requested() && g_running) {
+      ArmMotion::Joint6Dof jog;
+      if (arm->GetCurrentJoint(jog) == 0) {
+        ARM_LOG_INFO("j1: {:.4f}, j2: {:.4f}, j3: {:.4f}, j4: {:.4f}, j5: {:.4f}, j6: {:.4f}",
+                     jog.q[0], jog.q[1], jog.q[2], jog.q[3], jog.q[4], jog.q[5]);
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    }
+  });
 
-  /* 夹爪测试 */
-  ARM_LOG_INFO("开始夹爪测试");
-  gripper->PosControl(1.0, 0.5, 1.0, 0.0);
-  gripper->WaitForCompletion();
-  gripper->PosControl(0.0, 0.5, 1.0, 0.0);
-  gripper->WaitForCompletion();
+  std::this_thread::sleep_for(std::chrono::milliseconds(200));
 
-  /* 关节 MoveJ 测试 */
-  ARM_LOG_INFO("开始关节Move测试");
-  ArmMotion::Joint6Dof jog{0, 1.00, -1.00, 0.0, 0.0, 0.0};
-  arm->MoveJ(jog, 0.5, 0.3);
+  if (gripper) {
+    ARM_LOG_INFO("开始夹爪测试");
+    gripper->PosControl(1.0, 0.5, 1.0, 0.0);
+    gripper->WaitForCompletion();
+    gripper->PosControl(0.0, 0.5, 1.0, 0.0);
+    gripper->WaitForCompletion();
+  }
+
+  ARM_LOG_INFO("开始关节 MoveJ 测试");
+  arm->MoveJ(ArmMotion::Joint6Dof{0, 1.00, -1.00, 0.0, 0.0, 0.0}, 0.5, 0.3);
   arm->WaitForCompletion();
 
   ArmMotion::Pose6Dof current_pose;
-  arm->GetCurrentPose(current_pose);
-  ARM_LOG_INFO("当前位置：x: {}, y: {}, z: {}", current_pose.x, current_pose.y, current_pose.z);
+  if (arm->GetCurrentPose(current_pose) == 0) {
+    ARM_LOG_INFO("当前位置：x: {:.4f}, y: {:.4f}, z: {:.4f}", current_pose.x, current_pose.y, current_pose.z);
+  }
 
-  // ArmMotion::Pose6Dof traget_pose = current_pose;
-  // traget_pose.y += 0.1;
-  // ARM_LOG_INFO("朝Y方向平移0.1m");
-  // arm->MoveL(traget_pose, 0.5, 0.3);
-  // arm->GetCurrentPose(current_pose);
-  // ARM_LOG_INFO("当前位置：x: {}, y: {}, z: {}", current_pose.x, current_pose.y, current_pose.z);
-
-  /* 笛卡尔多点测试 */
+  ARM_LOG_INFO("开始笛卡尔多点 MoveL 测试");
   std::vector<ArmMotion::Pose6Dof> cart_points;
-  ArmMotion::Pose6Dof p1 = current_pose;
-  p1.y -= 0.10;
-  cart_points.push_back(p1);
-
-  ArmMotion::Pose6Dof p2 = p1;
-  p2.z -= 0.10;
-  cart_points.push_back(p2);
-
-  ArmMotion::Pose6Dof p3 = p2;
-  p3.y += 0.10;
-  cart_points.push_back(p3);
-
-  ArmMotion::Pose6Dof p4 = p3;
-  p4.z += 0.10;
-  cart_points.push_back(p4);
-
+  ArmMotion::Pose6Dof p1 = current_pose; p1.y -= 0.10; cart_points.push_back(p1);
+  ArmMotion::Pose6Dof p2 = p1;           p2.z -= 0.10; cart_points.push_back(p2);
+  ArmMotion::Pose6Dof p3 = p2;           p3.y += 0.10; cart_points.push_back(p3);
+  ArmMotion::Pose6Dof p4 = p3;           p4.z += 0.10; cart_points.push_back(p4);
   arm->MoveLMulti(cart_points, 0.05, 0.1, 0.2);
   arm->WaitForCompletion();
 
-  jog = ArmMotion::Joint6Dof{};
-  arm->MoveJ(jog, 0.5, 0.3);
-  arm->WaitForCompletion();
-
-  /* 处理 Ctrl+C 信号 */
   while (g_running) {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
   }
 
   ARM_LOG_INFO("回收线程中......");
-  arm_joint_thread.request_stop();
-  arm_joint_thread.join();
-  ARM_LOG_INFO("回收线程完成");
+  monitor.request_stop();
+  loop.request_stop();
+  loop.join();
+  monitor.join();
 
-  ARM_LOG_INFO("失能机械臂");
-  robo_manger.Disable();
-
+  ARM_LOG_INFO("失能执行器");
+  arm_ctrl->Disable();
+  if (gripper_ctrl) gripper_ctrl->Disable();
   return 0;
 }

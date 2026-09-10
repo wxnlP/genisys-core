@@ -23,7 +23,6 @@ option(SDK_BUILD_WITH_EXAMPLES "Build robotic arm examples" ON)
 
 add_subdirectory(actuator)
 add_subdirectory(arm_control)
-add_subdirectory(robo_manager)
 
 if (SDK_BUILD_WITH_EXAMPLES)
     add_subdirectory(example)

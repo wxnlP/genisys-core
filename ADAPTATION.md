@@ -81,7 +81,7 @@ MDH 参数坐标系定义遵循标准改进型 Denavit-Hartenberg 约定。
 > 如果直接使用[robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)那么该步骤可以跳过。
 
 ```yaml
-# cfg/my_robo_manager.yaml
+# cfg/my_body_cfg.yaml
 actuator_config: "my_robot_actuator_cfg.yaml"
 arm_config: "my_robot_body_cfg.yaml"
 control_frequency: 200.0

@@ -8,7 +8,7 @@
 
 SDK 围绕三个原则构建：
 
-1. **接口解耦**：层与层之间只依赖纯虚接口（`ArmCtrlBase`、`JointPathBase`、`TimeScalerBase` 等），不依赖具体实现；集成调度层只持有接口指针，不认识任何具体类。
+1. **接口解耦**：层与层之间只依赖纯虚接口（`ArmCtrlBase`、`JointPathBase`、`TimeScalerBase` 等），不依赖具体实现；适配层只持有接口指针，不认识任何具体类。
 2. **策略化算法**：路径、时间缩放等算法以策略模式组合进轨迹，新增一种算法 = 继承抽象基类 + 注册一个工厂分支，两处改动、零侵入。
 3. **配置驱动装配**：对象由 YAML 描述装配，同一套运动规划代码只需更换配置文件即可适配不同机械臂。
 
@@ -51,9 +51,6 @@ robotic_arm_sdk
 │   │   └── arm_manager.h             # 规划层 YAML 工厂
 │   └── src/
 │
-├── robo_manager/                 # ── 集成调度层（静态库 robotic_arm_sdk）──
-│   ├── robo_manager.h
-│   └── robo_manager.cc               # 实时控制循环（默认 200 Hz）
 │
 ├── cfg/                          # 配置文件（驱动参数 + 机械臂参数）
 ├── example/                      # 使用示例
@@ -70,7 +67,7 @@ SDK 采用**纵向三层解耦**结构，层间只通过接口与布局一致的
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│           集成调度层  RoboManager（可整体替换）                   │
+│           适配层  由中间件模块自行实现（本项目为 ControlModule）    │
 │   实时控制循环：读取驱动反馈 → 取规划指令 → 下发驱动指令              │
 └───────────────┬────────────────────────────────┬──────────────┘
                 │ 依赖接口 / 高层类                 │ 依赖纯虚接口
@@ -101,7 +98,7 @@ SDK 中所有可替换组件都收敛到一组抽象接口：
 | `TimeScalerBase` | 规划层 | 时间分配（`Plan` / `Evaluate` / `GetDuration`） |
 | `KinematicSolver` | 规划层 | 运动学求解（FK / IK），内置双 IK 模式 |
 
-集成层（`RoboManager`）通过 `shared_ptr` 持有这些接口，控制循环里只做三件事——读反馈、取指令、发指令——从不关心具体驱动走的是 CAN 还是串口，也不关心轨迹是如何规划的。
+适配层（本项目中即 `ControlModule`）通过 `shared_ptr` 持有这些接口，控制循环里只做三件事——读反馈、取指令、发指令——从不关心具体驱动走的是 CAN 还是串口，也不关心轨迹是如何规划的。
 
 ### 2. 策略模式：算法可插拔
 
@@ -128,7 +125,7 @@ TimeScalerBase ────┘
 对象装配链路如下：
 
 ```
-robo_manager.yaml ──▶ RoboManager
+geniarm_body_cfg.yaml ──▶ ArmManager + ActuatorManager
     ├── actuator_config ──▶ ActuatorManager ──▶ name 分支 ──▶ ArmCtrlBase 实现
     └── arm_config     ──▶ ArmManager ──▶ KinematicSolver + ArmController
 ```
@@ -145,9 +142,10 @@ SDK 产出三个独立静态库目标：
 |------|------|----------|
 | `actuator_controller` | 驱动实现 + 工厂 | 不依赖规划层 |
 | `arm_controller` | 运动学 + 路径 + 轨迹 + 规划器 | 不依赖驱动层 |
-| `robotic_arm_sdk` | RoboManager 集成层 | 链接以上两者 |
+| `actuator_controller` | 驱动实现（DM 电机 / CAN） | 不依赖算法层 |
+| `arm_controller` | 运动学 + 规划 + 控制器 | 不依赖驱动层 |
 
-`RoboManager` 只是集成调度层的**参考实现**。接入 ROS2、AimRT 等通信中间件时，可以完全抛弃它，直接复用 `arm_controller` 与 `actuator_controller` 两个底层库自行编写通信适配层（参考 [robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)）。
+示例程序（`example/`）演示了如何直接组合 `ActuatorManager` 与 `ArmManager` 自建控制回路；接入 ROS2、AimRT 等中间件时，按同样方式在中间件模块里编写适配层（参考 [robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)）。
 
 ---
 
@@ -255,10 +253,12 @@ robot:
 ## 快速开始
 
 ```cpp
-#include "robo_manager.h"
+#include "actuator_manager.h"
+#include "arm_manager.h"
 
 int main() {
-    RoboManager manager("robo_manager.yaml");
+    ActuatorManager actuator_manager("geniarm_actuator_cfg.yaml");
+    ArmManager arm_manager("geniarm_body_cfg.yaml");
 
     auto arm = manager.GetArmController();
     auto gripper = manager.GetGripperController();
@@ -293,5 +293,5 @@ int main() {
 
 ## 项目引用与使用方式
 
-1. **纯 CPP 集成**：直接链接静态库 `robotic_arm_sdk`，使用 `RoboManager` 作为集成层；
-2. **中间件集成**：适配 ROS2、AimRT 等通信中间件时，抛弃 `RoboManager`，基于 `arm_controller` 与 `actuator_controller` 两个独立库目标自行实现通信架构（参考 [robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)）。
+1. **纯 CPP 集成**：链接 `actuator_controller` + `arm_controller`，自行编写控制回路（见 `example/real_arm_sample.cc`）；
+2. **中间件集成**：适配 ROS2、AimRT 等通信中间件时，基于 `arm_controller` 与 `actuator_controller` 两个独立库目标实现通信架构（参考 [robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)）。

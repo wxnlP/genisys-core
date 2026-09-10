@@ -1,6 +1,16 @@
 #include "geniarm_gripper.h"
 #include <chrono>
+#include <cmath>
+#include <thread>
 
+namespace {
+
+// 标零验证参数
+constexpr double kZeroPosTol = 0.001;  // rad，位置容差
+constexpr int kZeroTimeoutMs = 800;   // 验证超时
+constexpr int kZeroPollMs = 20;       // 轮询间隔
+
+}  // namespace
 
 void GeniArmGripper::Init() {
 }
@@ -42,4 +52,24 @@ bool GeniArmGripper::ReceiveState(GripperState& state) {
     state.effort = motor_state.torque;
   }
   return true;
+}
+
+bool GeniArmGripper::CalibrateZero() {
+  // set zero position
+  motor_driver_.SetZeroPos();
+
+  // verify zero position
+  const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(kZeroTimeoutMs);
+  while (std::chrono::steady_clock::now() < deadline) {
+    // 主动索取新帧再读（GetLatestState 读的是后台 Sample 线程缓存的帧，
+    // 不索取就可能一直读到标零前的旧值）
+    motor_driver_.RequestState();
+    std::this_thread::sleep_for(std::chrono::milliseconds(kZeroPollMs));  // 等反馈
+
+    DmMotorDriver::MotorState state;
+    if (motor_driver_.GetLatestState(state) == 0 && std::fabs(state.pos) <= kZeroPosTol) {
+      return true;
+    }
+  }
+  return false;
 }

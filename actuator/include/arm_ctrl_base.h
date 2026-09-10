@@ -1,5 +1,8 @@
 #pragma once
 
+#include <cstdint>
+#include <vector>
+
 
 class ArmCtrlBase {
  public:
@@ -30,5 +33,6 @@ class ArmCtrlBase {
   virtual void Disable() { return; };
   virtual bool SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) = 0;
   virtual bool GetJointState(ArmCtrlBase::JointState& joint_state) = 0;
-  virtual bool SetCtrlMode(ArmCtrlBase::CtrlMode /*mode*/) { return true; };
+  virtual bool SetCtrlMode(ArmCtrlBase::CtrlMode mode) { return true; };
+  virtual uint32_t CalibrateZero() { return 0; };
 };

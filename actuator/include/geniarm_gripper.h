@@ -13,6 +13,7 @@ class GeniArmGripper : public GripperCtrlBase {
   void Disable() override;
   bool ReceiveState(GripperState& state) override;
   bool SendCommand(const GripperCommand& command) override;
+  bool CalibrateZero() override;
 
  private:
   DmMotorDriver& motor_driver_;

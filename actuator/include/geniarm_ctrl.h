@@ -17,6 +17,7 @@ public:
     bool SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) override;
     bool GetJointState(ArmCtrlBase::JointState& joint_state) override;
     bool SetCtrlMode(ArmCtrlBase::CtrlMode mode) override;
+    uint32_t CalibrateZero() override;
 
 private:
     std::vector<DmMotorDriver>& motor_driver_;

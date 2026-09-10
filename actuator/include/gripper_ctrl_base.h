@@ -26,5 +26,6 @@ class GripperCtrlBase {
 
   virtual bool SendCommand(const GripperCommand& command) = 0;
   virtual bool ReceiveState(GripperState& state) = 0;
+  virtual bool CalibrateZero() { return false; }
 
 };

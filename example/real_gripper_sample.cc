@@ -85,5 +85,8 @@ int main() {
 
   ARM_LOG_INFO("失能夹爪");
   gripper_actuator->Disable();
+
+  std::signal(SIGINT, SIG_DFL);  // 恢复默认，退出阶段Ctrl+C才有效
+  actuator_manager.Shutdown();   // 停CAN采样线程
   return 0;
 }

@@ -35,6 +35,6 @@ private:
   std::mutex fb_frames_mutex_;
   std::jthread sample_thread_;
   std::string can_interface_;
-  int socket_fd_;
+  int socket_fd_{-1};
   bool fd_mode_;
 };

@@ -7,8 +7,9 @@ SocketCANBus::SocketCANBus(const std::string &interface_name, bool fd_mode)
     : can_interface_(interface_name), fd_mode_(fd_mode) {}
 
 SocketCANBus::~SocketCANBus() {
-  Shutdown();
+  Shutdown();  // 先停采样线程
   SocketCAN_Close(socket_fd_);
+  socket_fd_ = -1;
 }
 
 int SocketCANBus::Init() {
@@ -26,6 +27,10 @@ int SocketCANBus::Init() {
 
 void SocketCANBus::Shutdown() {
   sample_thread_.request_stop();
+  // 等线程退出，read()有超时兜底，最坏100ms
+  if (sample_thread_.joinable()) {
+    sample_thread_.join();
+  }
 }
 
 void SocketCANBus::SetReceiverId(uint32_t *id, uint8_t len) {

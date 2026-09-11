@@ -124,5 +124,8 @@ int main() {
   ARM_LOG_INFO("失能执行器");
   arm_ctrl->Disable();
   if (gripper_ctrl) gripper_ctrl->Disable();
+
+  std::signal(SIGINT, SIG_DFL);  // 恢复默认，退出阶段Ctrl+C才有效
+  actuator_manager.Shutdown();   // 停CAN采样线程
   return 0;
 }

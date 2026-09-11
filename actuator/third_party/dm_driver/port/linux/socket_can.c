@@ -1,6 +1,7 @@
 #include "socket_can.h"
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#include <sys/time.h>
 #include <linux/if.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
@@ -44,6 +45,15 @@ int SocketCAN_Connect(const char* can_port, bool fd_mode)
   addr.can_family = AF_CAN;
   addr.can_ifindex = ifr.ifr_ifindex;
   if (bind(sock_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+    close(sock_fd);
+    return -1;
+  }
+
+  // 接收超时100ms，否则read()永久阻塞（AF_CAN不支持shutdown，只能靠超时唤醒）
+  struct timeval rcv_timeout;
+  rcv_timeout.tv_sec = 0;
+  rcv_timeout.tv_usec = 100000;
+  if (setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout)) == -1) {
     close(sock_fd);
     return -1;
   }

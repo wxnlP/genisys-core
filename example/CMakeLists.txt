@@ -3,7 +3,7 @@ set(JACOBIAN_TARGET_NAME jacobian_example)
 set(TRAJECTORY_TARGET_NAME trajectory_example)
 set(REAL_GRIPPER_TARGET_NAME real_gripper_example)
 set(REAL_ARM_TARGET_NAME real_arm_example)
-set(ZERO_CALIBRATE_TARGET_NAME zero_calibrate_sample)
+set(ZERO_CALIBRATE_TARGET_NAME zero_calibrate_example)
 
 
 add_executable(${KINEMATIC_TARGET_NAME} kinematic_sample.cc)

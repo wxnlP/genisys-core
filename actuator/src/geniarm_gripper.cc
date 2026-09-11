@@ -62,8 +62,7 @@ bool GeniArmGripper::CalibrateZero() {
   // verify zero position
   const auto deadline = std::chrono::steady_clock::now() + std::chrono::milliseconds(kZeroTimeoutMs);
   while (std::chrono::steady_clock::now() < deadline) {
-    // 主动索取新帧再读（GetLatestState 读的是后台 Sample 线程缓存的帧，
-    // 不索取就可能一直读到标零前的旧值）
+
     motor_driver_.RequestState();
     std::this_thread::sleep_for(std::chrono::milliseconds(kZeroPollMs));  // 等反馈
 

@@ -98,8 +98,6 @@ uint32_t GeniArmCtrl::CalibrateZero() {
 
   // Verify all joints
   while (verified_mask != target_mask && std::chrono::steady_clock::now() < deadline) {
-    // 先给尚未通过验证的关节统一发一次状态请求（GetLatestState 读的是后台
-    // Sample 线程缓存的帧，不主动索取就可能一直读到标零前的旧值）
     for (size_t i = 0; i < joint_num; ++i) {
       if (!(verified_mask & (1U << i))) {
         motor_driver_[i].RequestState();

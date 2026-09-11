@@ -254,12 +254,10 @@ void ArmController::StartSampleThread() {
 int ArmController::GetCurrentPose(ArmMotion::Pose6Dof& current_pose) {
   ArmMotion::Joint6Dof current_joint;
   if (GetCurrentJoint(current_joint) != 0) {
-    ARM_LOG_ERROR("[GetCurrentPose] failed: current joint state is not available");
     return -1;
   }
   if (!kinematic_solver_->FK(current_joint, current_pose)) {
-    ARM_LOG_ERROR("[GetCurrentPose] failed: FK");
-    return -1;
+    return -2;
   }
   return 0;
 }
@@ -267,7 +265,6 @@ int ArmController::GetCurrentPose(ArmMotion::Pose6Dof& current_pose) {
 int ArmController::GetCurrentJoint(ArmMotion::Joint6Dof& current_joint) {
   std::lock_guard<std::mutex> lock(state_mutex_);
   if (!current_state_.has_value()) {
-    ARM_LOG_ERROR("[GetCurrentJoint] current_state_ is not set");
     return -1;
   }
   current_joint = current_state_.value().position;
@@ -276,7 +273,6 @@ int ArmController::GetCurrentJoint(ArmMotion::Joint6Dof& current_joint) {
 
 int ArmController::JointToPose(const ArmMotion::Joint6Dof& joint, ArmMotion::Pose6Dof& pose) {
   if (!kinematic_solver_->FK(joint, pose)) {
-    ARM_LOG_ERROR("[JointToPose] failed: FK");
     return -1;
   }
   return 0;

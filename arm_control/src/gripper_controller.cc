@@ -15,7 +15,6 @@ void GripperController::SetGripperState(double position, double velocity, double
 int GripperController::GetCurrentPosition(double& position) {
   std::lock_guard<std::mutex> lock(state_mutex_);
   if (!current_position_.has_value()) {
-    ARM_LOG_ERROR("[GetCurrentPosition] current_position_ is not set");
     return -1;
   }
   position = *current_position_;
@@ -46,7 +45,6 @@ bool GripperController::PosControl(double position, double velocity, double acce
       return false;
     }
     current_position = *current_position_;
-    ARM_LOG_INFO("Current State: {}", current_position);
   }
 
   double target_pos = position * max_range_;

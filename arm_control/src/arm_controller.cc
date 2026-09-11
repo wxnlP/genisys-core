@@ -253,7 +253,10 @@ void ArmController::StartSampleThread() {
 
 int ArmController::GetCurrentPose(ArmMotion::Pose6Dof& current_pose) {
   ArmMotion::Joint6Dof current_joint;
-  GetCurrentJoint(current_joint);
+  if (GetCurrentJoint(current_joint) != 0) {
+    ARM_LOG_ERROR("[GetCurrentPose] failed: current joint state is not available");
+    return -1;
+  }
   if (!kinematic_solver_->FK(current_joint, current_pose)) {
     ARM_LOG_ERROR("[GetCurrentPose] failed: FK");
     return -1;
@@ -263,7 +266,11 @@ int ArmController::GetCurrentPose(ArmMotion::Pose6Dof& current_pose) {
 
 int ArmController::GetCurrentJoint(ArmMotion::Joint6Dof& current_joint) {
   std::lock_guard<std::mutex> lock(state_mutex_);
-  current_joint = current_state_.position;
+  if (!current_state_.has_value()) {
+    ARM_LOG_ERROR("[GetCurrentJoint] current_state_ is not set");
+    return -1;
+  }
+  current_joint = current_state_.value().position;
   return 0;
 }
 
@@ -309,7 +316,10 @@ int ArmController::WaitForCompletion(ArmMotion::Joint6Dof& target, uint32_t time
   double period = 1.0 / sample_frequency_;
   ArmMotion::Joint6Dof current;
   for (int i=0; i < timeout_ms; ++i) {
-    GetCurrentJoint(current);
+    if (GetCurrentJoint(current) != 0) {
+      ARM_LOG_ERROR("[WaitForCompletion] failed: current joint state is not available");
+      return -1;
+    }
     if (JointPathLength(current, target) < 0.01) {
       return 0;
     }
@@ -330,7 +340,10 @@ int ArmController::WaitForCompletion(ArmMotion::Pose6Dof& target, uint32_t timeo
   double period = 1.0 / sample_frequency_;
   ArmMotion::Pose6Dof current;
   for (int i=0; i < timeout_ms; ++i) {
-    GetCurrentPose(current);
+    if (GetCurrentPose(current) != 0) {
+      ARM_LOG_ERROR("[WaitForCompletion] failed: current pose is not available");
+      return -1;
+    }
     if (CartesianPosDistance(current, target) < 0.005) {
       return 0;
     }
@@ -348,7 +361,10 @@ int ArmController::WaitForCompletion(ArmMotion::Pose6Dof& target, uint32_t timeo
 
 int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
   ArmMotion::Joint6Dof current_joint;
-  GetCurrentJoint(current_joint);
+  if (GetCurrentJoint(current_joint) != 0) {
+    ARM_LOG_ERROR("[MoveL] failed: current joint state is not available");
+    return -1;
+  }
 
   for (int i = 0; i < 6; ++i) {
     if (current_joint[i] < joint_min_[i]) {
@@ -467,7 +483,10 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
   }
 
   ArmMotion::Joint6Dof current_joint;
-  GetCurrentJoint(current_joint);
+  if (GetCurrentJoint(current_joint) != 0) {
+    ARM_LOG_ERROR("[MoveJ] failed: current joint state is not available");
+    return -1;
+  }
 
   for (int i = 0; i < 6; ++i) {
     if (current_joint[i] < joint_min_[i]) {
@@ -541,7 +560,10 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
 
 int ArmController::MoveJ(ArmMotion::Pose6Dof target_pose, double v, double a) {
   ArmMotion::Joint6Dof current_joint;
-  GetCurrentJoint(current_joint);
+  if (GetCurrentJoint(current_joint) != 0) {
+    ARM_LOG_ERROR("[MoveJ] failed: current joint state is not available");
+    return -1;
+  }
 
   // 逆解得到目标关节角，优先选择接近当前关节角的解
   ArmMotion::IKSolves ik_solves;
@@ -567,7 +589,10 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
   }
 
   ArmMotion::Joint6Dof current_joint;
-  GetCurrentJoint(current_joint);
+  if (GetCurrentJoint(current_joint) != 0) {
+    ARM_LOG_ERROR("[MoveLMulti] failed: current joint state is not available");
+    return -1;
+  }
 
   for (int i = 0; i < 6; ++i) {
     if (current_joint[i] < joint_min_[i]) {
@@ -689,7 +714,10 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
   }
 
   ArmMotion::Joint6Dof current_joint;
-  GetCurrentJoint(current_joint);
+  if (GetCurrentJoint(current_joint) != 0) {
+    ARM_LOG_ERROR("[MoveJMulti] failed: current joint state is not available");
+    return -1;
+  }
 
   for (int i = 0; i < 6; ++i) {
     if (current_joint[i] < joint_min_[i]) {
@@ -772,7 +800,10 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
   }
 
   ArmMotion::Joint6Dof current_joint;
-  GetCurrentJoint(current_joint);
+  if (GetCurrentJoint(current_joint) != 0) {
+    ARM_LOG_ERROR("[MoveJMulti] failed: current joint state is not available");
+    return -1;
+  }
 
   // 逐个位姿逆解，每个点以上一个点的关节解作为参考，保证路径连续性
   std::vector<ArmMotion::Joint6Dof> joint_points;
@@ -813,7 +844,10 @@ int ArmController::ServoJ(const ArmMotion::Joint6Dof& target_joint, double dt) {
   // 单独处理首次servo
   if (!prev_servo_joint_.has_value()) {
     ArmMotion::Joint6Dof current_joint;
-    GetCurrentJoint(current_joint);
+    if (GetCurrentJoint(current_joint) != 0) {
+      ARM_LOG_ERROR("[ServoJ] failed: current joint state is not available");
+      return -1;
+    }
     prev_servo_joint_ = current_joint;
   } 
 
@@ -852,7 +886,10 @@ int ArmController::ServoJ(const ArmMotion::Pose6Dof& target_pose, double dt) {
   if (prev_servo_joint_.has_value()) {
     reference_joint = prev_servo_joint_.value();
   } else {
-    GetCurrentJoint(reference_joint);
+    if (GetCurrentJoint(reference_joint) != 0) {
+      ARM_LOG_ERROR("[ServoJ] failed: current joint state is not available");
+      return -1;
+    }
   }
 
   ArmMotion::IKSolves ik_solves;
@@ -878,7 +915,10 @@ int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
   }
 
   ArmMotion::Joint6Dof current_joint;
-  GetCurrentJoint(current_joint);
+  if (GetCurrentJoint(current_joint) != 0) {
+    ARM_LOG_ERROR("[ServoL] failed: current joint state is not available");
+    return -1;
+  }
   for (int i = 0; i < 6; ++i) {
     if (current_joint[i] < joint_min_[i]) {
       current_joint[i] = joint_min_[i];
@@ -890,7 +930,10 @@ int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
   // 单独处理首次servo
   if (!prev_servo_pose_.has_value()) {
     ArmMotion::Pose6Dof current_pose;
-    GetCurrentPose(current_pose);
+    if (GetCurrentPose(current_pose) != 0) {
+      ARM_LOG_ERROR("[ServoL] failed: current pose is not available");
+      return -1;
+    }
     prev_servo_pose_ = current_pose;
   }
 

@@ -158,7 +158,10 @@ void PrintGripperResult(bool ok, const GripperCtrlBase::GripperState& state) {
 // ---------------------------------------------------------------------------
 void DoArmZero(const std::shared_ptr<ArmCtrlBase>& arm, const std::vector<std::string>& names) {
   ArmCtrlBase::JointState before;
-  arm->GetJointState(before);
+  if (!arm->GetJointState(before)) {
+    fmt::print("{}错误：读取当前关节状态失败，无法进行标零{}\n", Ansi::kRed, Ansi::kReset);
+    return;
+  }
   PrintArmState("标零前位置快照", before, names);
 
   fmt::print("\n>>> 请确认机械臂已按机械基准（工装/刻线）摆到零位姿态，按回车开始标零...");
@@ -171,7 +174,10 @@ void DoArmZero(const std::shared_ptr<ArmCtrlBase>& arm, const std::vector<std::s
   const uint32_t verified_mask = arm->CalibrateZero();
 
   ArmCtrlBase::JointState after;
-  arm->GetJointState(after);
+  if (!arm->GetJointState(after)) {
+    fmt::print("{}错误：标零后读取关节状态失败，无法验证实际位置{}\n", Ansi::kRed, Ansi::kReset);
+    return;
+  }
   PrintArmResult(verified_mask, after, names);
 }
 
@@ -186,7 +192,10 @@ void DoGripperZero(const std::shared_ptr<GripperCtrlBase>& gripper) {
   const bool ok = gripper->CalibrateZero();
 
   GripperCtrlBase::GripperState after;
-  gripper->ReceiveState(after);
+  if (!gripper->ReceiveState(after)) {
+    fmt::print("{}错误：标零后读取夹爪状态失败{}\n", Ansi::kRed, Ansi::kReset);
+    return;
+  }
   PrintGripperResult(ok, after);
 }
 

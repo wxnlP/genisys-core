@@ -95,7 +95,6 @@ class ArmController {
   ArmMotion::Joint6Dof motor_damping_{};
   ArmMotion::Joint6Dof joint_min_{};
   ArmMotion::Joint6Dof joint_max_{};
-  ArmMotion::JointState current_state_{};
 
   TrajectoryMode traj_planning_mode{TrajectoryMode::QUINTIC};
 
@@ -109,6 +108,7 @@ class ArmController {
   std::atomic<MotionState> motion_state_{MotionState::IDLE};     // 采样线程运动状态
   SPSCRingBuffer<ArmMotion::JointCommand> command_queue_{8192};  // 待执行的关节命令队列
   std::deque<SampleContext> sample_queue_;                       // 待采样的轨迹队列
+  std::optional<ArmMotion::JointState> current_state_;
   std::optional<ArmMotion::Joint6Dof> prev_servo_joint_;
   std::optional<ArmMotion::Pose6Dof> prev_servo_pose_;
 

@@ -7,8 +7,8 @@ namespace {
 
 // 标零验证参数
 constexpr double kZeroPosTol = 0.001;  // rad，位置容差
-constexpr int kZeroTimeoutMs = 800;   // 验证超时
-constexpr int kZeroPollMs = 20;       // 轮询间隔
+constexpr int kZeroTimeoutMs = 800;    // 验证超时
+constexpr int kZeroPollMs = 20;        // 轮询间隔
 
 }  // namespace
 
@@ -54,11 +54,12 @@ bool GeniArmCtrl::GetJointState(ArmCtrlBase::JointState& joint_state) {
 
   for (int i = 0; i < motor_driver_.size(); ++i) {
     DmMotorDriver::MotorState state;
-    if (motor_driver_[i].GetLatestState(state) == 0) {
-      joint_state.position[i] = state.pos;
-      joint_state.velocity[i] = state.vel;
-      joint_state.effort[i] = state.torque;
+    if (motor_driver_[i].GetLatestState(state) != 0) {
+      return false;
     }
+    joint_state.position[i] = state.pos;
+    joint_state.velocity[i] = state.vel;
+    joint_state.effort[i] = state.torque;
   }
   return true;
 }

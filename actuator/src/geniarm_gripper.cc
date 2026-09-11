@@ -46,11 +46,12 @@ bool GeniArmGripper::ReceiveState(GripperState& state) {
   }
 
   DmMotorDriver::MotorState motor_state;
-  if (motor_driver_.GetLatestState(motor_state) == 0) {
-    state.position = motor_state.pos;
-    state.velocity = motor_state.vel;
-    state.effort = motor_state.torque;
+  if (motor_driver_.GetLatestState(motor_state) != 0) {
+    return false;
   }
+  state.position = motor_state.pos;
+  state.velocity = motor_state.vel;
+  state.effort = motor_state.torque;
   return true;
 }
 

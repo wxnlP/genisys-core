@@ -14,7 +14,11 @@ void GripperController::SetGripperState(double position, double velocity, double
 
 int GripperController::GetCurrentPosition(double& position) {
   std::lock_guard<std::mutex> lock(state_mutex_);
-  position = current_position_;
+  if (!current_position_.has_value()) {
+    ARM_LOG_ERROR("[GetCurrentPosition] current_position_ is not set");
+    return -1;
+  }
+  position = *current_position_;
   return 0;
 }
 
@@ -37,8 +41,12 @@ bool GripperController::PosControl(double position, double velocity, double acce
   double current_position;
   {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    current_position = current_position_;
-    ARM_LOG_INFO("Current State: {} {} {}", current_position_, current_velocity_, current_effort_);
+    if (!current_position_.has_value()) {
+      ARM_LOG_ERROR("[PosControl] current_position_ is not set");
+      return false;
+    }
+    current_position = *current_position_;
+    ARM_LOG_INFO("Current State: {}", current_position);
   }
 
   double target_pos = position * max_range_;
@@ -73,7 +81,6 @@ bool GripperController::PosControl(double position, double velocity, double acce
       return false;
     }
 
-    // TODO: 队列
     GripperCommand cmd;
     cmd.position = current_position + state.s * distance;
     cmd.velocity = state.sd * distance;

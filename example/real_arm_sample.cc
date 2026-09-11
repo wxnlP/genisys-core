@@ -33,7 +33,13 @@ int main() {
     auto next = std::chrono::steady_clock::now();
     while (!stoken.stop_requested() && g_running) {
       ArmCtrlBase::JointState actuator_state;
-      if (arm_ctrl->GetJointState(actuator_state)) {
+      if (!arm_ctrl->GetJointState(actuator_state)) {
+        ARM_LOG_WARN("读取关节状态失败，跳过本周期");
+        next += std::chrono::milliseconds(5);
+        std::this_thread::sleep_until(next);
+        continue;
+      }
+      {
         ArmMotion::JointState motion_state;
         std::memcpy(&motion_state, &actuator_state, sizeof(motion_state));
         arm->SetJointState(motion_state);

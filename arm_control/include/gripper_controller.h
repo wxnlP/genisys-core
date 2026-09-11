@@ -1,6 +1,7 @@
 #pragma once
 
 #include <mutex>
+#include <optional>
 #include "spsc_ring_buffer.h"
 
 class GripperController {
@@ -31,9 +32,9 @@ class GripperController {
   double sample_frequency_ = 100.0;  // Hz
 
   // current state
-  double current_position_{0.0};
-  double current_velocity_{0.0};
-  double current_effort_{0.0};
+  std::optional<double> current_position_{};
+  std::optional<double> current_velocity_{};
+  std::optional<double> current_effort_{};
 
   std::mutex state_mutex_;
   SPSCRingBuffer<GripperCommand> command_queue_{4096};

@@ -3,6 +3,54 @@
 #include "arm_logger.h"
 #include "yaml-cpp/yaml.h"
 
+namespace {
+
+// ------------------------------------------------------------------
+// 末端工具（tool）惯量融合：把刚性安装在连杆上的工具并入该连杆参数
+//   m = m_l + m_t
+//   c = (m_l·c_l + m_t·c_t) / m
+//   I = Σ_i [ I_i + m_i·(|d_i|²·E − d_i·d_iᵀ) ],  d_i = c_i − c
+// 前提：link.com / tool.com 均以「该连杆坐标系」表达；
+//       I 均为「绕各自质心、与连杆系轴对齐」的张量（YAML 约定）。
+// 融合后求解器（RNEA 等）读到的就是"变重并偏心的最后一根连杆"，无需改动。
+// ------------------------------------------------------------------
+void FuseToolIntoLink(Dynamics::Link& link, double tool_mass, const double tool_com[3],
+                      const double tool_inertia[9]) {
+  const double m_l = link.mass;
+  const double m = m_l + tool_mass;
+
+  const Eigen::Vector3d c_l = Eigen::Map<const Eigen::Vector3d>(link.com);
+  const Eigen::Vector3d c_t(tool_com[0], tool_com[1], tool_com[2]);
+  const Eigen::Vector3d c = (m_l * c_l + tool_mass * c_t) / m;
+
+  Eigen::Matrix3d I_l;
+  I_l << link.inertia[0], link.inertia[1], link.inertia[2],
+         link.inertia[3], link.inertia[4], link.inertia[5],
+         link.inertia[6], link.inertia[7], link.inertia[8];
+  Eigen::Matrix3d I_t;
+  I_t << tool_inertia[0], tool_inertia[1], tool_inertia[2],
+         tool_inertia[3], tool_inertia[4], tool_inertia[5],
+         tool_inertia[6], tool_inertia[7], tool_inertia[8];
+
+  auto parallel_axis = [](double m_i, const Eigen::Vector3d& d) {
+    return m_i * (d.squaredNorm() * Eigen::Matrix3d::Identity() - d * d.transpose());
+  };
+  const Eigen::Matrix3d I =
+      I_l + parallel_axis(m_l, c_l - c) + I_t + parallel_axis(tool_mass, c_t - c);
+
+  link.mass = m;
+  for (int i = 0; i < 3; ++i) {
+    link.com[i] = c[i];
+  }
+  for (int r = 0; r < 3; ++r) {
+    for (int col = 0; col < 3; ++col) {
+      link.inertia[r * 3 + col] = I(r, col);
+    }
+  }
+}
+
+}  // namespace
+
 ArmManager::ArmManager(const std::string& yaml_file) {
   std::string config_file_path = "./cfg/" + yaml_file;
   YAML::Node config = YAML::LoadFile(config_file_path);
@@ -86,6 +134,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
     std::vector<Dynamics::Link> links;
     Dynamics::Link base{};
     links.push_back(base);
+    std::vector<std::string> link_names;  // 与 links[1..N] 一一对应（links[0] 为基座占位）
     std::vector<double> gravity;
     if (robot_cfg["dynamics"]) {
       if (!robot_cfg["dynamics"].IsScalar()) {
@@ -129,6 +178,45 @@ ArmManager::ArmManager(const std::string& yaml_file) {
             link.inertia[7] = iyz;
             link.inertia[8] = izz;
             links.push_back(link);
+            link_names.push_back(l["name"] ? l["name"].as<std::string>() : std::string());
+          }
+        }
+
+        // ---- 末端工具（tool）惯量融合 ----
+        if (dyn_root["tool"]) {
+          auto tool = dyn_root["tool"];
+          const std::string attach_to = tool["attach_to"].as<std::string>();
+          const double tool_mass = tool["mass"].as<double>();
+          const double tool_com[3] = {tool["com"][0].as<double>(),
+                                      tool["com"][1].as<double>(),
+                                      tool["com"][2].as<double>()};
+          auto ti = tool["inertia"];
+          const double tool_inertia[9] = {
+              ti["ixx"].as<double>(), ti["ixy"].as<double>(), ti["ixz"].as<double>(),
+              ti["ixy"].as<double>(), ti["iyy"].as<double>(), ti["iyz"].as<double>(),
+              ti["ixz"].as<double>(), ti["iyz"].as<double>(), ti["izz"].as<double>()};
+
+          int target = -1;
+          for (size_t i = 0; i < link_names.size(); ++i) {
+            if (link_names[i] == attach_to) {
+              target = static_cast<int>(i) + 1;  // links[0] 为基座占位
+              break;
+            }
+          }
+
+          if (target < 0) {
+            ARM_LOG_WARN("Dynamics: tool.attach_to='{}' 未在 links 中找到，未融合", attach_to);
+          } else {
+            const double m_before = links[target].mass;
+            const double c_before[3] = {links[target].com[0], links[target].com[1],
+                                        links[target].com[2]};
+            FuseToolIntoLink(links[target], tool_mass, tool_com, tool_inertia);
+            ARM_LOG_INFO(
+                "Dynamics: 已融合末端工具 → {}: mass {:.5f} → {:.5f} kg, "
+                "com [{:.5f}, {:.5f}, {:.5f}] → [{:.5f}, {:.5f}, {:.5f}] m",
+                attach_to, m_before, links[target].mass, c_before[0], c_before[1],
+                c_before[2], links[target].com[0], links[target].com[1],
+                links[target].com[2]);
           }
         }
 

@@ -1,6 +1,8 @@
-# Robotic Arm SDK
+# Genisys Core
 
-> 面向六轴协作机械臂的模块化运动控制 SDK，覆盖从**硬件驱动 → 运动规划 → 实时控制**的完整软件栈。核心设计目标：**层间解耦、算法可插拔、配置驱动装配**——新增机械臂硬件、轨迹算法、机器人构型时，尽量不触碰已有代码。
+> Genisys Core——面向六轴协作机械臂的模块化运动控制核心库，覆盖从**硬件驱动 → 运动规划 → 实时控制**的完整软件栈。核心设计目标：**层间解耦、算法可插拔、配置驱动装配**——新增机械臂硬件、轨迹算法、机器人构型时，尽量不触碰已有代码。
+>
+> **命名由来**：Genisys = genimind + geniarm + genesis。genimind 是作者的第一台轮式机器人（最初的想法），geniarm 是第一台机械臂（想法落地），genisys 则是两者沉淀下来的一套通用核心框架（创世）。
 
 ---
 
@@ -17,7 +19,7 @@ SDK 围绕三个原则构建：
 ## 目录结构
 
 ```
-robotic_arm_sdk
+genisys-core
 ├── actuator/                     # ── 驱动抽象层（静态库 actuator_controller）──
 │   ├── include/
 │   │   ├── arm_ctrl_base.h           # 机械臂驱动纯虚接口
@@ -145,7 +147,7 @@ SDK 产出三个独立静态库目标：
 | `actuator_controller` | 驱动实现（DM 电机 / CAN） | 不依赖算法层 |
 | `arm_controller` | 运动学 + 规划 + 控制器 | 不依赖驱动层 |
 
-示例程序（`example/`）演示了如何直接组合 `ActuatorManager` 与 `ArmManager` 自建控制回路；接入 ROS2、AimRT 等中间件时，按同样方式在中间件模块里编写适配层（参考 [robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)）。
+示例程序（`example/`）演示了如何直接组合 `ActuatorManager` 与 `ArmManager` 自建控制回路；接入 ROS2、AimRT 等中间件时，按同样方式在中间件模块里编写适配层（参考 [genisys](https://github.com/wxnlP/genisys)）。
 
 ---
 
@@ -157,7 +159,7 @@ SDK 产出三个独立静态库目标：
 | 新增轨迹平滑算法 | 继承 `TimeScalerBase`，加 `TrajectoryMode` 枚举值与工厂分支 | 仅规划层 | ★☆☆ |
 | 新增路径类型 | 继承 `JointPathBase` / `CartesianPathBase` | 仅规划层 | ★★☆ |
 | 适配新构型机械臂 | 配置 MDH / 限位 / IK 模式，必要时扩展 `KinematicSolver` | 配置文件或规划层 | ★★☆ |
-| 接入 ROS2 / AimRT 中间件 | 不链接 `robotic_arm_sdk`，复用两个底层库写通信层 | 仅集成层 | ★☆☆ |
+| 接入 ROS2 / AimRT 中间件 | 不链接 `genisys_core`，复用两个底层库写通信层 | 仅集成层 | ★☆☆ |
 
 机械臂硬件适配的详细步骤见 [ADAPTATION.md](./ADAPTATION.md)。
 
@@ -294,4 +296,4 @@ int main() {
 ## 项目引用与使用方式
 
 1. **纯 CPP 集成**：链接 `actuator_controller` + `arm_controller`，自行编写控制回路（见 `example/real_arm_sample.cc`）；
-2. **中间件集成**：适配 ROS2、AimRT 等通信中间件时，基于 `arm_controller` 与 `actuator_controller` 两个独立库目标实现通信架构（参考 [robotic_arm_aimrt](https://github.com/wxnlP/robotic_arm_aimrt)）。
+2. **中间件集成**：适配 ROS2、AimRT 等通信中间件时，基于 `arm_controller` 与 `actuator_controller` 两个独立库目标实现通信架构（参考 [genisys](https://github.com/wxnlP/genisys)）。

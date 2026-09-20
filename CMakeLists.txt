@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(robotic_arm_sdk LANGUAGES C CXX)
+project(genisys_core LANGUAGES C CXX)
 
 # 修改默认的库文件、存档文件的存放位置
 set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR})
@@ -18,13 +18,13 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 # 是否构建示例
-option(SDK_BUILD_WITH_EXAMPLES "Build robotic arm examples" ON)
+option(GENISYS_CORE_BUILD_EXAMPLES "Build genisys-core examples" ON)
 
 
 add_subdirectory(actuator)
 add_subdirectory(arm_control)
 
-if (SDK_BUILD_WITH_EXAMPLES)
+if (GENISYS_CORE_BUILD_EXAMPLES)
     add_subdirectory(example)
 endif()
 

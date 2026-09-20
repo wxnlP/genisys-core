@@ -2,7 +2,7 @@
 
 cmake -Bbuild -S. \
     -DCMAKE_INSTALL_PREFIX=./build/install \
-    -DSDK_BUILD_WITH_EXAMPLES=ON \
+    -DGENISYS_CORE_BUILD_EXAMPLES=ON \
     -DDMDRIVER_BUILD_WITH_EXAMPLE=ON \
     $@
 

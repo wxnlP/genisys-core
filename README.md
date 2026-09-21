@@ -1,8 +1,6 @@
 # Genisys Core
 
 > Genisys Core——面向六轴协作机械臂的模块化运动控制核心库，覆盖从**硬件驱动 → 运动规划 → 实时控制**的完整软件栈。核心设计目标：**层间解耦、算法可插拔、配置驱动装配**——新增机械臂硬件、轨迹算法、机器人构型时，尽量不触碰已有代码。
->
-> **命名由来**：Genisys = genimind + geniarm + genesis。genimind 是作者的第一台轮式机器人（最初的想法），geniarm 是第一台机械臂（想法落地），genisys 则是两者沉淀下来的一套通用核心框架（创世）。
 
 ---
 
@@ -25,7 +23,7 @@ genisys-core
 │   │   ├── arm_ctrl_base.h           # 机械臂驱动纯虚接口
 │   │   ├── gripper_ctrl_base.h       # 夹爪驱动纯虚接口
 │   │   ├── actuator_manager.h        # 驱动层 YAML 工厂
-│   │   ├── geniarm_ctrl.h            # GeniArm 驱动实现（CAN FD / DM 电机）
+│   │   ├── geniarm_ctrl.h            # GeniArm 驱动实现（CANFD）
 │   │   ├── s6h4d_ctrl.h              # S6H4D 驱动实现（串口）
 │   │   └── geniarm_gripper.h         # GeniArm 夹爪驱动实现
 │   ├── src/
@@ -138,16 +136,14 @@ geniarm_body_cfg.yaml ──▶ ArmManager + ActuatorManager
 
 ### 4. 构建级解耦：集成层可整体替换
 
-SDK 产出三个独立静态库目标：
+SDK 产出两个个独立静态库目标：
 
 | 目标 | 内容 | 依赖关系 |
 |------|------|----------|
-| `actuator_controller` | 驱动实现 + 工厂 | 不依赖规划层 |
-| `arm_controller` | 运动学 + 路径 + 轨迹 + 规划器 | 不依赖驱动层 |
 | `actuator_controller` | 驱动实现（DM 电机 / CAN） | 不依赖算法层 |
 | `arm_controller` | 运动学 + 规划 + 控制器 | 不依赖驱动层 |
 
-示例程序（`example/`）演示了如何直接组合 `ActuatorManager` 与 `ArmManager` 自建控制回路；接入 ROS2、AimRT 等中间件时，按同样方式在中间件模块里编写适配层（参考 [genisys](https://github.com/wxnlP/genisys)）。
+示例程序（`example/`）演示了如何直接组合 `ActuatorManager` 与 `ArmManager` 自建控制回路。
 
 ---
 
@@ -241,8 +237,8 @@ robot:
 
 | 库 | 用途 | 获取方式 |
 |----|------|----------|
-| Eigen3 | 矩阵运算 | 系统安装（`apt install libeigen3-dev`） |
-| yaml-cpp | YAML 解析 | 系统安装（`apt install libyaml-cpp-dev`） |
+| Eigen3 | 矩阵运算 | 系统安装（`sudo apt install libeigen3-dev`） |
+| yaml-cpp | YAML 解析 | 系统安装（`sudo apt install libyaml-cpp-dev`） |
 
 编译：
 

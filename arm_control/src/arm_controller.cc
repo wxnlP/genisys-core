@@ -380,7 +380,7 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
   const double path_length = CartesianPosDistance(current_pose, target_pose);
   if (path_length <= 1e-7) {
     ARM_LOG_WARN("[MoveL] skip: path length too small");
-    return 0;
+    return -1;
   }
 
   // 单位归一化

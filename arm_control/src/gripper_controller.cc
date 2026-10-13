@@ -99,17 +99,14 @@ bool GripperController::PosControl(double position, double velocity, double acce
   return true;
 }
 
-// ============================================================================
-//  力控抓取
-// ============================================================================
 bool GripperController::ForceControl(const ForceControlParams& params) {
   if (params.target_torque <= 0.0 || params.target_torque > force_config_.max_target_torque ||
-      params.switch_torque < 0.0 || params.approach_velocity <= 0.0 ||
+      params.switch_velocity <= 0.0 || params.approach_velocity <= 0.0 ||
       params.approach_accel <= 0.0) {
     ARM_LOG_ERROR(
-        "[Gripper] ForceControl 参数非法: target={:.3f} (上限 {:.3f}), switch={:.3f}, "
+        "[Gripper] ForceControl 参数非法: target={:.3f} (上限 {:.3f}), switch_v={:.3f}, "
         "v={:.3f}, a={:.3f}",
-        params.target_torque, force_config_.max_target_torque, params.switch_torque,
+        params.target_torque, force_config_.max_target_torque, params.switch_velocity,
         params.approach_velocity, params.approach_accel);
     return false;
   }
@@ -119,18 +116,20 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
   const auto tick = std::chrono::duration<double>(dt);
   const double release_pos = force_config_.min_position_ratio * max_range_;
 
-  auto read_state = [this](double& x, double& tau) {
+  auto read_state = [this](double& x, double& v, double& tau) {
     std::lock_guard<std::mutex> lock(state_mutex_);
-    if (!current_position_.has_value() || !current_effort_.has_value()) {
+    if (!current_position_.has_value() || !current_velocity_.has_value() || !current_effort_.has_value()) {
       return false;
     }
     x = *current_position_;
+    v = *current_velocity_;
     tau = *current_effort_;
     return true;
   };
-  auto push = [this](double position, double effort, double stiffness, double damping) {
+  auto push = [this](double position, double velocity, double effort, double stiffness, double damping) {
     GripperCommand cmd;
     cmd.position = position;
+    cmd.velocity = velocity;
     cmd.effort = effort;
     cmd.stiffness = stiffness;
     cmd.damping = damping;
@@ -139,12 +138,12 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
     }
   };
 
-  auto release = [&]() { 
-    PosControl(0.0, params.approach_velocity, params.approach_accel, 0.0); 
+  auto release = [&]() {
+    PosControl(1.0, params.approach_velocity, params.approach_accel, 0.0);
   };
 
-  double x = 0.0, tau = 0.0;
-  if (!read_state(x, tau)) {
+  double x = 0.0, v = 0.0, tau = 0.0;
+  if (!read_state(x, v, tau)) {
     ARM_LOG_ERROR("[Gripper] 力控启动失败：读不到夹爪状态");
     return false;
   }
@@ -153,6 +152,9 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
   const double x_start = x;
   const double distance = -x_start;  // 目标 0 = 完全闭合
   const double abs_dist = std::abs(distance);
+
+  const double dir = (distance >= 0.0) ? 1.0 : -1.0;
+
   double duration = 0.0;
   QuinticTimeScaler scaler;
   if (abs_dist > 1e-6) {
@@ -170,24 +172,41 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
   double t = 0.0;
   int confirm = 0;
   bool contact = false;
-  while (read_state(x, tau)) {
-    TimeScalerBase::State state{};
-    scaler.Evaluate(std::min(t, duration), state);
-    push(x_start + state.s * distance, 0.0, stiffness_, damping_);
+  double pos_plan{0}, v_plan{0};
+  while (read_state(x, v, tau)) {
+    if (t >= duration) {
+      if (params.closed_release) {
+        release();
+        ARM_LOG_WARN("[Gripper] 夹空（超时）");
+        return true;
+      } else {
+        break;
+      }
+    }
 
-    if (std::abs(tau) >= params.switch_torque) {
+    double v_deficit = v_plan - v;
+    if (std::abs(v_deficit) >= params.switch_velocity) {
       if (++confirm >= force_config_.contact_ticks) {
         contact = true;
+        ARM_LOG_INFO("[Gripper] 接触确认，位置 {:.4f} rad, 速度 {:.4f}, 反馈力矩 {:.4f} N·m",
+               x, v, tau);
         break;
       }
     } else {
       confirm = 0;
     }
 
+    TimeScalerBase::State state{};
+    scaler.Evaluate(std::min(t, duration), state);
+
+    pos_plan = x_start + state.s * distance;
+    v_plan = state.sd * distance;
+    push(pos_plan, v_plan, dir * approach_torque_ff_, stiffness_, damping_);
+
     // 空夹
-    if (t >= duration || x <= release_pos) {
+    if (x <= release_pos) {
       release();
-      ARM_LOG_WARN("[Gripper] 夹空");
+      ARM_LOG_WARN("[Gripper] 夹空（限位）");
       return true;
     }
 
@@ -196,19 +215,11 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
   }
 
   // ---------------- 第 2 步：夹住 ----------------
-  const double dir = (tau >= 0.0) ? 1.0 : -1.0;
-  double tau_cmd = std::min(std::abs(tau), params.target_torque);  // 从接触时的力矩无缝接管
+  double tau_cmd = std::min(std::abs(tau), params.target_torque);
 
-  while (read_state(x, tau)) {
-    // 位置接近闭合，是否卸力
-    if (params.closed_release && x <= release_pos) {
-      release();
-      ARM_LOG_WARN("[Gripper] 位置 {:.4f} rad 已接近闭合，释放力矩", x);
-      return true;
-    }
-
+  while (read_state(x, v, tau)) {
     tau_cmd = std::min(tau_cmd + force_config_.ramp_rate * dt, params.target_torque);
-    push(0.0, dir * tau_cmd, 0.0, force_config_.hold_damping);
+    push(0.0, 0.0, dir * tau_cmd, 0.0, force_config_.hold_damping);
 
     if (tau_cmd >= params.target_torque) {
       break;
@@ -216,6 +227,7 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
     std::this_thread::sleep_for(tick);
   }
 
+  ARM_LOG_INFO("[Gripper] 力控完成，位置 {:.4f} rad, 反馈力矩 {:.4f} N·m", x, tau);
+
   return true;
 }
-

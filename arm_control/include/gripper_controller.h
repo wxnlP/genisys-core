@@ -18,7 +18,7 @@ class GripperController {
   struct ForceControlParams {
     double approach_velocity{1.0};  // 接近速度 rad/s
     double approach_accel{1.0};     // 接近加速度 rad/s^2
-    double switch_torque{0.05};     // 力矩模式切换阈值 N·m：反馈力矩超过它就认为碰到了物体
+    double switch_velocity{0.2};    // 速度亏欠阈值 rad/s
     double target_torque{0.30};     // 力矩控制值 N·m：夹持力矩
     bool closed_release{true};      // 位置接近闭合时是否释放力矩
   };
@@ -62,4 +62,6 @@ class GripperController {
 
   std::atomic<bool> force_stop_{false};
   ForceControlConfig force_config_{};
+
+  double approach_torque_ff_{0.3};
 };

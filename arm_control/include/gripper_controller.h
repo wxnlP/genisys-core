@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <mutex>
 #include <optional>
 #include "spsc_ring_buffer.h"
@@ -13,6 +14,23 @@ class GripperController {
     double stiffness{};
     double damping{};
   };
+
+  struct ForceControlParams {
+    double approach_velocity{1.0};  // 接近速度 rad/s
+    double approach_accel{1.0};     // 接近加速度 rad/s^2
+    double switch_torque{0.05};     // 力矩模式切换阈值 N·m：反馈力矩超过它就认为碰到了物体
+    double target_torque{0.30};     // 力矩控制值 N·m：夹持力矩
+    bool closed_release{true};      // 位置接近闭合时是否释放力矩
+  };
+
+  struct ForceControlConfig {
+    int contact_ticks{3};             // 接触确认帧数，防单帧电流尖峰
+    double hold_damping{0.3};         // 保持段阻尼
+    double ramp_rate{2.0};            // 力矩爬升率 N·m/s
+    double min_position_ratio{0.05};  // 「位置接近闭合」阈值 = 比例 × max_range
+    double max_target_torque{3.0};    // 力矩控制值上限 N·m
+  };
+
   GripperController(double stiffness, double damping) : stiffness_(stiffness), damping_(damping) {}
 
   void SetGripperState(double position, double velocity, double effort);
@@ -23,7 +41,10 @@ class GripperController {
   double GetSampleFrequency() const { return sample_frequency_; }
   void WaitForCompletion();
   bool PosControl(double position, double velocity, double accel, double effort);
-  // bool TorqueControl(double effort, double ramp_rate = 3.0, double pos_limit = 0.0);
+  bool ForceControl(const ForceControlParams& params);
+
+  void SetForceControlConfig(const ForceControlConfig& config) { force_config_ = config; }
+  const ForceControlConfig& GetForceControlConfig() const { return force_config_; }
 
  private:
   double stiffness_{0.0};
@@ -38,4 +59,7 @@ class GripperController {
 
   std::mutex state_mutex_;
   SPSCRingBuffer<GripperCommand> command_queue_{4096};
+
+  std::atomic<bool> force_stop_{false};
+  ForceControlConfig force_config_{};
 };

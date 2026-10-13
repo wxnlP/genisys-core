@@ -25,12 +25,12 @@ void FuseToolIntoLink(Dynamics::Link& link, double tool_mass, const double tool_
 
   Eigen::Matrix3d I_l;
   I_l << link.inertia[0], link.inertia[1], link.inertia[2],
-         link.inertia[3], link.inertia[4], link.inertia[5],
-         link.inertia[6], link.inertia[7], link.inertia[8];
+      link.inertia[3], link.inertia[4], link.inertia[5],
+      link.inertia[6], link.inertia[7], link.inertia[8];
   Eigen::Matrix3d I_t;
   I_t << tool_inertia[0], tool_inertia[1], tool_inertia[2],
-         tool_inertia[3], tool_inertia[4], tool_inertia[5],
-         tool_inertia[6], tool_inertia[7], tool_inertia[8];
+      tool_inertia[3], tool_inertia[4], tool_inertia[5],
+      tool_inertia[6], tool_inertia[7], tool_inertia[8];
 
   auto parallel_axis = [](double m_i, const Eigen::Vector3d& d) {
     return m_i * (d.squaredNorm() * Eigen::Matrix3d::Identity() - d * d.transpose());
@@ -267,8 +267,12 @@ ArmManager::ArmManager(const std::string& yaml_file) {
           // 缓存配置，延迟到初始化打印中统一输出
           tool_configured = true;
           tool_frame = tool_node["frame"] ? tool_node["frame"].as<std::string>() : std::string("tcp");
-          tool_xyz_cache[0] = xyz[0]; tool_xyz_cache[1] = xyz[1]; tool_xyz_cache[2] = xyz[2];
-          tool_rpy_cache_deg[0] = rpy_deg[0]; tool_rpy_cache_deg[1] = rpy_deg[1]; tool_rpy_cache_deg[2] = rpy_deg[2];
+          tool_xyz_cache[0] = xyz[0];
+          tool_xyz_cache[1] = xyz[1];
+          tool_xyz_cache[2] = xyz[2];
+          tool_rpy_cache_deg[0] = rpy_deg[0];
+          tool_rpy_cache_deg[1] = rpy_deg[1];
+          tool_rpy_cache_deg[2] = rpy_deg[2];
         } else {
           ARM_LOG_WARN("tool.xyz 或 tool.rpy 长度不为 3，忽略 Tool 设置");
         }
@@ -313,6 +317,18 @@ ArmManager::ArmManager(const std::string& yaml_file) {
     gripper_controller_ = std::make_shared<GripperController>(gripper_stiffness, gripper_damping);
     gripper_controller_->SetMaxRange(gripper_max_range);
     gripper_controller_->SetSampleFrequency(sample_frequency);
+
+    if (auto fc = gripper_cfg["force_control"]) {
+      GripperController::ForceControlConfig cfg = gripper_controller_->GetForceControlConfig();
+      
+      cfg.contact_ticks = fc["contact_ticks"].as<int>();
+      cfg.hold_damping = fc["hold_damping"].as<double>();
+      cfg.ramp_rate = fc["ramp_rate"].as<double>();
+      cfg.min_position_ratio = fc["min_position_ratio"].as<double>();
+      cfg.max_target_torque = fc["max_target_torque"].as<double>();
+
+      gripper_controller_->SetForceControlConfig(cfg);
+    }
   }
 
   // ============================================================
@@ -363,6 +379,12 @@ ArmManager::ArmManager(const std::string& yaml_file) {
     if (gripper_controller_) {
       ARM_LOG_INFO("  Gripper:    range={:.3f}, stiffness={:.1f}, damping={:.1f}",
                    gripper_max_range, gripper_stiffness, gripper_damping);
+      const auto fc = gripper_controller_->GetForceControlConfig();
+      ARM_LOG_INFO(
+          "  Gripper FC: ticks={}, hold_damp={:.2f}, ramp={:.2f} N·m/s, "
+          "closed@ratio={:.3f} ({:.4f} rad), torque_limit={:.2f} N·m",
+          fc.contact_ticks, fc.hold_damping, fc.ramp_rate, fc.min_position_ratio,
+          fc.min_position_ratio * gripper_max_range, fc.max_target_torque);
     } else {
       ARM_LOG_INFO("  Gripper:    (未配置)");
     }

@@ -57,7 +57,10 @@ class GripperController {
   std::optional<double> current_velocity_{};
   std::optional<double> current_effort_{};
 
+  std::optional<double> last_cmd_position_{};
+
   std::mutex state_mutex_;
+  std::mutex last_cmd_mutex_;
   SPSCRingBuffer<GripperCommand> command_queue_{4096};
 
   std::atomic<bool> force_stop_{false};

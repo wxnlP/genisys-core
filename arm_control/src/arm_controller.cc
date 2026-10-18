@@ -19,6 +19,8 @@ namespace {
 // 限位检查浮点容差 (rad)
 constexpr double kLimitEps = 0.01;
 
+constexpr double kBumplessTolRad = 0.05;
+
 double JointPathLength(const ArmMotion::Joint6Dof& q0, const ArmMotion::Joint6Dof& q1) {
   double sum = 0.0;
   for (int i = 0; i < 6; ++i) {
@@ -293,11 +295,53 @@ void ArmController::SetJointState(const ArmMotion::JointState& joint_state) {
 
 bool ArmController::GetJointCommand(ArmMotion::JointCommand& joint_command) {
   if (command_queue_.Pop(joint_command)) {
+    {
+      std::lock_guard<std::mutex> lock(last_cmd_mutex_);
+      last_cmd_joint_ = joint_command.position;
+    }
     return true;
   }
   joint_command.damping = motor_damping_;
   joint_command.stiffness = motor_stiffness_;
   return false;
+}
+
+ArmMotion::Joint6Dof ArmController::ResolveStartJoint(const ArmMotion::Joint6Dof& measured) const {
+  std::optional<ArmMotion::Joint6Dof> last;
+  {
+    std::lock_guard<std::mutex> lock(last_cmd_mutex_);
+    last = last_cmd_joint_;
+  }
+  if (!last.has_value()) {
+    return measured;
+  }
+
+  double max_delta = 0.0;
+  int max_delta_idx = 0;
+  for (int i = 0; i < 6; ++i) {
+    if (last->q[i] < joint_min_.q[i] - kLimitEps ||
+        last->q[i] > joint_max_.q[i] + kLimitEps) {
+      ARM_LOG_WARN("[bumpless] last command joint[{}]={:.4f} out of limit, fallback to measured",
+                   i, last->q[i]);
+      return measured;
+    }
+    const double d = std::abs(last->q[i] - measured.q[i]);
+    if (d > max_delta) {
+      max_delta = d;
+      max_delta_idx = i;
+    }
+  }
+
+  // 设定点与实测值差得太多
+  if (max_delta > kBumplessTolRad) {
+    ARM_LOG_WARN("[bumpless] fallback to measured: joint{} delta={:.4f} rad > {:.3f} rad",
+                 max_delta_idx + 1, max_delta, kBumplessTolRad);
+    return measured;
+  }
+
+  ARM_LOG_DEBUG("[bumpless] start from last command, max delta={:.4f} rad (joint{})",
+                max_delta, max_delta_idx + 1);
+  return last.value();
 }
 
 int ArmController::WaitForCompletion() {
@@ -361,6 +405,8 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     ARM_LOG_ERROR("[MoveL] failed: current joint state is not available");
     return -1;
   }
+
+  current_joint = ResolveStartJoint(current_joint);
 
   for (int i = 0; i < 6; ++i) {
     if (current_joint[i] < joint_min_[i]) {
@@ -484,6 +530,8 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
     return -1;
   }
 
+  current_joint = ResolveStartJoint(current_joint);
+
   for (int i = 0; i < 6; ++i) {
     if (current_joint[i] < joint_min_[i]) {
       current_joint[i] = joint_min_[i];
@@ -589,6 +637,8 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     ARM_LOG_ERROR("[MoveLMulti] failed: current joint state is not available");
     return -1;
   }
+
+  current_joint = ResolveStartJoint(current_joint);
 
   for (int i = 0; i < 6; ++i) {
     if (current_joint[i] < joint_min_[i]) {
@@ -714,6 +764,8 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
     ARM_LOG_ERROR("[MoveJMulti] failed: current joint state is not available");
     return -1;
   }
+
+  current_joint = ResolveStartJoint(current_joint);
 
   for (int i = 0; i < 6; ++i) {
     if (current_joint[i] < joint_min_[i]) {
@@ -844,7 +896,7 @@ int ArmController::ServoJ(const ArmMotion::Joint6Dof& target_joint, double dt) {
       ARM_LOG_ERROR("[ServoJ] failed: current joint state is not available");
       return -1;
     }
-    prev_servo_joint_ = current_joint;
+    prev_servo_joint_ = ResolveStartJoint(current_joint);
   } 
 
   ArmMotion::Joint6Dof q_prev = prev_servo_joint_.value();
@@ -925,8 +977,9 @@ int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
 
   // 单独处理首次servo
   if (!prev_servo_pose_.has_value()) {
+    const ArmMotion::Joint6Dof start_joint = ResolveStartJoint(current_joint);
     ArmMotion::Pose6Dof current_pose;
-    if (GetCurrentPose(current_pose) != 0) {
+    if (!kinematic_solver_->FK(start_joint, current_pose)) {
       ARM_LOG_ERROR("[ServoL] failed: current pose is not available");
       return -1;
     }

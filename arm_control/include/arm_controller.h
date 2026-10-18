@@ -75,6 +75,8 @@ class ArmController {
                          const ArmMotion::Joint6Dof& reference_joint,
                          ArmMotion::Joint6Dof& selected_joint) const;
 
+  ArmMotion::Joint6Dof ResolveStartJoint(const ArmMotion::Joint6Dof& measured) const;
+
   std::unique_ptr<TimeScalerBase> CreateTimeScaler(double normalized_v,
                                                    double normalized_a,
                                                    TimeScalerBase::PlanConfig& config);
@@ -111,6 +113,8 @@ class ArmController {
   std::optional<ArmMotion::JointState> current_state_;
   std::optional<ArmMotion::Joint6Dof> prev_servo_joint_;
   std::optional<ArmMotion::Pose6Dof> prev_servo_pose_;
+  std::optional<ArmMotion::Joint6Dof> last_cmd_joint_;
+  mutable std::mutex last_cmd_mutex_;
 
   std::string robot_name_;
 };

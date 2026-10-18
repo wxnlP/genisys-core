@@ -8,6 +8,10 @@
 #include "lspb_time_scaler.h"
 #include "quintic_time_scaler.h"
 
+namespace {
+constexpr double kBumplessTolRad = 0.05;
+}  // namespace
+
 void GripperController::SetGripperState(double position, double velocity, double effort) {
   std::lock_guard<std::mutex> lock(state_mutex_);
   current_position_ = position;
@@ -26,6 +30,10 @@ int GripperController::GetCurrentPosition(double& position) {
 
 int GripperController::GetGripperCommand(GripperCommand& command) {
   if (command_queue_.Pop(command)) {
+    {
+      std::lock_guard<std::mutex> lock(last_cmd_mutex_);
+      last_cmd_position_ = command.position;
+    }
     return 0;
   }
   command.damping = damping_;
@@ -50,9 +58,21 @@ bool GripperController::PosControl(double position, double velocity, double acce
     current_position = *current_position_;
   }
 
+  double start_position = current_position;
+  {
+    std::lock_guard<std::mutex> lock(last_cmd_mutex_);
+    if (last_cmd_position_.has_value() &&
+        std::abs(*last_cmd_position_ - current_position) <= kBumplessTolRad) {
+      start_position = *last_cmd_position_;
+    } else if (last_cmd_position_.has_value()) {
+      ARM_LOG_WARN("[Gripper] fallback to measured: delta={:.4f} rad > {:.3f} rad",
+                   std::abs(*last_cmd_position_ - current_position), kBumplessTolRad);
+    }
+  }
+
   double target_pos = position * max_range_;
 
-  double distance = target_pos - current_position;
+  double distance = target_pos - start_position;
   if (std::abs(distance) < 1e-6) {
     return true;
   }
@@ -83,7 +103,7 @@ bool GripperController::PosControl(double position, double velocity, double acce
     }
 
     GripperCommand cmd;
-    cmd.position = current_position + state.s * distance;
+    cmd.position = start_position + state.s * distance;
     cmd.velocity = state.sd * distance;
     cmd.effort = effort;
     cmd.stiffness = stiffness_;

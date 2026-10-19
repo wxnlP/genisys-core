@@ -180,15 +180,18 @@ int DmMotorDriver::MITCtrl(MotorType pos, MotorType vel, MotorType torque,
 int DmMotorDriver::PosCtrl(MotorType pos, MotorType vel) {
   uint8_t data[8];
   uint16_t id = motor_id_ + 0x100;
-  memcpy(data, &pos, sizeof(float));
-  memcpy(data + 4, &vel, sizeof(float));
+  const float pos_float = static_cast<float>(pos);
+  const float vel_float = static_cast<float>(vel);
+  memcpy(data, &pos_float, sizeof(float));
+  memcpy(data + 4, &vel_float, sizeof(float));
   return canfd_bus_.Send(id, data, 8);
 }
 
 int DmMotorDriver::VelCtrl(MotorType vel) {
   uint8_t data[8];
   uint16_t id = motor_id_ + 0x200;
-  memcpy(data, &vel, sizeof(float));
+  const float vel_float = static_cast<float>(vel);
+  memcpy(data, &vel_float, sizeof(float));
   return canfd_bus_.Send(id, data, 4);
 }
 

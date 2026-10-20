@@ -90,9 +90,9 @@ void Jacobian6Dof::Update(const ArmMotion::Joint6Dof& inputJoint, double dt) {
 bool Jacobian6Dof::ForwardVelocity(const ArmMotion::Joint6Dof& inputVel,
                                    ArmMotion::CartesianTwist& outputVel) {
   Eigen::Matrix<double, 6, 1> jointVel;
-  jointVel << inputVel.q[0], inputVel.q[1], 
-              inputVel.q[2], inputVel.q[3], 
-              inputVel.q[4], inputVel.q[5];
+  jointVel << inputVel.q[0], inputVel.q[1],
+      inputVel.q[2], inputVel.q[3],
+      inputVel.q[4], inputVel.q[5];
   Eigen::Matrix<double, 6, 1> cartesianVel = impl_->current_jacobian_ * jointVel;
 
   outputVel.linear.x = cartesianVel[0];
@@ -109,8 +109,8 @@ bool Jacobian6Dof::InverseVelocity(const ArmMotion::CartesianTwist& inputVel,
                                    ArmMotion::Joint6Dof& outputVel,
                                    double damping) {
   Eigen::Matrix<double, 6, 1> cartesianVel;
-  cartesianVel << inputVel.linear.x, inputVel.linear.y,inputVel.linear.z,
-                  inputVel.angular.x, inputVel.angular.y, inputVel.angular.z;
+  cartesianVel << inputVel.linear.x, inputVel.linear.y, inputVel.linear.z,
+      inputVel.angular.x, inputVel.angular.y, inputVel.angular.z;
   // 求雅可比伪逆
   Eigen::Matrix<double, 6, 6> J = impl_->current_jacobian_;
   Eigen::Matrix<double, 6, 6> JT = J.transpose();
@@ -123,6 +123,10 @@ bool Jacobian6Dof::InverseVelocity(const ArmMotion::CartesianTwist& inputVel,
   // 使用LLDT计算代替求逆
   Eigen::Matrix<double, 6, 1> x = JJT.ldlt().solve(cartesianVel);
   Eigen::Matrix<double, 6, 1> dqResult = JT * x;
+
+  if (!dqResult.allFinite() || dqResult.cwiseAbs().maxCoeff() > 10.0) {
+    return false;
+  }
   impl_->current_dq_ = dqResult;
 
   Eigen::Map<Eigen::Matrix<double, 6, 1>> outMap(&outputVel.q[0]);
@@ -134,7 +138,7 @@ bool Jacobian6Dof::ForwardAccel(const ArmMotion::Joint6Dof& inputAcc,
                                 ArmMotion::CartesianTwist& outputAcc) {
   Eigen::Matrix<double, 6, 1> jointAcc;
   jointAcc << inputAcc.q[0], inputAcc.q[1], inputAcc.q[2],
-              inputAcc.q[3], inputAcc.q[4], inputAcc.q[5];
+      inputAcc.q[3], inputAcc.q[4], inputAcc.q[5];
   Eigen::Matrix<double, 6, 1> cartesianAcc =
       impl_->current_jacobian_ * jointAcc +
       impl_->jacobian_dot_ * impl_->current_dq_;
@@ -154,7 +158,7 @@ bool Jacobian6Dof::InverseAccel(const ArmMotion::CartesianTwist& inputAcc,
                                 double damping) {
   Eigen::Matrix<double, 6, 1> cartesianAcc;
   cartesianAcc << inputAcc.linear.x, inputAcc.linear.y, inputAcc.linear.z,
-                  inputAcc.angular.x, inputAcc.angular.y, inputAcc.angular.z;
+      inputAcc.angular.x, inputAcc.angular.y, inputAcc.angular.z;
   // 求雅可比伪逆
   Eigen::Matrix<double, 6, 6> J = impl_->current_jacobian_;
   Eigen::Matrix<double, 6, 6> JT = J.transpose();
@@ -171,6 +175,10 @@ bool Jacobian6Dof::InverseAccel(const ArmMotion::CartesianTwist& inputAcc,
   // 使用LLDT计算代替求逆
   Eigen::Matrix<double, 6, 1> x = JJT.ldlt().solve(bias_acc);
   Eigen::Matrix<double, 6, 1> ddqResult = JT * x;
+
+  if (!ddqResult.allFinite() || ddqResult.cwiseAbs().maxCoeff() > 10.0) {
+    return false;
+  }
 
   Eigen::Map<Eigen::Matrix<double, 6, 1>> outMap(&outputAcc.q[0]);
   outMap = ddqResult;

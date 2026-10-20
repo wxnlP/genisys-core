@@ -135,7 +135,7 @@ int DmMotorDriver::SetMotorID(uint32_t id, bool save) {
   for (int i = 0; i < 4; i++) {
     data[i] = static_cast<uint8_t>(id >> (i * 8));
   }
-  if (WriteRegister(0x08, data)) {
+  if (WriteRegister(0x08, data) == -1) {
     return -1;
   }
   if (save) {

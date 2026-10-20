@@ -1,6 +1,8 @@
 #pragma once
 
 #include <vector>
+#include <optional>
+#include <chrono>
 #include "arm_ctrl_base.h"
 #include "dm_motor_driver.h"
 
@@ -21,4 +23,5 @@ public:
 
 private:
     std::vector<DmMotorDriver>& motor_driver_;
+    std::optional<std::chrono::steady_clock::time_point> last_request_time_;
 };

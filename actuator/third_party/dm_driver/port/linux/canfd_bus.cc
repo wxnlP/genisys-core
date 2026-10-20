@@ -2,6 +2,11 @@
 #include "socket_can.h"
 #include <cstring>
 
+namespace {
+// 反馈帧有效期：500Hz 下约 25 帧，超过则视为该关节已失联
+constexpr int kFrameTimeoutMs = 50;
+}  // namespace
+
 
 SocketCANBus::SocketCANBus(const std::string &interface_name, bool fd_mode)
     : can_interface_(interface_name), fd_mode_(fd_mode) {}
@@ -49,8 +54,8 @@ void SocketCANBus::SetReceiverId(uint32_t *id, uint8_t len) {
 }
 
 void SocketCANBus::Sample() {
-  uint32_t id;
-  uint8_t dlc;
+  uint32_t id{};
+  uint8_t dlc{};
   uint8_t data[8]{};
   int bytes;
   if (fd_mode_) {
@@ -58,14 +63,17 @@ void SocketCANBus::Sample() {
   } else {
     bytes = SocketCAN_Receive(socket_fd_, &id, &dlc, data);
   }
-  if (bytes > 0) {
-    std::lock_guard<std::mutex> lock(fb_frames_mutex_);
-    for (int i = 0; i < kMAX_MOTOR_NUM; ++i) {
-      if (fb_frames_[i].master_id == id) {
-        memcpy(fb_frames_[i].data, data, dlc);
-        fb_frames_[i].valid = true;
-        break;
-      }
+  if (bytes <= 0) {
+    // 超时/错误：不碰任何缓存帧，过期由 Receive() 的时间戳判定
+    return;
+  }
+  std::lock_guard<std::mutex> lock(fb_frames_mutex_);
+  for (int i = 0; i < kMAX_MOTOR_NUM; ++i) {
+    if (fb_frames_[i].master_id == id) {
+      memcpy(fb_frames_[i].data, data, dlc);
+      fb_frames_[i].valid = true;
+      fb_frames_[i].stamp = std::chrono::steady_clock::now();
+      break;
     }
   }
 }
@@ -80,11 +88,17 @@ int SocketCANBus::Send(uint32_t id, const uint8_t *data, uint8_t len) {
 
 int SocketCANBus::Receive(uint32_t id, uint8_t *data) {
   std::lock_guard<std::mutex> lock(fb_frames_mutex_);
+  const auto now = std::chrono::steady_clock::now();
   for (int i = 0; i < kMAX_MOTOR_NUM; ++i) {
-    if (fb_frames_[i].master_id == id + 0x10 && fb_frames_[i].valid) {
-      memcpy(data, fb_frames_[i].data, 8);
-      return 0;
+    if (fb_frames_[i].master_id != id + 0x10 || !fb_frames_[i].valid) {
+      continue;
     }
+    if (now - fb_frames_[i].stamp > std::chrono::milliseconds(kFrameTimeoutMs)) {
+      fb_frames_[i].valid = false;
+      return -1;
+    }
+    memcpy(data, fb_frames_[i].data, 8);
+    return 0;
   }
   return -1;
 }

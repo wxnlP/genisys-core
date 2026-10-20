@@ -3,17 +3,16 @@
 class GripperCtrlBase {
  public:
   struct GripperState {
-    double position;
-    double velocity;
-    double effort;
+    double position{};
+    double velocity{};
+    double effort{};
   };
-
   struct GripperCommand {
-    double position;
-    double velocity;
-    double effort;
-    double stiffness;
-    double damping;
+    double position{};
+    double velocity{};
+    double effort{};
+    double stiffness{};
+    double damping{};
   };
 
   GripperCtrlBase() = default;
@@ -27,5 +26,4 @@ class GripperCtrlBase {
   virtual bool SendCommand(const GripperCommand& command) = 0;
   virtual bool ReceiveState(GripperState& state) = 0;
   virtual bool CalibrateZero() { return false; }
-
 };

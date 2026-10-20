@@ -229,7 +229,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
     }
   } catch (const std::exception& e) {
     ARM_LOG_ERROR("加载 dynamics 配置失败: {}", e.what());
-    return;
+    throw;
   }
 
   // ============================================================
@@ -280,6 +280,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
     }
   } catch (const std::exception& e) {
     ARM_LOG_ERROR("解析 tool 配置失败: {}", e.what());
+    throw;
   }
 
   // ============================================================

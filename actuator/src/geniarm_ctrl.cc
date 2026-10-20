@@ -1,5 +1,4 @@
 #include "geniarm_ctrl.h"
-#include <chrono>
 #include <cmath>
 #include <thread>
 
@@ -33,23 +32,24 @@ void GeniArmCtrl::Disable() {
 }
 
 bool GeniArmCtrl::SetJointState(const ArmCtrlBase::JointCommand& joint_cmd) {
+  bool ok = true;
   for (int i = 0; i < motor_driver_.size(); ++i) {
     DmMotorDriver::CtrlCmd cmd(joint_cmd.position[i], joint_cmd.velocity[i], joint_cmd.effort[i], joint_cmd.stiffness[i], joint_cmd.damping[i]);
     if (motor_driver_[i].MoveCtrl(cmd) == -1) {
-      return false;
+      ok = false;
     }
   }
-  return true;
+  return ok;
 }
 
 bool GeniArmCtrl::GetJointState(ArmCtrlBase::JointState& joint_state) {
-  static auto last_request_time = std::chrono::steady_clock::now();
   auto now = std::chrono::steady_clock::now();
-  if (now - last_request_time > std::chrono::milliseconds(100)) {
+
+  if (!last_request_time_.has_value() || now - last_request_time_.value() > std::chrono::milliseconds(100)) {
     for (auto& motor : motor_driver_) {
       motor.RequestState();
     }
-    last_request_time = now;
+    last_request_time_ = now;
   }
 
   for (int i = 0; i < motor_driver_.size(); ++i) {

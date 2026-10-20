@@ -280,7 +280,7 @@ bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof& inputPose,
           outputSolves.solveFlag[2 + i + 4 * ind_arm][1] = 1;
         }
       }
-    } else if (fabs(c - fabs(a - b) <= 0.000001)) {
+    } else if (fabs(c - fabs(a - b)) <= 0.000001) {
       theta_23[0][0] = std::atan2(L_2w[2], L_2w[0]);
       theta_23[1][0] = theta_23[0][0];
 

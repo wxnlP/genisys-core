@@ -485,10 +485,14 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     jacobian_->Update(target_joint, 1.0 / sample_frequency_);
 
     ArmMotion::Joint6Dof joint_vel;
-    jacobian_->InverseVelocity(cart_point.velocity, joint_vel, 1e-6);
+    if (!jacobian_->InverseVelocity(cart_point.velocity, joint_vel, 1e-6)) {
+      return false;
+    }
 
     ArmMotion::Joint6Dof joint_acc;
-    jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6);
+    if (!jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6)) {
+      return false;
+    }
 
     cmd.position = target_joint;
     cmd.velocity = joint_vel;
@@ -497,9 +501,11 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     // s6h4d特殊处理
     if (robot_name_ == "s6h4d") {
       cmd.effort = joint_acc;
-    } else {
+    } else if (dynamics_) {
       // 重力补偿
       dynamics_->GravityVector(target_joint, cmd.effort);
+    } else {
+      cmd.effort = ArmMotion::Joint6Dof{};
     }
     // 本地更新参考关节角
     current_joint = target_joint;
@@ -586,9 +592,11 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
     cmd.damping = motor_damping_;
     if (robot_name_ == "s6h4d") {
       cmd.effort = point.acceleration;
-    } else {
+    } else if (dynamics_) {
       // 重力补偿
       dynamics_->GravityVector(point.position, cmd.effort);
+    } else {
+      cmd.effort = ArmMotion::Joint6Dof{};
     }
     return true;
   };
@@ -714,9 +722,13 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
 
     jacobian_->Update(target_joint, 1.0 / sample_frequency_);
     ArmMotion::Joint6Dof joint_vel;
-    jacobian_->InverseVelocity(cart_point.velocity, joint_vel, 1e-6);
+    if (!jacobian_->InverseVelocity(cart_point.velocity, joint_vel, 1e-6)) {
+      return false;
+    }
     ArmMotion::Joint6Dof joint_acc;
-    jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6);
+    if (!jacobian_->InverseAccel(cart_point.acceleration, joint_acc, 1e-6)) {
+      return false;
+    }
 
     cmd.position = target_joint;
     cmd.velocity = joint_vel;
@@ -724,8 +736,10 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     cmd.damping = motor_damping_;
     if (robot_name_ == "s6h4d") {
       cmd.effort = joint_acc;
-    } else {
+    } else if (dynamics_) {
       dynamics_->GravityVector(target_joint, cmd.effort);
+    } else {
+      cmd.effort = ArmMotion::Joint6Dof{};
     }
     // 本地更新参考关节角
     current_joint = target_joint;
@@ -826,8 +840,10 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
     cmd.damping = motor_damping_;
     if (robot_name_ == "s6h4d") {
       cmd.effort = point.acceleration;
-    } else {
+    } else if (dynamics_) {
       dynamics_->GravityVector(point.position, cmd.effort);
+    } else {
+      cmd.effort = ArmMotion::Joint6Dof{};
     }
     return true;
   };

@@ -3,6 +3,7 @@
 #include "canfd_bus_base.h"
 #include <string>
 #include <atomic>
+#include <chrono>
 #include <mutex>
 #include <thread>
 
@@ -18,6 +19,7 @@ public:
     uint32_t master_id{};
     uint8_t data[8]{};
     bool valid{false};
+    std::chrono::steady_clock::time_point stamp{};
   };
 
   SocketCANBus(const std::string &interface_name, bool fd_mode = false);

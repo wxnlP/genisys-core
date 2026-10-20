@@ -1,4 +1,5 @@
 #include "socket_can.h"
+#include <errno.h>
 #include <linux/can.h>
 #include <linux/can/raw.h>
 #include <linux/if.h>
@@ -59,11 +60,20 @@ int SocketCAN_Connect(const char* can_port, bool fd_mode) {
     return -1;
   }
 
-  // 接收超时100ms，否则read()永久阻塞（AF_CAN不支持shutdown，只能靠超时唤醒）
+  // 接收超时10ms（对read生效）
   struct timeval rcv_timeout;
   rcv_timeout.tv_sec = 0;
-  rcv_timeout.tv_usec = 100000;
+  rcv_timeout.tv_usec = 10000;
   if (setsockopt(sock_fd, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout)) == -1) {
+    close(sock_fd);
+    return -1;
+  }
+
+  // 发送超时2ms（对write生效）
+  struct timeval snd_timeout;
+  snd_timeout.tv_sec = 0;
+  snd_timeout.tv_usec = 2000;
+  if (setsockopt(sock_fd, SOL_SOCKET, SO_SNDTIMEO, &snd_timeout, sizeof(snd_timeout)) == -1) {
     close(sock_fd);
     return -1;
   }
@@ -86,6 +96,19 @@ int SocketCAN_SetFilters(int sock_fd, const uint32_t* ids, int count) {
                     filters, sizeof(filters));
 }
 
+static int SocketCAN_SendFrame(int sock_fd, const void* frame, size_t len) {
+  for (int retry = 0; retry < 3; ++retry) {
+    ssize_t n = send(sock_fd, frame, len, MSG_DONTWAIT);
+    if (n >= 0) {
+      return (int)n;
+    }
+    if (errno != EINTR) {
+      return -1;
+    }
+  }
+  return -1;
+}
+
 int SocketCAN_Send(int sock_fd, uint32_t id, uint8_t dlc, const uint8_t* data) {
   if (sock_fd == -1 || dlc > CAN_MAX_DLC) {
     return -1;
@@ -95,7 +118,8 @@ int SocketCAN_Send(int sock_fd, uint32_t id, uint8_t dlc, const uint8_t* data) {
   frame.can_dlc = dlc;
   memcpy(frame.data, data, dlc);
 
-  return write(sock_fd, &frame, sizeof(frame));
+  int n = SocketCAN_SendFrame(sock_fd, &frame, sizeof(frame));
+  return (n == (int)sizeof(frame)) ? n : -1;
 }
 
 int SocketCAN_Receive(int sock_fd, uint32_t* id, uint8_t* dlc, uint8_t* data) {
@@ -104,7 +128,7 @@ int SocketCAN_Receive(int sock_fd, uint32_t* id, uint8_t* dlc, uint8_t* data) {
   }
 
   struct can_frame frame;
-  int nbytes = read(sock_fd, &frame, sizeof(struct can_frame));
+  int nbytes = recv(sock_fd, &frame, sizeof(struct can_frame), MSG_DONTWAIT);
   if (nbytes < 0) {
     return -1;
   }
@@ -127,7 +151,8 @@ int SocketCANFD_Send(int sock_fd, uint32_t id, uint8_t dlc, bool brs, const uint
   frame.flags = brs ? CANFD_BRS : 0;
   memcpy(frame.data, data, dlc);
 
-  return write(sock_fd, &frame, sizeof(frame));
+  int n = SocketCAN_SendFrame(sock_fd, &frame, sizeof(frame));
+  return (n == (int)sizeof(frame)) ? n : -1;
 }
 
 int SocketCANFD_Receive(int sock_fd, uint32_t* id, uint8_t* dlc, uint8_t* data) {
@@ -136,7 +161,7 @@ int SocketCANFD_Receive(int sock_fd, uint32_t* id, uint8_t* dlc, uint8_t* data) 
   }
 
   struct canfd_frame frame;
-  int nbytes = read(sock_fd, &frame, sizeof(struct canfd_frame));
+  int nbytes = recv(sock_fd, &frame, sizeof(struct can_frame), MSG_DONTWAIT);
   if (nbytes < 0) {
     return -1;
   }

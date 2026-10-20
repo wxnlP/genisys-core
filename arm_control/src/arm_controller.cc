@@ -68,7 +68,8 @@ std::unique_ptr<TimeScalerBase> ArmController::CreateTimeScaler(
 bool ArmController::SelectBestIKSolve(
     const ArmMotion::IKSolves& ik_solves,
     const ArmMotion::Joint6Dof& reference_joint,
-    ArmMotion::Joint6Dof& selected_joint) const {
+    ArmMotion::Joint6Dof& selected_joint,
+    bool require_within_limits) const {
   constexpr double kPi = M_PI;
   constexpr double kTwoPi = 2.0 * kPi;
 
@@ -85,19 +86,38 @@ bool ArmController::SelectBestIKSolve(
       continue;
     }
 
+    ArmMotion::Joint6Dof candidate = ik_solves.solves[i];
+    for (int j = 0; j < 6; ++j) {
+      double d = candidate.q[j] - reference_joint.q[j];
+      while (d > kPi) {
+        d -= kTwoPi;
+      }
+      while (d <= -kPi) {
+        d += kTwoPi;
+      }
+      candidate.q[j] = reference_joint.q[j] + d;
+    }
+
+    bool within_limits = true;
+    for (int j = 0; j < 6; ++j) {
+      if (candidate.q[j] < joint_min_.q[j] - kLimitEps ||
+          candidate.q[j] > joint_max_.q[j] + kLimitEps) {
+        within_limits = false;
+        break;
+      }
+    }
+
+    if (require_within_limits && !within_limits) {
+      continue;
+    }
+
     double score = 0.0;
     for (int j = 0; j < 6; ++j) {
-      double diff = ik_solves.solves[i].q[j] - reference_joint.q[j];
-      while (diff > kPi) {
-        diff -= kTwoPi;
-      }
-      while (diff <= -kPi) {
-        diff += kTwoPi;
-      }
+      const double diff = candidate.q[j] - reference_joint.q[j];
       score += diff * diff;
 
       // 对接近限位的解增加惩罚，优先选择远离限位的解
-      double val = ik_solves.solves[i].q[j];
+      double val = candidate.q[j];
       double margin_lower = val - joint_min_.q[j];
       double margin_upper = joint_max_.q[j] - val;
       double min_margin = std::min(margin_lower, margin_upper);
@@ -119,18 +139,7 @@ bool ArmController::SelectBestIKSolve(
 
     if (score < best_score) {
       best_score = score;
-      selected_joint = ik_solves.solves[i];
-      // 将候选解展开到 reference_joint 邻域，避免 ±2pi 等价角导致的突跳。
-      for (int j = 0; j < 6; ++j) {
-        double d = selected_joint.q[j] - reference_joint.q[j];
-        while (d > kPi) {
-          d -= kTwoPi;
-        }
-        while (d <= -kPi) {
-          d += kTwoPi;
-        }
-        selected_joint.q[j] = reference_joint.q[j] + d;
-      }
+      selected_joint = candidate;
       found_valid_solve = true;
     }
   }
@@ -625,8 +634,8 @@ int ArmController::MoveJ(ArmMotion::Pose6Dof target_pose, double v, double a) {
     return -1;
   }
   ArmMotion::Joint6Dof target_joint;
-  if (!SelectBestIKSolve(ik_solves, current_joint, target_joint)) {
-    ARM_LOG_ERROR("[MoveJ] failed: no valid IK solve at target pose=({}, {}, {})",
+  if (!SelectBestIKSolve(ik_solves, current_joint, target_joint, true)) {
+    ARM_LOG_ERROR("[MoveJ] failed: no valid IK solve within joint limits at target pose=({}, {}, {})",
                   target_pose.x, target_pose.y, target_pose.z);
     return -1;
   }

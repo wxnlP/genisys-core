@@ -482,7 +482,8 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
   double duration = trajectory->GetDuration();
 
   const ToolFrame tool = tool_frame_;
-  SampleTask task = [trajectory, current_joint, this, tool](double t, ArmMotion::JointCommand& cmd) mutable {
+  bool first_sample = true;
+  SampleTask task = [trajectory, current_joint, this, tool, first_sample](double t, ArmMotion::JointCommand& cmd) mutable {
     ArmMotion::CartesianTrajectoryPoint cart_point;
     if (!trajectory->Sample(t, cart_point)) {
       ARM_LOG_ERROR("[MoveL] failed: Sample at t={}", t);
@@ -514,7 +515,9 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     }
 
     // 通过雅可比矩阵将笛卡尔速度/加速度转换为关节速度/加速度
-    jacobian_->Update(target_joint, 1.0 / sample_frequency_);
+    jacobian_->Update(target_joint, first_sample ? 0.0 : 1.0 / sample_frequency_,
+                      tool.LocalPoint());
+    first_sample = false;
 
     ArmMotion::Joint6Dof joint_vel;
     if (!jacobian_->InverseVelocity(cart_point.velocity, joint_vel, 1e-6)) {
@@ -726,7 +729,8 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
   double duration = trajectory->GetDuration();
 
   const ToolFrame tool = tool_frame_;
-  SampleTask task = [trajectory, current_joint, this, tool](double t, ArmMotion::JointCommand& cmd) mutable {
+  bool first_sample = true;
+  SampleTask task = [trajectory, current_joint, this, tool, first_sample](double t, ArmMotion::JointCommand& cmd) mutable {
     ArmMotion::CartesianTrajectoryPoint cart_point;
     if (!trajectory->Sample(t, cart_point)) {
       ARM_LOG_ERROR("[MoveLMulti] failed: Sample at t={}", t);
@@ -754,7 +758,9 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
       }
     }
 
-    jacobian_->Update(target_joint, 1.0 / sample_frequency_);
+    jacobian_->Update(target_joint, first_sample ? 0.0 : 1.0 / sample_frequency_,
+                      tool.LocalPoint());
+    first_sample = false;
     ArmMotion::Joint6Dof joint_vel;
     if (!jacobian_->InverseVelocity(cart_point.velocity, joint_vel, 1e-6)) {
       return false;

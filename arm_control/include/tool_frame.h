@@ -17,6 +17,8 @@ class ToolFrame {
   ArmMotion::Pose6Dof Compose(const ArmMotion::Pose6Dof& flange_pose) const;
   // TCP 位姿 → 法兰位姿
   ArmMotion::Pose6Dof Remove(const ArmMotion::Pose6Dof& tcp_pose) const;
+  // 工具点在法兰坐标系下的位置
+  ArmMotion::Vector3d LocalPoint() const;
 
  private:
   Eigen::Matrix4d T_6tool_{Eigen::Matrix4d::Identity()};

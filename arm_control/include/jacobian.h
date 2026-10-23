@@ -9,7 +9,9 @@ class Jacobian6Dof {
   explicit Jacobian6Dof(const ArmMotion::MDHParams& mdh_params);
   ~Jacobian6Dof();
 
-  void Update(const ArmMotion::Joint6Dof& inputJoint, double dt);
+  // p_tool 为工具点在法兰坐标系下的位置。
+  void Update(const ArmMotion::Joint6Dof& inputJoint, double dt,
+              const ArmMotion::Vector3d& p_tool);
   bool ForwardVelocity(const ArmMotion::Joint6Dof& inputVel,
                        ArmMotion::CartesianTwist& outputVel);
   bool InverseVelocity(const ArmMotion::CartesianTwist& inputVel,

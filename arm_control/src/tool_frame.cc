@@ -21,3 +21,7 @@ ArmMotion::Pose6Dof ToolFrame::Compose(const ArmMotion::Pose6Dof& flange_pose) c
 ArmMotion::Pose6Dof ToolFrame::Remove(const ArmMotion::Pose6Dof& tcp_pose) const {
   return TransformToPose(PoseToTransform(tcp_pose) * T_tool6_);
 }
+
+ArmMotion::Vector3d ToolFrame::LocalPoint() const {
+  return {T_6tool_(0, 3), T_6tool_(1, 3), T_6tool_(2, 3)};
+}

@@ -12,9 +12,15 @@ class Jacobian6Dof::Impl {
   Eigen::Matrix<double, 6, 6> last_jacobian_;
   Eigen::Matrix<double, 6, 6> jacobian_dot_;
   Eigen::Matrix<double, 6, 1> current_dq_;
+  bool has_last_{false};
 
   explicit Impl(const ArmMotion::MDHParams& mdh_params)
-      : mdhParams_(mdh_params) {}
+      : mdhParams_(mdh_params) {
+    current_jacobian_.setZero();
+    last_jacobian_.setZero();
+    jacobian_dot_.setZero();
+    current_dq_.setZero();
+  }
 };
 
 Jacobian6Dof::Jacobian6Dof(const ArmMotion::MDHParams& mdh_params)
@@ -27,7 +33,8 @@ Jacobian6Dof::Jacobian6Dof(const ArmMotion::MDHParams& mdh_params)
   jointOffset_[5] = mdh_params.theta[5];
 }
 
-void Jacobian6Dof::Update(const ArmMotion::Joint6Dof& inputJoint, double dt) {
+void Jacobian6Dof::Update(const ArmMotion::Joint6Dof& inputJoint, double dt,
+                          const ArmMotion::Vector3d& p_tool) {
   // 齐次矩阵
   Eigen::Matrix4d T_02, T_03, T_04, T_05, T_06;
   Eigen::Matrix4d T[6];
@@ -63,7 +70,8 @@ void Jacobian6Dof::Update(const ArmMotion::Joint6Dof& inputJoint, double dt) {
   p[3] = T_04.block<3, 1>(0, 3);
   p[4] = T_05.block<3, 1>(0, 3);
   p[5] = T_06.block<3, 1>(0, 3);
-  pe = T_06.block<3, 1>(0, 3);
+  const Eigen::Vector3d tool_point(p_tool.x, p_tool.y, p_tool.z);
+  pe = T_06.block<3, 3>(0, 0) * tool_point + T_06.block<3, 1>(0, 3);
   z[0] = T[0].block<3, 1>(0, 2);
   z[1] = T_02.block<3, 1>(0, 2);
   z[2] = T_03.block<3, 1>(0, 2);
@@ -72,19 +80,20 @@ void Jacobian6Dof::Update(const ArmMotion::Joint6Dof& inputJoint, double dt) {
   z[5] = T_06.block<3, 1>(0, 2);
 
   // 构建雅可比矩阵
-  impl_->last_jacobian_ = impl_->current_jacobian_;
   for (int i = 0; i < 6; i++) {
     // 线速度
     impl_->current_jacobian_.block<3, 1>(0, i) = z[i].cross(pe - p[i]);
     // 角速度
     impl_->current_jacobian_.block<3, 1>(3, i) = z[i];
   }
-  if (dt > 1e-6) {
+  if (impl_->has_last_ && dt > 1e-6) {
     impl_->jacobian_dot_ =
         (impl_->current_jacobian_ - impl_->last_jacobian_) / dt;
   } else {
     impl_->jacobian_dot_.setZero();
   }
+  impl_->last_jacobian_ = impl_->current_jacobian_;
+  impl_->has_last_ = true;
 }
 
 bool Jacobian6Dof::ForwardVelocity(const ArmMotion::Joint6Dof& inputVel,

@@ -89,12 +89,13 @@ int main() {
       .d = {0.2, 0.0, 0.0, 0.05, 0.0, 0.1},
       .theta = {0.0, -M_PI_2, 0.0, 0.0, 0.0, 0.0}};
   Jacobian6Dof jac(mdh_params);
+  const ArmMotion::Vector3d p_tool{0.0, 0.0, 0.0};
 
   const ArmMotion::Joint6Dof q_current{0.35, -0.65, 0.90, -0.40, 0.55, 0.25};
   const ArmMotion::Joint6Dof dq{0.40, -0.25, 0.18, 0.12, -0.08, 0.15};
   const ArmMotion::Joint6Dof ddq{0.30, -0.18, 0.12, -0.10, 0.06, 0.08};
 
-  jac.Update(q_current, 0.0);
+  jac.Update(q_current, 0.0, p_tool);
 
   ArmMotion::CartesianTwist v_current;
   jac.ForwardVelocity(dq, v_current);
@@ -106,7 +107,7 @@ int main() {
       IntegratePosition(q_current, dq, ddq, kDt);
   const ArmMotion::Joint6Dof dq_next = IntegrateVelocity(dq, ddq, kDt);
 
-  jac.Update(q_next, kDt);
+  jac.Update(q_next, kDt, p_tool);
 
   ArmMotion::CartesianTwist v_next;
   jac.ForwardVelocity(dq_next, v_next);

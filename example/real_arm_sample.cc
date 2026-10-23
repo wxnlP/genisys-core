@@ -103,14 +103,14 @@ int main() {
   arm->MoveJ(ArmMotion::Joint6Dof{0, 1.00, -1.00, 0.0, 0.0, 0.0}, 0.5, 0.3);
   arm->WaitForCompletion();
 
-  ArmMotion::Pose6Dof current_pose;
-  if (arm->GetCurrentPose(current_pose) == 0) {
-    ARM_LOG_INFO("当前位置：x: {:.4f}, y: {:.4f}, z: {:.4f}", current_pose.x, current_pose.y, current_pose.z);
+  ArmMotion::Pose6Dof tcp;
+  if (arm->GetTCPPose(tcp) == 0) {
+    ARM_LOG_INFO("当前位置：x: {:.4f}, y: {:.4f}, z: {:.4f}", tcp.x, tcp.y, tcp.z);
   }
 
   ARM_LOG_INFO("开始笛卡尔多点 MoveL 测试");
   std::vector<ArmMotion::Pose6Dof> cart_points;
-  ArmMotion::Pose6Dof p1 = current_pose; p1.y -= 0.10; cart_points.push_back(p1);
+  ArmMotion::Pose6Dof p1 = tcp; p1.y -= 0.10; cart_points.push_back(p1);
   ArmMotion::Pose6Dof p2 = p1;           p2.z -= 0.10; cart_points.push_back(p2);
   ArmMotion::Pose6Dof p3 = p2;           p3.y += 0.10; cart_points.push_back(p3);
   ArmMotion::Pose6Dof p4 = p3;           p4.z += 0.10; cart_points.push_back(p4);

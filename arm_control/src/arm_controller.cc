@@ -262,14 +262,33 @@ void ArmController::StartSampleThread() {
   });
 }
 
-int ArmController::GetCurrentPose(ArmMotion::Pose6Dof& current_pose) {
+int ArmController::GetTCPPose(ArmMotion::Pose6Dof& tcp) {
+  ArmMotion::Pose6Dof flange;
+  const int ret = GetFlangePose(flange);
+  if (ret != 0) {
+    return ret;
+  }
+  tcp = tool_frame_.Compose(flange);
+  return 0;
+}
+
+int ArmController::GetFlangePose(ArmMotion::Pose6Dof& flange) {
   ArmMotion::Joint6Dof current_joint;
   if (GetCurrentJoint(current_joint) != 0) {
     return -1;
   }
-  if (!kinematic_solver_->FK(current_joint, current_pose)) {
+  if (!kinematic_solver_->FK(current_joint, flange)) {
     return -2;
   }
+  return 0;
+}
+
+int ArmController::GetEndEffectorPoses(EndEffectorPoses& poses) {
+  const int ret = GetFlangePose(poses.flange);
+  if (ret != 0) {
+    return ret;
+  }
+  poses.tcp = tool_frame_.Compose(poses.flange);
   return 0;
 }
 
@@ -282,19 +301,21 @@ int ArmController::GetCurrentJoint(ArmMotion::Joint6Dof& current_joint) {
   return 0;
 }
 
-int ArmController::JointToPose(const ArmMotion::Joint6Dof& joint, ArmMotion::Pose6Dof& pose) {
-  if (!kinematic_solver_->FK(joint, pose)) {
+int ArmController::JointToTCPPose(const ArmMotion::Joint6Dof& joint, ArmMotion::Pose6Dof& tcp) {
+  ArmMotion::Pose6Dof flange;
+  if (!kinematic_solver_->FK(joint, flange)) {
     return -1;
   }
+  tcp = tool_frame_.Compose(flange);
   return 0;
 }
 
-void ArmController::SetToolPose(const ArmMotion::Pose6Dof& tool_pose) {
-  kinematic_solver_->SetToolPose(tool_pose);
+void ArmController::SetTool(const ArmMotion::Pose6Dof& tool_pose) {
+  tool_frame_.Set(tool_pose);
 }
 
-void ArmController::ClearToolPose() {
-  kinematic_solver_->ClearToolPose();
+void ArmController::ClearTool() {
+  tool_frame_.Clear();
 }
 
 void ArmController::SetJointState(const ArmMotion::JointState& joint_state) {
@@ -387,20 +408,20 @@ int ArmController::WaitForCompletion(ArmMotion::Joint6Dof& target, uint32_t time
 int ArmController::WaitForCompletion(ArmMotion::Pose6Dof& target, uint32_t timeout_ms) {
   auto t0 = std::chrono::steady_clock::now();
   double period = 1.0 / sample_frequency_;
-  ArmMotion::Pose6Dof current;
+  ArmMotion::Pose6Dof tcp;
   for (int i=0; i < timeout_ms; ++i) {
-    if (GetCurrentPose(current) != 0) {
-      ARM_LOG_ERROR("[WaitForCompletion] failed: current pose is not available");
+    if (GetTCPPose(tcp) != 0) {
+      ARM_LOG_ERROR("[WaitForCompletion] failed: tcp pose is not available");
       return -1;
     }
-    if (CartesianPosDistance(current, target) < 0.005) {
+    if (CartesianPosDistance(tcp, target) < 0.005) {
       return 0;
     }
     auto t1 = std::chrono::steady_clock::now();
     auto ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
     if (ms > timeout_ms) {
-      ARM_LOG_WARN("[WaitForCompletion] timeout: current pose={:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}",
-                   current.x, current.y, current.z, current.quat.x, current.quat.y, current.quat.z, current.quat.w);
+      ARM_LOG_WARN("[WaitForCompletion] timeout: tcp pose={:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}",
+                   tcp.x, tcp.y, tcp.z, tcp.quat.x, tcp.quat.y, tcp.quat.z, tcp.quat.w);
       return -1;
     }
     std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(period * 1000)));
@@ -426,13 +447,14 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
   }
 
   // 通过正运动学获取当前笛卡尔位置
-  ArmMotion::Pose6Dof current_pose;
-  if (!kinematic_solver_->FK(current_joint, current_pose)) {
+  ArmMotion::Pose6Dof flange;
+  if (!kinematic_solver_->FK(current_joint, flange)) {
     ARM_LOG_ERROR("[MoveL] failed: FK at start");
     return -1;
   }
+  const ArmMotion::Pose6Dof current_tcp = tool_frame_.Compose(flange);
 
-  const double path_length = CartesianPosDistance(current_pose, target_pose);
+  const double path_length = CartesianPosDistance(current_tcp, target_pose);
   if (path_length <= 1e-7) {
     ARM_LOG_WARN("[MoveL] skip: path length too small");
     return -1;
@@ -454,12 +476,13 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
   }
 
   // 创建笛卡尔路径（直线路径）
-  auto path = std::make_shared<CartesianLinearPath>(current_pose, target_pose);
+  auto path = std::make_shared<CartesianLinearPath>(current_tcp, target_pose);
   // 创建笛卡尔轨迹
   auto trajectory = std::make_shared<CartesianTrajectory>(path, std::move(time_scaler));
   double duration = trajectory->GetDuration();
 
-  SampleTask task = [trajectory, current_joint, this](double t, ArmMotion::JointCommand& cmd) mutable {
+  const ToolFrame tool = tool_frame_;
+  SampleTask task = [trajectory, current_joint, this, tool](double t, ArmMotion::JointCommand& cmd) mutable {
     ArmMotion::CartesianTrajectoryPoint cart_point;
     if (!trajectory->Sample(t, cart_point)) {
       ARM_LOG_ERROR("[MoveL] failed: Sample at t={}", t);
@@ -468,7 +491,7 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
 
     // 通过逆运动学求解目标关节角
     ArmMotion::IKSolves ik_solves;
-    if (!kinematic_solver_->IK(cart_point.pose, current_joint, ik_solves)) {
+    if (!kinematic_solver_->IK(tool.Remove(cart_point.pose), current_joint, ik_solves)) {
       ARM_LOG_ERROR("[MoveL] failed: IK at t={}, pose=({}, {}, {})",
                     t, cart_point.pose.x, cart_point.pose.y, cart_point.pose.z);
       return false;
@@ -628,7 +651,7 @@ int ArmController::MoveJ(ArmMotion::Pose6Dof target_pose, double v, double a) {
 
   // 逆解得到目标关节角，优先选择接近当前关节角的解
   ArmMotion::IKSolves ik_solves;
-  if (!kinematic_solver_->IK(target_pose, current_joint, ik_solves)) {
+  if (!kinematic_solver_->IK(tool_frame_.Remove(target_pose), current_joint, ik_solves)) {
     ARM_LOG_ERROR("[MoveJ] failed: IK at target pose=({}, {}, {})",
                   target_pose.x, target_pose.y, target_pose.z);
     return -1;
@@ -665,15 +688,16 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     }
   }
 
-  ArmMotion::Pose6Dof current_pose;
-  if (!kinematic_solver_->FK(current_joint, current_pose)) {
+  ArmMotion::Pose6Dof flange;
+  if (!kinematic_solver_->FK(current_joint, flange)) {
     ARM_LOG_ERROR("[MoveLMulti] failed: FK at start");
     return -1;
   }
+  const ArmMotion::Pose6Dof current_tcp = tool_frame_.Compose(flange);
 
   std::vector<ArmMotion::Pose6Dof> path_points;
   path_points.reserve(points.size() + 1);
-  path_points.push_back(current_pose);
+  path_points.push_back(current_tcp);
   path_points.insert(path_points.end(), points.begin(), points.end());
 
   auto path = std::make_shared<CartesianMultiPointPath>(std::move(path_points), r);
@@ -701,7 +725,8 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
   auto trajectory = std::make_shared<CartesianTrajectory>(path, std::move(time_scaler));
   double duration = trajectory->GetDuration();
 
-  SampleTask task = [trajectory, current_joint, this](double t, ArmMotion::JointCommand& cmd) mutable {
+  const ToolFrame tool = tool_frame_;
+  SampleTask task = [trajectory, current_joint, this, tool](double t, ArmMotion::JointCommand& cmd) mutable {
     ArmMotion::CartesianTrajectoryPoint cart_point;
     if (!trajectory->Sample(t, cart_point)) {
       ARM_LOG_ERROR("[MoveLMulti] failed: Sample at t={}", t);
@@ -709,7 +734,7 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     }
 
     ArmMotion::IKSolves ik_solves;
-    if (!kinematic_solver_->IK(cart_point.pose, current_joint, ik_solves)) {
+    if (!kinematic_solver_->IK(tool.Remove(cart_point.pose), current_joint, ik_solves)) {
       ARM_LOG_ERROR("[MoveLMulti] failed: IK at t={}, pose=({}, {}, {})",
                     t, cart_point.pose.x, cart_point.pose.y, cart_point.pose.z);
       return false;
@@ -884,7 +909,7 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
   ArmMotion::Joint6Dof reference_joint = current_joint;
   for (size_t p = 0; p < points.size(); ++p) {
     ArmMotion::IKSolves ik_solves;
-    if (!kinematic_solver_->IK(points[p], reference_joint, ik_solves)) {
+    if (!kinematic_solver_->IK(tool_frame_.Remove(points[p]), reference_joint, ik_solves)) {
       ARM_LOG_ERROR("[MoveJMulti] failed: IK at point {}", p);
       return -1;
     }
@@ -966,7 +991,7 @@ int ArmController::ServoJ(const ArmMotion::Pose6Dof& target_pose, double dt) {
   }
 
   ArmMotion::IKSolves ik_solves;
-  if (!kinematic_solver_->IK(target_pose, reference_joint, ik_solves)) {
+  if (!kinematic_solver_->IK(tool_frame_.Remove(target_pose), reference_joint, ik_solves)) {
     ARM_LOG_ERROR("[ServoJ] failed: IK at target pose=({}, {}, {})",
                   target_pose.x, target_pose.y, target_pose.z);
     return -1;
@@ -1001,21 +1026,22 @@ int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
   }
 
   // 单独处理首次servo
-  if (!prev_servo_pose_.has_value()) {
+  if (!prev_servo_tcp_.has_value()) {
     const ArmMotion::Joint6Dof start_joint = ResolveStartJoint(current_joint);
-    ArmMotion::Pose6Dof current_pose;
-    if (!kinematic_solver_->FK(start_joint, current_pose)) {
-      ARM_LOG_ERROR("[ServoL] failed: current pose is not available");
+    ArmMotion::Pose6Dof flange;
+    if (!kinematic_solver_->FK(start_joint, flange)) {
+      ARM_LOG_ERROR("[ServoL] failed: flange pose is not available");
       return -1;
     }
-    prev_servo_pose_ = current_pose;
+    prev_servo_tcp_ = tool_frame_.Compose(flange);
   }
 
-  ArmMotion::Pose6Dof p_prev = prev_servo_pose_.value();
+  ArmMotion::Pose6Dof p_prev = prev_servo_tcp_.value();
   ArmMotion::Pose6Dof p_now = target_pose;
-  prev_servo_pose_ = p_now;
+  prev_servo_tcp_ = p_now;
 
-  SampleTask task = [this, p_prev, p_now, dt, current_joint](double t, ArmMotion::JointCommand& cmd) mutable {
+  const ToolFrame tool = tool_frame_;
+  SampleTask task = [this, p_prev, p_now, dt, current_joint, tool](double t, ArmMotion::JointCommand& cmd) mutable {
     ArmMotion::Pose6Dof interp_pose;
     // 线性插值（位置）
     const double s = std::clamp(t / dt, 0.0, 1.0);
@@ -1035,7 +1061,7 @@ int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
     interp_pose.quat.w = qi.w();
 
     ArmMotion::IKSolves ik_solves;
-    if (!kinematic_solver_->IK(interp_pose, current_joint, ik_solves)) {
+    if (!kinematic_solver_->IK(tool.Remove(interp_pose), current_joint, ik_solves)) {
       ARM_LOG_ERROR("[ServoL] failed: IK at t={}, pose=({}, {}, {})",
                     t, interp_pose.x, interp_pose.y, interp_pose.z);
       return false;
@@ -1079,5 +1105,5 @@ int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
 
 void ArmController::ServoStop() {
   prev_servo_joint_.reset();
-  prev_servo_pose_.reset();
+  prev_servo_tcp_.reset();
 }

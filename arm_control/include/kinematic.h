@@ -14,14 +14,6 @@ class KinematicSolver {
   ~KinematicSolver();
 
   void SetIKMode(IKMode mode);
-  // 设置法兰坐标系到工具坐标系的固定变换（T_6_tool）。
-  void SetToolPose(const ArmMotion::Pose6Dof& tool_pose);
-  void ClearToolPose();
-
-  // 设置 IK 解筛选使用的关节限位（弧度）。
-  void SetJointLimits(const ArmMotion::Joint6Dof& joint_min,
-                      const ArmMotion::Joint6Dof& joint_max);
-  void ClearJointLimits();
 
   bool FK(const ArmMotion::Joint6Dof& inputJoint,
           ArmMotion::Pose6Dof& outputPose);

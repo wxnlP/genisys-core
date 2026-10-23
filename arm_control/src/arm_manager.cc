@@ -262,7 +262,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
           tool_pose.z = xyz[2];
           tool_pose.quat = ArmMotion::Quaternion(q.w(), q.x(), q.y(), q.z());
 
-          arm_controller_->SetToolPose(tool_pose);
+          arm_controller_->SetTool(tool_pose);
 
           // 缓存配置，延迟到初始化打印中统一输出
           tool_configured = true;

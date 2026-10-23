@@ -15,6 +15,12 @@
 #include "dynamics.h"
 #include "spsc_ring_buffer.h"
 #include "time_scaler_base.h"
+#include "tool_frame.h"
+
+struct EndEffectorPoses {
+  ArmMotion::Pose6Dof flange;
+  ArmMotion::Pose6Dof tcp;
+};
 
 class ArmController {
  public:
@@ -42,12 +48,14 @@ class ArmController {
   double GetSampleFrequency() const { return sample_frequency_; }
   void SetDynamicsModel(const std::vector<Dynamics::Link>& links, const std::vector<double>& g);
 
-  int GetCurrentPose(ArmMotion::Pose6Dof& current_pose);
+  int GetTCPPose(ArmMotion::Pose6Dof& tcp);
+  int GetFlangePose(ArmMotion::Pose6Dof& flange);
+  int GetEndEffectorPoses(EndEffectorPoses& poses);
   int GetCurrentJoint(ArmMotion::Joint6Dof& current_joint);
-  int JointToPose(const ArmMotion::Joint6Dof& joint, ArmMotion::Pose6Dof& pose);
+  int JointToTCPPose(const ArmMotion::Joint6Dof& joint, ArmMotion::Pose6Dof& tcp);
 
-  void SetToolPose(const ArmMotion::Pose6Dof& tool_pose);
-  void ClearToolPose();
+  void SetTool(const ArmMotion::Pose6Dof& tool_pose);
+  void ClearTool();
 
   // 底层驱动更新
   void SetJointState(const ArmMotion::JointState& joint_state);
@@ -91,6 +99,7 @@ class ArmController {
   std::unique_ptr<KinematicSolver> kinematic_solver_;
   std::unique_ptr<Jacobian6Dof> jacobian_;
   std::unique_ptr<Dynamics> dynamics_;
+  ToolFrame tool_frame_;
 
   ArmMotion::MDHParams mdh_params_;
 
@@ -113,7 +122,7 @@ class ArmController {
   std::deque<SampleContext> sample_queue_;                       // 待采样的轨迹队列
   std::optional<ArmMotion::JointState> current_state_;
   std::optional<ArmMotion::Joint6Dof> prev_servo_joint_;
-  std::optional<ArmMotion::Pose6Dof> prev_servo_pose_;
+  std::optional<ArmMotion::Pose6Dof> prev_servo_tcp_;
   std::optional<ArmMotion::Joint6Dof> last_cmd_joint_;
   mutable std::mutex last_cmd_mutex_;
 

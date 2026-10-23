@@ -14,6 +14,8 @@ target_link_libraries(${CUR_TARGET_NAME} PUBLIC Eigen3::Eigen yaml-cpp)
 
 # 添加源文件
 target_sources(${CUR_TARGET_NAME} PRIVATE
+    src/pose_transform.cc
+    src/tool_frame.cc
     src/kinematic.cc
     src/jacobian.cc
     src/dynamics.cc

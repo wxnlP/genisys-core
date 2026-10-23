@@ -68,8 +68,7 @@ std::unique_ptr<TimeScalerBase> ArmController::CreateTimeScaler(
 bool ArmController::SelectBestIKSolve(
     const ArmMotion::IKSolves& ik_solves,
     const ArmMotion::Joint6Dof& reference_joint,
-    ArmMotion::Joint6Dof& selected_joint,
-    bool require_within_limits) const {
+    ArmMotion::Joint6Dof& selected_joint) const {
   constexpr double kPi = M_PI;
   constexpr double kTwoPi = 2.0 * kPi;
 
@@ -107,7 +106,8 @@ bool ArmController::SelectBestIKSolve(
       }
     }
 
-    if (require_within_limits && !within_limits) {
+    // 关节限位是硬约束：越界分支直接丢弃，不再作为候选。
+    if (!within_limits) {
       continue;
     }
 
@@ -660,7 +660,7 @@ int ArmController::MoveJ(ArmMotion::Pose6Dof target_pose, double v, double a) {
     return -1;
   }
   ArmMotion::Joint6Dof target_joint;
-  if (!SelectBestIKSolve(ik_solves, current_joint, target_joint, true)) {
+  if (!SelectBestIKSolve(ik_solves, current_joint, target_joint)) {
     ARM_LOG_ERROR("[MoveJ] failed: no valid IK solve within joint limits at target pose=({}, {}, {})",
                   target_pose.x, target_pose.y, target_pose.z);
     return -1;

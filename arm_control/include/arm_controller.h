@@ -79,10 +79,10 @@ class ArmController {
   void SetRobotName(std::string name) { robot_name_ = name; }
 
  private:
+  // 只接受关节限位内的解；调用方无需再单独过滤限位。
   bool SelectBestIKSolve(const ArmMotion::IKSolves& ik_solves,
                          const ArmMotion::Joint6Dof& reference_joint,
-                         ArmMotion::Joint6Dof& selected_joint,
-                         bool require_within_limits = false) const;
+                         ArmMotion::Joint6Dof& selected_joint) const;
 
   ArmMotion::Joint6Dof ResolveStartJoint(const ArmMotion::Joint6Dof& measured) const;
 

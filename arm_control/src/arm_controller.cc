@@ -1,9 +1,10 @@
 #include "arm_controller.h"
 
+#include <Eigen/Dense>
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 #include <thread>
-#include <Eigen/Dense>
 #include "arm_logger.h"
 #include "cartesian_linear_path.h"
 #include "cartesian_multi_point_path.h"
@@ -18,8 +19,16 @@ namespace {
 
 // 限位检查浮点容差 (rad)
 constexpr double kLimitEps = 0.01;
-
+// 到位判定容差：实际关节角与最后一条下发指令的最大偏差 (rad)
+constexpr double kJointArriveTolRad = 0.02;
 constexpr double kBumplessTolRad = 0.05;
+
+constexpr size_t kMaxTaskContexts = 10;
+
+// TaskContext 里的错误码
+constexpr int kCodeRequestError = -1;  // 请求错误
+constexpr int kCodeSampleError = -2;   // 采样错误
+constexpr int kCodeTolerError = -3;    // 容差错误
 
 double JointPathLength(const ArmMotion::Joint6Dof& q0, const ArmMotion::Joint6Dof& q1) {
   double sum = 0.0;
@@ -170,7 +179,7 @@ void ArmController::StopSampleThread() {
     sampling_thread_.request_stop();
     sample_cv_.notify_one();
     sampling_thread_.join();
-    motion_state_.store(MotionState::IDLE);
+    motion_state_.store(MotionState::Idle);
     command_queue_.Reset();
     {
       std::lock_guard<std::mutex> lock(sample_mutex_);
@@ -183,22 +192,23 @@ void ArmController::StartSampleThread() {
   sampling_thread_ = std::jthread([this](std::stop_token stoken) {
     constexpr size_t kLowWaterMark = 2048;   // 队列低水位阈值 (~25%)
     constexpr size_t kHighWaterMark = 6144;  // 队列高水位阈值 (~75%)
-    enum class Phase { BOOTSTRAP, STEADY, BACKOFF };
+    enum class Phase { BOOTSTRAP,
+                       STEADY,
+                       BACKOFF };
     ArmMotion::JointCommand cmd;
     while (!stoken.stop_requested()) {
       SampleContext context;
       {
         std::unique_lock<std::mutex> lock(sample_mutex_);
         if (sample_queue_.empty()) {
-          motion_state_.store(MotionState::IDLE);  // 无轨迹，转入空闲
-          // 睡眠
+          // 无轨迹：等待新任务
           sample_cv_.wait(lock, [this, &stoken]() {
             return !sample_queue_.empty() || stoken.stop_requested();
           });
-          if (stoken.stop_requested()) { break; }
+          if (stoken.stop_requested()) {
+            break;
+          }
         }
-        // 有轨迹，准备采样
-        motion_state_.store(MotionState::ACTIVE);
         context = std::move(sample_queue_.front());
         sample_queue_.pop_front();
       }
@@ -208,11 +218,15 @@ void ArmController::StartSampleThread() {
       double dt = 1.0 / sample_frequency_;
       auto t_last_push = std::chrono::steady_clock::now();
 
+      bool ok = true;
       while (t <= context.duration + 1e-7 && !stoken.stop_requested()) {
         // 跳过 t=0 采样点
         if (t > 1e-9) {
           // 采样
-          if (!context.task(t, cmd)) break;
+          if (!context.task(t, cmd)) {
+            ok = false;
+            break;
+          }
 
           // 入队（满则重试，永不丢点）
           while (!command_queue_.Push(cmd) && !stoken.stop_requested()) {
@@ -258,6 +272,11 @@ void ArmController::StartSampleThread() {
           }
         }
       }
+      if (!context.is_servo) {
+        motion_state_.store(ok ? MotionState::Sampled : MotionState::Error);
+      } else if (!ok) {
+        ARM_LOG_WARN("[Servo] Sampling failed");
+      }
     }
   });
 }
@@ -278,7 +297,7 @@ int ArmController::GetFlangePose(ArmMotion::Pose6Dof& flange) {
     return -1;
   }
   if (!kinematic_solver_->FK(current_joint, flange)) {
-    return -2;
+    return -1;
   }
   return 0;
 }
@@ -375,61 +394,133 @@ ArmMotion::Joint6Dof ArmController::ResolveStartJoint(const ArmMotion::Joint6Dof
 }
 
 int ArmController::WaitForCompletion() {
-  while (motion_state_.load() != MotionState::IDLE || !command_queue_.IsEmpty()) {
+  while (motion_state_.load() != MotionState::Idle || !command_queue_.IsEmpty()) {
     std::this_thread::yield();
   }
   return 0;
 }
 
-int ArmController::WaitForCompletion(ArmMotion::Joint6Dof& target, uint32_t timeout_ms) {
-  auto t0 = std::chrono::steady_clock::now();
-  double period = 1.0 / sample_frequency_;
-  ArmMotion::Joint6Dof current;
-  for (int i=0; i < timeout_ms; ++i) {
-    if (GetCurrentJoint(current) != 0) {
-      ARM_LOG_ERROR("[WaitForCompletion] failed: current joint state is not available");
-      return -1;
-    }
-    if (JointPathLength(current, target) < 0.01) {
-      return 0;
-    }
-    auto t1 = std::chrono::steady_clock::now();
-    auto ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-    if (ms > timeout_ms) {
-      ARM_LOG_WARN("[WaitForCompletion] timeout: current joint={:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}",
-                   current[0], current[1], current[2], current[3], current[4], current[5]);
-      return -1;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(period * 1000)));
+bool ArmController::JointTargetJudge(double tolerance) {
+  ArmMotion::Joint6Dof actual, last;
+  if (GetCurrentJoint(actual) != 0) {
+    return false;
   }
-  return -1;
+  {
+    std::lock_guard<std::mutex> lock(last_cmd_mutex_);
+    if (!last_cmd_joint_.has_value()) {
+      return false;
+    }
+    last = last_cmd_joint_.value();
+  }
+
+  for (int i = 0; i < 6; ++i) {
+    if (std::abs(actual[i] - last[i]) > tolerance) {
+      return false;
+    }
+  }
+  return true;
 }
 
-int ArmController::WaitForCompletion(ArmMotion::Pose6Dof& target, uint32_t timeout_ms) {
-  auto t0 = std::chrono::steady_clock::now();
-  double period = 1.0 / sample_frequency_;
-  ArmMotion::Pose6Dof tcp;
-  for (int i=0; i < timeout_ms; ++i) {
-    if (GetTCPPose(tcp) != 0) {
-      ARM_LOG_ERROR("[WaitForCompletion] failed: tcp pose is not available");
-      return -1;
-    }
-    if (CartesianPosDistance(tcp, target) < 0.005) {
-      return 0;
-    }
-    auto t1 = std::chrono::steady_clock::now();
-    auto ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
-    if (ms > timeout_ms) {
-      ARM_LOG_WARN("[WaitForCompletion] timeout: tcp pose={:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}, {:.4f}",
-                   tcp.x, tcp.y, tcp.z, tcp.quat.x, tcp.quat.y, tcp.quat.z, tcp.quat.w);
-      return -1;
-    }
-    std::this_thread::sleep_for(std::chrono::milliseconds(static_cast<int>(period * 1000)));
+void ArmController::SetTaskContextSize(int size) {
+  const int clamped = std::min(std::max(size, 1), static_cast<int>(kMaxTaskContexts));
+  if (clamped != size) {
+    ARM_LOG_WARN("[TaskContext] size {} out of range, clamped to {}", size, clamped);
   }
-  return -1;
+  std::lock_guard<std::mutex> lock(task_context_mutex_);
+  task_contexts_.assign(static_cast<size_t>(clamped), TaskContext{});
+}
+
+int ArmController::BeginMoveTask(SampleTask task, double duration_s) {
+  {
+    std::lock_guard<std::mutex> lock(sample_mutex_);
+    if (motion_state_.load() != MotionState::Idle) {
+      return -1;
+    }
+    sample_queue_.emplace_back(std::move(task), duration_s);
+    {
+      std::lock_guard<std::mutex> ctx_lock(task_context_mutex_);
+      current_task_context_ = TaskContext{++task_id_, duration_s * 1000.0, {}, TaskState::Running, 0};
+    }
+    motion_state_.store(MotionState::Running);
+  }
+  sample_cv_.notify_one();
+  return 0;
+}
+
+int ArmController::BeginServoTask(SampleTask task, double duration_s) {
+  {
+    std::lock_guard<std::mutex> lock(sample_mutex_);
+    const MotionState s = motion_state_.load();
+    if (s != MotionState::Idle && s != MotionState::Servo) {
+      return -1;
+    }
+    sample_queue_.emplace_back(std::move(task), duration_s, true);
+    motion_state_.store(MotionState::Servo);
+  }
+  sample_cv_.notify_one();
+  return 0;
+}
+
+void ArmController::MotionStateHandle(time_ns now) {
+  const MotionState now_state = motion_state_.load();
+  if (now_state != MotionState::Sampled && now_state != MotionState::Error) {
+    return;
+  }
+  if (!command_queue_.IsEmpty()) {
+    return;
+  }
+
+  TaskContext ctx;
+  {
+    std::lock_guard<std::mutex> lock(task_context_mutex_);
+    ctx = current_task_context_;
+  }
+
+  ctx.end_timestamp = now;
+  if (now_state == MotionState::Error) {
+    ctx.state = TaskState::SampleError;
+    ctx.code = kCodeSampleError;
+  } else if (JointTargetJudge(kJointArriveTolRad)) {
+    ctx.state = TaskState::Finished;
+    ctx.code = 0;
+  } else {
+    ctx.state = TaskState::TolerError;
+    ctx.code = kCodeTolerError;
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(task_context_mutex_);
+    task_contexts_[(ctx.id - 1) % task_contexts_.size()] = ctx;  // 环形覆盖最旧的一条
+    current_task_context_ = TaskContext{};
+  }
+
+  motion_state_.store(MotionState::Idle);
+}
+
+bool ArmController::GetHistoryTaskContext(std::vector<TaskContext>& task_contexts) {
+  std::lock_guard<std::mutex> lock(task_context_mutex_);
+  task_contexts.clear();
+  task_contexts.reserve(task_contexts_.size());
+  for (const auto& ctx : task_contexts_) {
+    if (ctx.id != 0) {
+      task_contexts.push_back(ctx);
+    }
+  }
+  return !task_contexts.empty();
+}
+
+bool ArmController::GetCurrentTaskContext(TaskContext& task_context) {
+  std::lock_guard<std::mutex> lock(task_context_mutex_);
+  task_context = current_task_context_;
+  return current_task_context_.id != 0;
 }
 
 int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
+  if (motion_state_.load() != MotionState::Idle) {
+    ARM_LOG_ERROR("[MoveL] failed: motion state is not idle");
+    return -1;
+  }
+
   ArmMotion::Joint6Dof current_joint;
   if (GetCurrentJoint(current_joint) != 0) {
     ARM_LOG_ERROR("[MoveL] failed: current joint state is not available");
@@ -547,16 +638,15 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     return true;
   };
 
-  {
-    std::lock_guard<std::mutex> lock(sample_mutex_);
-    sample_queue_.emplace_back(std::move(task), duration);
-    motion_state_.store(MotionState::ACTIVE);
-  }
-  sample_cv_.notify_one();
-  return 0;
+  return BeginMoveTask(std::move(task), duration);
 }
 
 int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) {
+  if (motion_state_.load() != MotionState::Idle) {
+    ARM_LOG_ERROR("[MoveJ] failed: motion state is not idle");
+    return -1;
+  }
+
   for (int i = 0; i < 6; i++) {
     if (target_joint[i] < joint_min_[i] - kLimitEps || target_joint[i] > joint_max_[i] + kLimitEps) {
       ARM_LOG_ERROR("[MoveJ] target joint[{}]={:.4f} out of limit [{:.4f}, {:.4f}]",
@@ -636,16 +726,15 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
     return true;
   };
 
-  {
-    std::lock_guard<std::mutex> lock(sample_mutex_);
-    sample_queue_.emplace_back(std::move(task), duration);
-    motion_state_.store(MotionState::ACTIVE);
-  }
-  sample_cv_.notify_one();
-  return 0;
+  return BeginMoveTask(std::move(task), duration);
 }
 
 int ArmController::MoveJ(ArmMotion::Pose6Dof target_pose, double v, double a) {
+  if (motion_state_.load() != MotionState::Idle) {
+    ARM_LOG_ERROR("[MoveJ] failed: motion state is not idle");
+    return -1;
+  }
+
   ArmMotion::Joint6Dof current_joint;
   if (GetCurrentJoint(current_joint) != 0) {
     ARM_LOG_ERROR("[MoveJ] failed: current joint state is not available");
@@ -670,6 +759,11 @@ int ArmController::MoveJ(ArmMotion::Pose6Dof target_pose, double v, double a) {
 }
 
 int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, double r, double v, double a) {
+  if (motion_state_.load() != MotionState::Idle) {
+    ARM_LOG_ERROR("[MoveLMulti] failed: motion state is not idle");
+    return -1;
+  }
+
   if (points.size() < 1) {
     ARM_LOG_ERROR("[MoveLMulti] failed: points size {} < 1", points.size());
     return -1;
@@ -786,16 +880,15 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     return true;
   };
 
-  {
-    std::lock_guard<std::mutex> lock(sample_mutex_);
-    sample_queue_.emplace_back(std::move(task), duration);
-    motion_state_.store(MotionState::ACTIVE);
-  }
-  sample_cv_.notify_one();
-  return 0;
+  return BeginMoveTask(std::move(task), duration);
 }
 
 int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, double r, double v, double a) {
+  if (motion_state_.load() != MotionState::Idle) {
+    ARM_LOG_ERROR("[MoveJMulti] failed: motion state is not idle");
+    return -1;
+  }
+
   if (points.size() < 2) {
     ARM_LOG_ERROR("[MoveJMulti] failed: points size {} < 2", points.size());
     return -1;
@@ -888,16 +981,15 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
     return true;
   };
 
-  {
-    std::lock_guard<std::mutex> lock(sample_mutex_);
-    sample_queue_.emplace_back(std::move(task), duration);
-    motion_state_.store(MotionState::ACTIVE);
-  }
-  sample_cv_.notify_one();
-  return 0;
+  return BeginMoveTask(std::move(task), duration);
 }
 
 int ArmController::MoveJMulti(const std::vector<ArmMotion::Pose6Dof>& points, double r, double v, double a) {
+  if (motion_state_.load() != MotionState::Idle) {
+    ARM_LOG_ERROR("[MoveJMulti] failed: motion state is not idle");
+    return -1;
+  }
+
   if (points.size() < 2) {
     ARM_LOG_ERROR("[MoveJMulti] failed: points size {} < 2", points.size());
     return -1;
@@ -932,6 +1024,11 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
 }
 
 int ArmController::ServoJ(const ArmMotion::Joint6Dof& target_joint, double dt) {
+  const MotionState s = motion_state_.load();
+  if (s != MotionState::Idle && s != MotionState::Servo) {
+    ARM_LOG_ERROR("[ServoJ] failed: motion state is not idle or servo");
+    return -1;
+  }
   if (dt <= 0.0) {
     ARM_LOG_ERROR("[ServoJ] failed: duration must be positive");
     return -1;
@@ -946,18 +1043,19 @@ int ArmController::ServoJ(const ArmMotion::Joint6Dof& target_joint, double dt) {
   }
 
   // 单独处理首次servo
-  if (!prev_servo_joint_.has_value()) {
+  ArmMotion::Joint6Dof q_prev;
+  if (prev_servo_joint_.has_value()) {
+    q_prev = prev_servo_joint_.value();
+  } else {
     ArmMotion::Joint6Dof current_joint;
     if (GetCurrentJoint(current_joint) != 0) {
       ARM_LOG_ERROR("[ServoJ] failed: current joint state is not available");
       return -1;
     }
-    prev_servo_joint_ = ResolveStartJoint(current_joint);
-  } 
+    q_prev = ResolveStartJoint(current_joint);
+  }
 
-  ArmMotion::Joint6Dof q_prev = prev_servo_joint_.value();
   ArmMotion::Joint6Dof q_now = target_joint;
-  prev_servo_joint_ = q_now;
 
   SampleTask task = [this, q_prev, q_now, dt](double t, ArmMotion::JointCommand& cmd) {
     for (int i = 0; i < 6; ++i) {
@@ -970,16 +1068,19 @@ int ArmController::ServoJ(const ArmMotion::Joint6Dof& target_joint, double dt) {
     return true;
   };
 
-  {
-    std::lock_guard<std::mutex> lock(sample_mutex_);
-    sample_queue_.emplace_back(std::move(task), dt);
-    motion_state_.store(MotionState::ACTIVE);
+  const int ret = BeginServoTask(std::move(task), dt);
+  if (ret == 0) {
+    prev_servo_joint_ = q_now;
   }
-  sample_cv_.notify_one();
-  return 0;
+  return ret;
 }
 
 int ArmController::ServoJ(const ArmMotion::Pose6Dof& target_pose, double dt) {
+  const MotionState s = motion_state_.load();
+  if (s != MotionState::Idle && s != MotionState::Servo) {
+    ARM_LOG_ERROR("[ServoJ] failed: motion state is not idle or servo");
+    return -1;
+  }
   if (dt <= 0.0) {
     ARM_LOG_ERROR("[ServoJ] failed: duration must be positive");
     return -1;
@@ -1013,6 +1114,11 @@ int ArmController::ServoJ(const ArmMotion::Pose6Dof& target_pose, double dt) {
 }
 
 int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
+  const MotionState s = motion_state_.load();
+  if (s != MotionState::Idle && s != MotionState::Servo) {
+    ARM_LOG_ERROR("[ServoL] failed: motion state is not idle or servo");
+    return -1;
+  }
   if (dt <= 0.0) {
     ARM_LOG_ERROR("[ServoL] failed: duration must be positive");
     return -1;
@@ -1032,19 +1138,20 @@ int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
   }
 
   // 单独处理首次servo
-  if (!prev_servo_tcp_.has_value()) {
+  ArmMotion::Pose6Dof p_prev;
+  if (prev_servo_tcp_.has_value()) {
+    p_prev = prev_servo_tcp_.value();
+  } else {
     const ArmMotion::Joint6Dof start_joint = ResolveStartJoint(current_joint);
     ArmMotion::Pose6Dof flange;
     if (!kinematic_solver_->FK(start_joint, flange)) {
       ARM_LOG_ERROR("[ServoL] failed: flange pose is not available");
       return -1;
     }
-    prev_servo_tcp_ = tool_frame_.Compose(flange);
+    p_prev = tool_frame_.Compose(flange);
   }
 
-  ArmMotion::Pose6Dof p_prev = prev_servo_tcp_.value();
   ArmMotion::Pose6Dof p_now = target_pose;
-  prev_servo_tcp_ = p_now;
 
   const ToolFrame tool = tool_frame_;
   SampleTask task = [this, p_prev, p_now, dt, current_joint, tool](double t, ArmMotion::JointCommand& cmd) mutable {
@@ -1099,17 +1206,18 @@ int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
     return true;
   };
 
-  {
-    std::lock_guard<std::mutex> lock(sample_mutex_);
-    sample_queue_.emplace_back(std::move(task), dt);
-    motion_state_.store(MotionState::ACTIVE);
+  const int ret = BeginServoTask(std::move(task), dt);
+  if (ret == 0) {
+    prev_servo_tcp_ = p_now;
   }
-  sample_cv_.notify_one();
-  return 0;
+  return ret;
 }
-
 
 void ArmController::ServoStop() {
   prev_servo_joint_.reset();
   prev_servo_tcp_.reset();
+  std::lock_guard<std::mutex> lock(sample_mutex_);
+  if (motion_state_.load() == MotionState::Servo) {
+    motion_state_.store(MotionState::Idle);
+  }
 }

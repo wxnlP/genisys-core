@@ -55,6 +55,7 @@ int main() {
         std::memcpy(&actuator_cmd.damping, &motion_cmd.damping, sizeof(actuator_cmd.damping));
       }
       arm_ctrl->SetJointState(actuator_cmd);
+      arm->MotionStateHandle(std::chrono::system_clock::now());
 
       if (gripper_ctrl) {
         GripperCtrlBase::GripperState gripper_state;

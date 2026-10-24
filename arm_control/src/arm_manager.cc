@@ -303,6 +303,11 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   // ============================================================
   double sample_frequency = robot_cfg["sample_frequency"].as<double>();
   arm_controller_->SetSampleFrequency(sample_frequency);
+  int task_context_size = 10;
+  if (auto node = robot_cfg["task_context_size"]; node) {
+    task_context_size = node.as<int>();
+  }
+  arm_controller_->SetTaskContextSize(task_context_size);
   arm_controller_->StartSampleThread();
   // ============================================================
   //  8. 夹爪控制器 — 仅在配置中存在时创建

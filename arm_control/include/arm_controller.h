@@ -78,6 +78,8 @@ class ArmController {
   void SetTool(const ArmMotion::Pose6Dof& tool_pose);
   void ClearTool();
 
+  int SolveIK(const ArmMotion::Pose6Dof& target, bool is_flange, bool do_fk, ArmMotion::Joint6Dof& joint);
+
   // 底层驱动更新
   void SetJointState(const ArmMotion::JointState& joint_state);
   bool GetJointCommand(ArmMotion::JointCommand& joint_command);
@@ -103,9 +105,8 @@ class ArmController {
 
  private:
   // 只接受关节限位内的解；调用方无需再单独过滤限位。
-  bool SelectBestIKSolve(const ArmMotion::IKSolves& ik_solves,
-                         const ArmMotion::Joint6Dof& reference_joint,
-                         ArmMotion::Joint6Dof& selected_joint) const;
+  bool SelectBestIKSolve(const ArmMotion::IKSolves& ik_solves, const ArmMotion::Joint6Dof& reference_joint,
+                         ArmMotion::Joint6Dof& selected_joint, bool log) const;
 
   ArmMotion::Joint6Dof ResolveStartJoint(const ArmMotion::Joint6Dof& measured) const;
 

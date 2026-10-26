@@ -1,6 +1,7 @@
 #include "arm_controller.h"
 
 #include <Eigen/Dense>
+#include <Eigen/Geometry>
 #include <algorithm>
 #include <cmath>
 #include <cstring>
@@ -21,7 +22,10 @@ namespace {
 constexpr double kLimitEps = 0.01;
 // 到位判定容差：实际关节角与最后一条下发指令的最大偏差 (rad)
 constexpr double kJointArriveTolRad = 0.02;
+// 设定点与实测值容差（rad）
 constexpr double kBumplessTolRad = 0.05;
+// 位置容差（m）
+constexpr double kPosTolM = 0.01;
 
 constexpr size_t kMaxTaskContexts = 10;
 
@@ -44,6 +48,28 @@ double CartesianPosDistance(const ArmMotion::Pose6Dof& p0, const ArmMotion::Pose
   const double dy = p1.y - p0.y;
   const double dz = p1.z - p0.z;
   return std::sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+bool IsPoseSame(const ArmMotion::Pose6Dof& p0, const ArmMotion::Pose6Dof& p1,
+                double trans_th, double rot_th_rad) {
+  Eigen::Quaterniond q0(p0.quat.w, p0.quat.x, p0.quat.y, p0.quat.z);
+  Eigen::Quaterniond q1(p1.quat.w, p1.quat.x, p1.quat.y, p1.quat.z);
+  q0.normalize();
+  q1.normalize();
+
+  // theta 是两个四元数的夹角, cos_theta_2 = q0 点积 q1
+  const double cos_theta_2 = std::min(1.0, std::abs(q0.dot(q1)));
+  // sin_theta_2 ^ 2 = 1 - cos_theta_2 ^ 2
+  const double sin_theta_2 = std::sqrt(std::max(0.0, 1.0 - cos_theta_2 * cos_theta_2));
+  // 四元数角度差
+  const double rot = 2.0 * std::atan2(sin_theta_2, cos_theta_2);
+
+  Eigen::Vector3d t0(p0.x, p0.y, p0.z);
+  Eigen::Vector3d t1(p1.x, p1.y, p1.z);
+  // 二范数距离差
+  const double dist = (t1 - t0).norm();
+
+  return rot < rot_th_rad && dist < trans_th;
 }
 
 }  // namespace
@@ -74,10 +100,9 @@ std::unique_ptr<TimeScalerBase> ArmController::CreateTimeScaler(
   }
 }
 
-bool ArmController::SelectBestIKSolve(
-    const ArmMotion::IKSolves& ik_solves,
-    const ArmMotion::Joint6Dof& reference_joint,
-    ArmMotion::Joint6Dof& selected_joint) const {
+bool ArmController::SelectBestIKSolve(const ArmMotion::IKSolves& ik_solves,
+                                      const ArmMotion::Joint6Dof& reference_joint,
+                                      ArmMotion::Joint6Dof& selected_joint, bool log=true) const {
   constexpr double kPi = M_PI;
   constexpr double kTwoPi = 2.0 * kPi;
 
@@ -184,7 +209,7 @@ bool ArmController::SelectBestIKSolve(
     }
   }
 
-  if (!found_valid_solve && bad_joint >= 0) {
+  if (!found_valid_solve && bad_joint >= 0 && log) {
     ARM_LOG_WARN(
         "[IK] no branch fits joint limits: branch {} joint {} value={:.4f} rad, "
         "limit=[{:.4f}, {:.4f}] rad, gap={:.4f} rad",
@@ -373,6 +398,36 @@ void ArmController::SetTool(const ArmMotion::Pose6Dof& tool_pose) {
 
 void ArmController::ClearTool() {
   tool_frame_.Clear();
+}
+
+int ArmController::SolveIK(const ArmMotion::Pose6Dof& target, bool is_flange, bool do_fk,
+                           ArmMotion::Joint6Dof& joint) {
+  //
+  ArmMotion::Joint6Dof current_joint;
+  if (GetCurrentJoint(current_joint) != 0) {
+    return -1;
+  }
+  ArmMotion::Pose6Dof flange_pose = target;
+  if (!is_flange) {
+    flange_pose = tool_frame_.Remove(target);
+  }
+  ArmMotion::IKSolves ik_solves{};
+  kinematic_solver_->IK(flange_pose, current_joint, ik_solves);
+  if (!SelectBestIKSolve(ik_solves, current_joint, joint, false)) {
+    return -2;
+  }
+
+  if (do_fk) {
+    ArmMotion::Pose6Dof fk_refer;
+    kinematic_solver_->FK(joint, fk_refer);
+    if (!is_flange) {
+      fk_refer = tool_frame_.Compose(fk_refer);
+    }
+    if (!IsPoseSame(fk_refer, target, kPosTolM, kLimitEps)) {
+      return -3;
+    }
+  }
+  return 0;
 }
 
 void ArmController::SetJointState(const ArmMotion::JointState& joint_state) {

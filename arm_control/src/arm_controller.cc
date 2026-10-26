@@ -84,6 +84,14 @@ bool ArmController::SelectBestIKSolve(
   double best_score = std::numeric_limits<double>::infinity();
   bool found_valid_solve = false;
 
+  // 记录最接近限位、但因限位被丢弃的关节
+  int bad_branch = -1;
+  int bad_joint = -1;
+  double bad_value = 0.0;
+  double bad_lo = 0.0;
+  double bad_hi = 0.0;
+  double bad_gap = std::numeric_limits<double>::infinity();
+
   for (int i = 0; i < 8; ++i) {
     const char j1_flag = ik_solves.solveFlag[i][0];
     const char j23_flag = ik_solves.solveFlag[i][1];
@@ -94,28 +102,51 @@ bool ArmController::SelectBestIKSolve(
       continue;
     }
 
-    ArmMotion::Joint6Dof candidate = ik_solves.solves[i];
-    for (int j = 0; j < 6; ++j) {
-      double d = candidate.q[j] - reference_joint.q[j];
-      while (d > kPi) {
-        d -= kTwoPi;
-      }
-      while (d <= -kPi) {
-        d += kTwoPi;
-      }
-      candidate.q[j] = reference_joint.q[j] + d;
-    }
-
+    // 把每个关节格式化到限位内的 2π 表示；多个表示时取离参考最近的。
+    ArmMotion::Joint6Dof candidate;
     bool within_limits = true;
     for (int j = 0; j < 6; ++j) {
-      if (candidate.q[j] < joint_min_.q[j] - kLimitEps ||
-          candidate.q[j] > joint_max_.q[j] + kLimitEps) {
+      const double raw = ik_solves.solves[i].q[j];
+      const double lo = joint_min_.q[j] - kLimitEps;
+      const double hi = joint_max_.q[j] + kLimitEps;
+      const int k_min = static_cast<int>(std::ceil((lo - raw) / kTwoPi));
+      const int k_max = static_cast<int>(std::floor((hi - raw) / kTwoPi));
+
+      bool found = false;
+      double best = 0.0;
+      double best_dist = std::numeric_limits<double>::infinity();
+      for (int k = k_min; k <= k_max; ++k) {
+        const double q = raw + static_cast<double>(k) * kTwoPi;
+        const double dist = std::abs(q - reference_joint[j]);
+        if (dist < best_dist) {
+          best_dist = dist;
+          best = q;
+          found = true;
+        }
+      }
+      if (!found) {
+        // 该关节没有任何 2π 表示落在限位内；记录离限位最近的表示。
+        const double q_above = raw + static_cast<double>(k_min) * kTwoPi;
+        const double q_below = raw + static_cast<double>(k_max) * kTwoPi;
+        const double gap_above = q_above - joint_max_.q[j];
+        const double gap_below = joint_min_.q[j] - q_below;
+        const bool use_above = gap_above <= gap_below;
+        const double gap = use_above ? gap_above : gap_below;
+        if (gap < bad_gap) {
+          bad_gap = gap;
+          bad_branch = i;
+          bad_joint = j;
+          bad_value = use_above ? q_above : q_below;
+          bad_lo = joint_min_.q[j];
+          bad_hi = joint_max_.q[j];
+        }
         within_limits = false;
         break;
       }
+      candidate[j] = best;
     }
 
-    // 关节限位是硬约束：越界分支直接丢弃，不再作为候选。
+    // 关节限位是硬约束：没有任何 2π 表示落在限位内的分支直接丢弃。
     if (!within_limits) {
       continue;
     }
@@ -151,6 +182,13 @@ bool ArmController::SelectBestIKSolve(
       selected_joint = candidate;
       found_valid_solve = true;
     }
+  }
+
+  if (!found_valid_solve && bad_joint >= 0) {
+    ARM_LOG_WARN(
+        "[IK] no branch fits joint limits: branch {} joint {} value={:.4f} rad, "
+        "limit=[{:.4f}, {:.4f}] rad, gap={:.4f} rad",
+        bad_branch, bad_joint, bad_value, bad_lo, bad_hi, bad_gap);
   }
 
   return found_valid_solve;

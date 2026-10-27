@@ -706,10 +706,7 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
     cmd.velocity = joint_vel;
     cmd.stiffness = motor_stiffness_;
     cmd.damping = motor_damping_;
-    // s6h4d特殊处理
-    if (robot_name_ == "s6h4d") {
-      cmd.effort = joint_acc;
-    } else if (dynamics_) {
+    if (dynamics_) {
       // 重力补偿
       dynamics_->GravityVector(target_joint, cmd.effort);
     } else {
@@ -797,9 +794,7 @@ int ArmController::MoveJ(ArmMotion::Joint6Dof target_joint, double v, double a) 
     cmd.velocity = point.velocity;
     cmd.stiffness = motor_stiffness_;
     cmd.damping = motor_damping_;
-    if (robot_name_ == "s6h4d") {
-      cmd.effort = point.acceleration;
-    } else if (dynamics_) {
+    if (dynamics_) {
       // 重力补偿
       dynamics_->GravityVector(point.position, cmd.effort);
     } else {
@@ -939,9 +934,7 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     cmd.velocity = joint_vel;
     cmd.stiffness = motor_stiffness_;
     cmd.damping = motor_damping_;
-    if (robot_name_ == "s6h4d") {
-      cmd.effort = joint_acc;
-    } else if (dynamics_) {
+    if (dynamics_) {
       dynamics_->GravityVector(target_joint, cmd.effort);
     } else {
       cmd.effort = ArmMotion::Joint6Dof{};
@@ -1042,9 +1035,7 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
     cmd.velocity = point.velocity;
     cmd.stiffness = motor_stiffness_;
     cmd.damping = motor_damping_;
-    if (robot_name_ == "s6h4d") {
-      cmd.effort = point.acceleration;
-    } else if (dynamics_) {
+    if (dynamics_) {
       dynamics_->GravityVector(point.position, cmd.effort);
     } else {
       cmd.effort = ArmMotion::Joint6Dof{};

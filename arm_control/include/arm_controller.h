@@ -101,8 +101,6 @@ class ArmController {
   int ServoL(const ArmMotion::Pose6Dof& target_pose, double dt);
   void ServoStop();
 
-  void SetRobotName(std::string name) { robot_name_ = name; }
-
  private:
   // 只接受关节限位内的解；调用方无需再单独过滤限位。
   bool SelectBestIKSolve(const ArmMotion::IKSolves& ik_solves, const ArmMotion::Joint6Dof& reference_joint,
@@ -167,6 +165,4 @@ class ArmController {
   std::optional<ArmMotion::Pose6Dof> prev_servo_tcp_;
   std::optional<ArmMotion::Joint6Dof> last_cmd_joint_;
   mutable std::mutex last_cmd_mutex_;
-
-  std::string robot_name_;
 };

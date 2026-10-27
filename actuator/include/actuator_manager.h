@@ -7,7 +7,6 @@
 #include "gripper_ctrl_base.h"
 #include "canfd_bus.h"
 #include "dm_motor_driver.h"
-#include "serial/serial.h"
 
 class ActuatorManager {
  public:
@@ -23,7 +22,6 @@ class ActuatorManager {
   std::shared_ptr<ArmCtrlBase> arm_ctrl_;
   std::shared_ptr<GripperCtrlBase> gripper_ctrl_;
   std::shared_ptr<SocketCANBus> can_bus_;
-  std::unique_ptr<serial::Serial> serial_;
   std::vector<DmMotorDriver> arm_motors_;
   std::shared_ptr<DmMotorDriver> gripper_motor_;
   std::vector<std::string> joint_names_;

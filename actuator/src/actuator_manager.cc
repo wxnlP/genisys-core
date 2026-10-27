@@ -3,7 +3,6 @@
 #include <stdexcept>
 #include "geniarm_ctrl.h"
 #include "geniarm_gripper.h"
-#include "s6h4d_ctrl.h"
 
 ActuatorManager::ActuatorManager(std::string file) {
   std::string config_file_path = "./cfg/" + file;
@@ -76,18 +75,6 @@ ActuatorManager::ActuatorManager(std::string file) {
       }
     }
     // "MIT" 或不指定时保持默认
-
-  } else if (arm_name == "s6h4d") {
-    auto proto = arm_cfg["protocol"];
-    std::string arm_port = proto["port"].as<std::string>();
-    int baud_rate = proto["baud_rate"].as<int>();
-    // 记录关节名称
-    for (const auto& joint : arm_cfg["joints"]) {
-      joint_names_.push_back(joint["name"].as<std::string>());
-    }
-    // 创建串口
-    serial_ = std::make_unique<serial::Serial>(arm_port, baud_rate, serial::Timeout::simpleTimeout(100));
-    arm_ctrl_ = std::make_shared<S6h4dCtrl>(*serial_);
   }
 
   if (!arm_ctrl_) {

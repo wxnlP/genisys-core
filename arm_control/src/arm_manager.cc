@@ -56,7 +56,6 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   YAML::Node config = YAML::LoadFile(config_file_path);
 
   auto robot_cfg = config["robot"];
-  std::string robot_name = robot_cfg["name"].as<std::string>();
 
   // ============================================================
   //  1. 关节限位（YAML 使用角度，内部转为弧度）
@@ -98,7 +97,6 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   //  4. 创建 ArmController
   // ============================================================
   arm_controller_ = std::make_shared<ArmController>(mdh_params, ik_mode);
-  arm_controller_->SetRobotName(robot_name);
 
   // Tool 配置缓存（用于后续统一打印）
   bool tool_configured = false;

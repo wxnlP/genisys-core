@@ -24,7 +24,6 @@ genisys-core
 │   │   ├── gripper_ctrl_base.h       # 夹爪驱动纯虚接口
 │   │   ├── actuator_manager.h        # 驱动层 YAML 工厂
 │   │   ├── geniarm_ctrl.h            # GeniArm 驱动实现（CANFD）
-│   │   ├── s6h4d_ctrl.h              # S6H4D 驱动实现（串口）
 │   │   └── geniarm_gripper.h         # GeniArm 夹爪驱动实现
 │   ├── src/
 │   └── third_party/                  # dm_driver / serial 等第三方依赖
@@ -130,7 +129,7 @@ geniarm_body_cfg.yaml ──▶ ArmManager + ActuatorManager
     └── arm_config     ──▶ ArmManager ──▶ KinematicSolver + ArmController
 ```
 
-- `ActuatorManager` 依据 YAML 中 `actuator.arm.name` 选择驱动实现（`geniarm` / `s6h4d`），新增硬件只需新增一个 name 分支；
+- `ActuatorManager` 依据 YAML 中 `actuator.arm.name` 选择驱动实现（`geniarm`），新增硬件只需新增一个 name 分支；
 - `ArmManager` 读取 MDH 参数、关节限位、IK 模式、控制参数并构造规划器；
 - 换一台不同构型的机械臂，通常**只改 YAML、不改代码**。
 

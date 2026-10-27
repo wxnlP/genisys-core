@@ -17,8 +17,8 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-# 是否构建示例
 option(GENISYS_CORE_BUILD_EXAMPLES "Build genisys-core examples" ON)
+set(GENISYS_CORE_BUILD_ARM "geniarm" CACHE STRING "Arm model to build (geniarm)")
 
 
 add_subdirectory(actuator)
@@ -29,5 +29,5 @@ if (GENISYS_CORE_BUILD_EXAMPLES)
 endif()
 
 install(DIRECTORY cfg/
-    DESTINATION ${CMAKE_BINARY_DIR}/cfg
+    DESTINATION ${CMAKE_BINARY_DIR}/cfg/genisys_core
 )

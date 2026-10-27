@@ -1,5 +1,6 @@
 #include "arm_manager.h"
 #include <Eigen/Geometry>
+#include <stdexcept>
 #include "arm_logger.h"
 #include "yaml-cpp/yaml.h"
 
@@ -62,6 +63,11 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   // ============================================================
   std::vector<double> limits_lower = robot_cfg["joint_limits"]["lower"].as<std::vector<double>>();
   std::vector<double> limits_upper = robot_cfg["joint_limits"]["upper"].as<std::vector<double>>();
+  if (limits_lower.size() != 6 || limits_upper.size() != 6) {
+    ARM_LOG_ERROR("joint_limits.lower/upper 必须各为 6 项，当前 lower={} upper={}",
+                  limits_lower.size(), limits_upper.size());
+    throw std::runtime_error("joint_limits must contain 6 values");
+  }
   for (auto& v : limits_lower) v *= M_PI / 180.0;
   for (auto& v : limits_upper) v *= M_PI / 180.0;
 
@@ -91,6 +97,7 @@ ArmManager::ArmManager(const std::string& yaml_file) {
     ik_mode = KinematicSolver::IKMode::ParallelWrist;
   } else {
     ARM_LOG_ERROR("IK 模式应为 'Piper' 或 'UR'，当前值: {}", ik_mode_str);
+    throw std::runtime_error("Unsupported ik_mode: " + ik_mode_str);
   }
 
   // ============================================================
@@ -112,9 +119,15 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   ArmMotion::Joint6Dof joint_min{};
   ArmMotion::Joint6Dof joint_max{};
 
+  auto joints_cfg = robot_cfg["joints"];
+  if (!joints_cfg || joints_cfg.size() != 6) {
+    ARM_LOG_ERROR("joints 配置必须为 6 项");
+    throw std::runtime_error("joints must contain 6 items");
+  }
+
   int count = 0;
   joint_names_.clear();
-  for (const auto& joint : robot_cfg["joints"]) {
+  for (const auto& joint : joints_cfg) {
     arm_stiffness[count] = joint["MIT"]["stiffness"].as<double>();
     arm_damping[count] = joint["MIT"]["damping"].as<double>();
     joint_min[count] = limits_lower[count];
@@ -300,6 +313,10 @@ ArmManager::ArmManager(const std::string& yaml_file) {
   //  7. 采样频率
   // ============================================================
   double sample_frequency = robot_cfg["sample_frequency"].as<double>();
+  if (sample_frequency <= 0.0) {
+    ARM_LOG_ERROR("sample_frequency 必须大于 0，当前值: {}", sample_frequency);
+    throw std::runtime_error("sample_frequency must be positive");
+  }
   arm_controller_->SetSampleFrequency(sample_frequency);
   int task_context_size = 10;
   if (auto node = robot_cfg["task_context_size"]; node) {

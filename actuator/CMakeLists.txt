@@ -1,13 +1,23 @@
 set(CUR_TARGET_NAME "actuator_controller")
 
-add_subdirectory(third_party/dm_driver)
-add_subdirectory(third_party/serial)
+if(GENISYS_CORE_BUILD_ARM STREQUAL "geniarm")
+  if(DEFINED GENISYS_CORE_BUILD_EXAMPLES)
+    set(DMDRIVER_BUILD_WITH_EXAMPLE ${GENISYS_CORE_BUILD_EXAMPLES})
+  endif()
+  add_subdirectory(third_party/dm_driver)
+  set(ARM_SOURCES
+    src/actuator_manager.cc
+    src/geniarm_ctrl.cc
+    src/geniarm_gripper.cc
+  )
+  set(ARM_LIBS dm_driver)
+else()
+  message(FATAL_ERROR "Unsupported GENISYS_CORE_BUILD_ARM: ${GENISYS_CORE_BUILD_ARM} (supported: geniarm)")
+endif()
 
 add_library(${CUR_TARGET_NAME} STATIC)
 
-file(GLOB_RECURSE src src/*.cc)
-
-target_sources(${CUR_TARGET_NAME} PRIVATE ${src})
+target_sources(${CUR_TARGET_NAME} PRIVATE ${ARM_SOURCES})
 
 target_include_directories(${CUR_TARGET_NAME} PUBLIC 
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -15,8 +25,7 @@ target_include_directories(${CUR_TARGET_NAME} PUBLIC
 )
 
 target_link_libraries(${CUR_TARGET_NAME} PUBLIC 
-  serial
-  dm_driver
+  ${ARM_LIBS}
 )
 
 # 安装静态库目标

@@ -22,7 +22,9 @@ target_sources(${CMAKE_TARGET_NAME} PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/port/linux/canfd_bus.cc
 )
 
-option(DMDRIVER_BUILD_WITH_EXAMPLE "Build dm_driver examples" ON)
+if(NOT DEFINED DMDRIVER_BUILD_WITH_EXAMPLE)
+    set(DMDRIVER_BUILD_WITH_EXAMPLE ON)
+endif()
 
 if (DMDRIVER_BUILD_WITH_EXAMPLE)
     add_executable(socketcan_demo example/socketcan_demo.cc)

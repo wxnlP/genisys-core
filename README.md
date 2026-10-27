@@ -2,6 +2,10 @@
 
 > Genisys Core——面向六轴协作机械臂的模块化运动控制核心库，覆盖从**硬件驱动 → 运动规划 → 实时控制**的完整软件栈。核心设计目标：**层间解耦、算法可插拔、配置驱动装配**——新增机械臂硬件、轨迹算法、机器人构型时，尽量不触碰已有代码。
 
+> [!WARNING]
+> 当前仓库仍在持续迭代，接口尚未完全稳定，后续可能会引入不兼容的破坏性更新。
+> 如果你希望将自己的机械臂接入本 SDK，欢迎通过 GitHub Issue 留言或发送邮件至 2661006892@qq.com 咨询。
+
 ---
 
 ## 设计理念
@@ -66,7 +70,7 @@ SDK 采用**纵向三层解耦**结构，层间只通过接口与布局一致的
 
 ```
 ┌───────────────────────────────────────────────────────────────┐
-│           适配层  由中间件模块自行实现（本项目为 ControlModule）    │
+│           适配层  由中间件模块自行实现（上层控制模块）              │
 │   实时控制循环：读取驱动反馈 → 取规划指令 → 下发驱动指令              │
 └───────────────┬────────────────────────────────┬──────────────┘
                 │ 依赖接口 / 高层类                 │ 依赖纯虚接口
@@ -97,7 +101,7 @@ SDK 中所有可替换组件都收敛到一组抽象接口：
 | `TimeScalerBase` | 规划层 | 时间分配（`Plan` / `Evaluate` / `GetDuration`） |
 | `KinematicSolver` | 规划层 | 运动学求解（FK / IK），内置双 IK 模式 |
 
-适配层（本项目中即 `ControlModule`）通过 `shared_ptr` 持有这些接口，控制循环里只做三件事——读反馈、取指令、发指令——从不关心具体驱动走的是 CAN 还是串口，也不关心轨迹是如何规划的。
+适配层（上层控制模块）通过 `shared_ptr` 持有这些接口，控制循环里只做三件事——读反馈、取指令、发指令——从不关心具体驱动走的是 CAN 还是串口，也不关心轨迹是如何规划的。
 
 ### 2. 策略模式：算法可插拔
 
@@ -124,9 +128,8 @@ TimeScalerBase ────┘
 对象装配链路如下：
 
 ```
-geniarm_body_cfg.yaml ──▶ ArmManager + ActuatorManager
-    ├── actuator_config ──▶ ActuatorManager ──▶ name 分支 ──▶ ArmCtrlBase 实现
-    └── arm_config     ──▶ ArmManager ──▶ KinematicSolver + ArmController
+geniarm_actuator_cfg.yaml ──▶ ActuatorManager ──▶ actuator.arm.name 分支 ──▶ ArmCtrlBase 实现
+geniarm_body_cfg.yaml     ──▶ ArmManager     ──▶ KinematicSolver + ArmController
 ```
 
 - `ActuatorManager` 依据 YAML 中 `actuator.arm.name` 选择驱动实现（`geniarm`），新增硬件只需新增一个 name 分支；
@@ -135,7 +138,7 @@ geniarm_body_cfg.yaml ──▶ ArmManager + ActuatorManager
 
 ### 4. 构建级解耦：集成层可整体替换
 
-SDK 产出两个个独立静态库目标：
+SDK 产出两个独立静态库目标：
 
 | 目标 | 内容 | 依赖关系 |
 |------|------|----------|
@@ -154,7 +157,7 @@ SDK 产出两个个独立静态库目标：
 | 新增轨迹平滑算法 | 继承 `TimeScalerBase`，加 `TrajectoryMode` 枚举值与工厂分支 | 仅规划层 | ★☆☆ |
 | 新增路径类型 | 继承 `JointPathBase` / `CartesianPathBase` | 仅规划层 | ★★☆ |
 | 适配新构型机械臂 | 配置 MDH / 限位 / IK 模式，必要时扩展 `KinematicSolver` | 配置文件或规划层 | ★★☆ |
-| 接入 ROS2 / AimRT 中间件 | 不链接 `genisys_core`，复用两个底层库写通信层 | 仅集成层 | ★☆☆ |
+| 接入 ROS2 / AimRT 中间件 | 复用 `arm_controller` 与 `actuator_controller` 两个底层库写通信层 | 仅集成层 | ★☆☆ |
 
 机械臂硬件适配的详细步骤见 [ADAPTATION.md](./ADAPTATION.md)。
 
@@ -205,10 +208,15 @@ actuator:
     name: "geniarm"            # 驱动类型标识，ActuatorManager 据此选择实现
     protocol: { port: "can0" }
     ctrl_mode: "MIT"           # MIT / POS / VEL
+    joint_limits:
+      lower: [-150, 0, -212, -90, -90, -180]
+      upper: [150, 212, 0, 90, 90, 180]
     joints:
       - name: "joint1"
         motor_id: 0x01
+        feedback_id: 0x11
         model: "DM4340P"
+      # ... 共 6 项
 ```
 
 **算法层 `xxx_body_cfg.yaml`：**
@@ -216,17 +224,31 @@ actuator:
 ```yaml
 robot:
   name: "geniarm"
+  sample_frequency: 500.0      # Hz
+  task_context_size: 10
+  joint_limits:
+    lower: [-150, 0, -212, -90, -90, -180]
+    upper: [150, 212, 0, 90, 90, 180]
+  trajectory_mode: "quintic"   # quintic / cubic / lspb
   kinematics:
-    ik_mode: "UR"              # SphericalWrist
+    ik_mode: "UR"              # UR -> ParallelWrist；Piper -> SphericalWrist
     MDH:
       alpha: [0, -90, 0, 0, -90, 90]
       a: [0, 0.02, 0.26, 0.24668, 0.075, 0]
       d: [0.1207, 0, 0, 0, 0, 0.0265]
       offset: [0, -180, 166.64, 13.36, 90, 0]
+  dynamics: "dynamics.yaml"    # 可选，相对于 ./cfg/
   joints:
     - name: "joint1"
       MIT: { stiffness: 120, damping: 5 }
+    # ... 共 6 项
+  tool:                        # 可选
+    frame: "default"
+    xyz: [0, 0, 0]
+    rpy: [0, 0, 0]
 ```
+
+完整字段与动力学配置见 [ADAPTATION.md](./ADAPTATION.md)。
 
 ---
 
@@ -245,6 +267,15 @@ robot:
 ./build.sh
 ```
 
+构建选项：
+
+| 选项 | 默认 | 说明 |
+|:---|:---|:---|
+| `GENISYS_CORE_BUILD_ARM` | `geniarm` | 选择要编译的机械臂型号，目前只支持 `geniarm` |
+| `GENISYS_CORE_BUILD_EXAMPLES` | `ON` | 是否编译示例；独立构建默认 ON |
+
+`third_party/serial` 不再默认参与构建。UART 型号需要在 `actuator/CMakeLists.txt` 对应分支中引入并链接 `serial`，详见 [ADAPTATION.md](./ADAPTATION.md)。
+
 ---
 
 ## 快速开始
@@ -257,38 +288,40 @@ int main() {
     ActuatorManager actuator_manager("geniarm_actuator_cfg.yaml");
     ArmManager arm_manager("geniarm_body_cfg.yaml");
 
-    auto arm = manager.GetArmController();
-    auto gripper = manager.GetGripperController();
+    auto arm_ctrl = actuator_manager.GetArmActuator();
+    auto gripper_ctrl = actuator_manager.GetGripperActuator();
+    auto arm = arm_manager.GetArmController();
+    auto gripper = arm_manager.GetGripperController();
 
-    manager.Enable();
-    manager.Start();
+    arm_ctrl->Enable();
+    if (gripper_ctrl) gripper_ctrl->Enable();
 
-    // 夹爪控制
-    gripper->PosControl(1.0, 0.5, 1.0, 0.0);
-    gripper->WaitForCompletion();
-
-    // 关节空间运动（MoveJ / MoveJMulti / ServoJ 同时支持位姿重载）
-    ArmMotion::Joint6Dof target{0, 1.0, -1.0, 0, 0, 0};
+    ArmMotion::Joint6Dof target{0.0, 1.0, -1.0, 0.0, 0.0, 0.0};
     arm->MoveJ(target, 0.5, 0.3);
     arm->WaitForCompletion();
 
-    // 笛卡尔空间运动
     ArmMotion::Pose6Dof pose;
-    arm->GetCurrentPose(pose);
+    arm->GetTCPPose(pose);
     pose.y += 0.1;
     arm->MoveL(pose, 0.5, 0.3);
     arm->WaitForCompletion();
 
-    manager.Disable();
+    if (gripper) {
+        gripper->PosControl(1.0, 0.5, 1.0, 0.0);
+        gripper->WaitForCompletion();
+    }
+
+    arm_ctrl->Disable();
+    if (gripper_ctrl) gripper_ctrl->Disable();
     return 0;
 }
 ```
 
-完整的示例参考 `example/real_arm_sample.cc`。
+上面只展示接口调用。实际运行时还需要控制循环持续把驱动反馈写入 `ArmController`，并从 `GetJointCommand` 取出指令下发给 `arm_ctrl`，完整实现见 `example/real_arm_sample.cc`。
 
 ---
 
 ## 项目引用与使用方式
 
 1. **纯 CPP 集成**：链接 `actuator_controller` + `arm_controller`，自行编写控制回路（见 `example/real_arm_sample.cc`）；
-2. **中间件集成**：适配 ROS2、AimRT 等通信中间件时，基于 `arm_controller` 与 `actuator_controller` 两个独立库目标实现通信架构（参考 [genisys](https://github.com/wxnlP/genisys)）。
+2. **中间件集成**：适配 ROS2、AimRT 等通信中间件时，基于 `arm_controller` 与 `actuator_controller` 两个独立库目标实现通信架构。

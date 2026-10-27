@@ -15,9 +15,9 @@ class KinematicSolver {
 
   void SetIKMode(IKMode mode);
 
-  bool FK(const ArmMotion::Joint6Dof& inputJoint,
+  void FK(const ArmMotion::Joint6Dof& inputJoint,
           ArmMotion::Pose6Dof& outputPose);
-  bool IK(const ArmMotion::Pose6Dof& inputPose, const ArmMotion::Joint6Dof& lastJoint,
+  void IK(const ArmMotion::Pose6Dof& inputPose, const ArmMotion::Joint6Dof& lastJoint,
           ArmMotion::IKSolves& outputSolves);
 
  private:

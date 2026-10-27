@@ -359,9 +359,7 @@ int ArmController::GetFlangePose(ArmMotion::Pose6Dof& flange) {
   if (GetCurrentJoint(current_joint) != 0) {
     return -1;
   }
-  if (!kinematic_solver_->FK(current_joint, flange)) {
-    return -1;
-  }
+  kinematic_solver_->FK(current_joint, flange);
   return 0;
 }
 
@@ -385,9 +383,7 @@ int ArmController::GetCurrentJoint(ArmMotion::Joint6Dof& current_joint) {
 
 int ArmController::JointToTCPPose(const ArmMotion::Joint6Dof& joint, ArmMotion::Pose6Dof& tcp) {
   ArmMotion::Pose6Dof flange;
-  if (!kinematic_solver_->FK(joint, flange)) {
-    return -1;
-  }
+  kinematic_solver_->FK(joint, flange);
   tcp = tool_frame_.Compose(flange);
   return 0;
 }
@@ -632,10 +628,7 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
 
   // 通过正运动学获取当前笛卡尔位置
   ArmMotion::Pose6Dof flange;
-  if (!kinematic_solver_->FK(current_joint, flange)) {
-    ARM_LOG_ERROR("[MoveL] failed: FK at start");
-    return -1;
-  }
+  kinematic_solver_->FK(current_joint, flange);
   const ArmMotion::Pose6Dof current_tcp = tool_frame_.Compose(flange);
 
   const double path_length = CartesianPosDistance(current_tcp, target_pose);
@@ -676,11 +669,7 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
 
     // 通过逆运动学求解目标关节角
     ArmMotion::IKSolves ik_solves;
-    if (!kinematic_solver_->IK(tool.Remove(cart_point.pose), current_joint, ik_solves)) {
-      ARM_LOG_ERROR("[MoveL] failed: IK at t={}, pose=({}, {}, {})",
-                    t, cart_point.pose.x, cart_point.pose.y, cart_point.pose.z);
-      return false;
-    }
+    kinematic_solver_->IK(tool.Remove(cart_point.pose), current_joint, ik_solves);
 
     // 选择最优逆解：过滤不可达解并优先选与当前姿态最接近的解。
     ArmMotion::Joint6Dof target_joint;
@@ -836,11 +825,7 @@ int ArmController::MoveJ(ArmMotion::Pose6Dof target_pose, double v, double a) {
 
   // 逆解得到目标关节角，优先选择接近当前关节角的解
   ArmMotion::IKSolves ik_solves;
-  if (!kinematic_solver_->IK(tool_frame_.Remove(target_pose), current_joint, ik_solves)) {
-    ARM_LOG_ERROR("[MoveJ] failed: IK at target pose=({}, {}, {})",
-                  target_pose.x, target_pose.y, target_pose.z);
-    return -1;
-  }
+  kinematic_solver_->IK(tool_frame_.Remove(target_pose), current_joint, ik_solves);
   ArmMotion::Joint6Dof target_joint;
   if (!SelectBestIKSolve(ik_solves, current_joint, target_joint)) {
     ARM_LOG_ERROR("[MoveJ] failed: no valid IK solve within joint limits at target pose=({}, {}, {})",
@@ -879,10 +864,7 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
   }
 
   ArmMotion::Pose6Dof flange;
-  if (!kinematic_solver_->FK(current_joint, flange)) {
-    ARM_LOG_ERROR("[MoveLMulti] failed: FK at start");
-    return -1;
-  }
+  kinematic_solver_->FK(current_joint, flange);
   const ArmMotion::Pose6Dof current_tcp = tool_frame_.Compose(flange);
 
   std::vector<ArmMotion::Pose6Dof> path_points;
@@ -925,11 +907,7 @@ int ArmController::MoveLMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
     }
 
     ArmMotion::IKSolves ik_solves;
-    if (!kinematic_solver_->IK(tool.Remove(cart_point.pose), current_joint, ik_solves)) {
-      ARM_LOG_ERROR("[MoveLMulti] failed: IK at t={}, pose=({}, {}, {})",
-                    t, cart_point.pose.x, cart_point.pose.y, cart_point.pose.z);
-      return false;
-    }
+    kinematic_solver_->IK(tool.Remove(cart_point.pose), current_joint, ik_solves);
 
     ArmMotion::Joint6Dof target_joint;
     if (!SelectBestIKSolve(ik_solves, current_joint, target_joint)) {
@@ -1100,10 +1078,7 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Pose6Dof>& points, do
   ArmMotion::Joint6Dof reference_joint = current_joint;
   for (size_t p = 0; p < points.size(); ++p) {
     ArmMotion::IKSolves ik_solves;
-    if (!kinematic_solver_->IK(tool_frame_.Remove(points[p]), reference_joint, ik_solves)) {
-      ARM_LOG_ERROR("[MoveJMulti] failed: IK at point {}", p);
-      return -1;
-    }
+    kinematic_solver_->IK(tool_frame_.Remove(points[p]), reference_joint, ik_solves);
     ArmMotion::Joint6Dof target_joint;
     if (!SelectBestIKSolve(ik_solves, reference_joint, target_joint)) {
       ARM_LOG_ERROR("[MoveJMulti] failed: no valid IK solve at point {}", p);
@@ -1191,11 +1166,7 @@ int ArmController::ServoJ(const ArmMotion::Pose6Dof& target_pose, double dt) {
   }
 
   ArmMotion::IKSolves ik_solves;
-  if (!kinematic_solver_->IK(tool_frame_.Remove(target_pose), reference_joint, ik_solves)) {
-    ARM_LOG_ERROR("[ServoJ] failed: IK at target pose=({}, {}, {})",
-                  target_pose.x, target_pose.y, target_pose.z);
-    return -1;
-  }
+  kinematic_solver_->IK(tool_frame_.Remove(target_pose), reference_joint, ik_solves);
   ArmMotion::Joint6Dof target_joint;
   if (!SelectBestIKSolve(ik_solves, reference_joint, target_joint)) {
     ARM_LOG_ERROR("[ServoJ] failed: no valid IK solve at target pose=({}, {}, {})",
@@ -1237,10 +1208,7 @@ int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
   } else {
     const ArmMotion::Joint6Dof start_joint = ResolveStartJoint(current_joint);
     ArmMotion::Pose6Dof flange;
-    if (!kinematic_solver_->FK(start_joint, flange)) {
-      ARM_LOG_ERROR("[ServoL] failed: flange pose is not available");
-      return -1;
-    }
+    kinematic_solver_->FK(start_joint, flange);
     p_prev = tool_frame_.Compose(flange);
   }
 
@@ -1267,11 +1235,7 @@ int ArmController::ServoL(const ArmMotion::Pose6Dof& target_pose, double dt) {
     interp_pose.quat.w = qi.w();
 
     ArmMotion::IKSolves ik_solves;
-    if (!kinematic_solver_->IK(tool.Remove(interp_pose), current_joint, ik_solves)) {
-      ARM_LOG_ERROR("[ServoL] failed: IK at t={}, pose=({}, {}, {})",
-                    t, interp_pose.x, interp_pose.y, interp_pose.z);
-      return false;
-    }
+    kinematic_solver_->IK(tool.Remove(interp_pose), current_joint, ik_solves);
 
     ArmMotion::Joint6Dof target_joint;
     if (!SelectBestIKSolve(ik_solves, current_joint, target_joint)) {

@@ -115,15 +115,11 @@ void demo_forward_kinematics(KinematicSolver& kinematic_solver,
   outJoint = initial_theta_rad;
 
   // ===== 2. 执行 FK 计算 =====
-  bool success = kinematic_solver.FK(initial_theta_rad, outPose);
-  if (!success) {
-    cout << "❌ 正运动学计算失败!" << endl;
-    return;
-  }
+  kinematic_solver.FK(initial_theta_rad, outPose);
 
   // ===== 3. 打印计算结果 =====
   cout << fixed << setprecision(6);
-  cout << "✅ 正运动学计算成功!" << endl;
+  cout << "✅ 正运动学计算完成!" << endl;
 
   // 位置信息
   cout << "\n[RESULT] 末端位置 (Position m):" << endl;

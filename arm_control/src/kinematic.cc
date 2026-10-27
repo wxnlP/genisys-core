@@ -53,7 +53,7 @@ KinematicSolver::KinematicSolver(const ArmMotion::MDHParams& mdh_params)
   jointOffset_[5] = mdh_params.theta[5];
 }
 
-bool KinematicSolver::FK(const ArmMotion::Joint6Dof& inputJoint,
+void KinematicSolver::FK(const ArmMotion::Joint6Dof& inputJoint,
                          ArmMotion::Pose6Dof& outputPose) {
   double theta_in[6];
   double theta[6];
@@ -89,8 +89,6 @@ bool KinematicSolver::FK(const ArmMotion::Joint6Dof& inputJoint,
   T_06 = T_05 * T[5];
 
   outputPose = TransformToPose(T_06);
-
-  return true;
 }
 
 bool KinematicSolver::IK_SphericalWrist(const ArmMotion::Pose6Dof& inputPose,
@@ -695,22 +693,13 @@ void KinematicSolver::SetIKMode(IKMode mode) {
   ikMode_ = mode;
 }
 
-bool KinematicSolver::IK(const ArmMotion::Pose6Dof& inputPose, const ArmMotion::Joint6Dof& lastJoint,
+void KinematicSolver::IK(const ArmMotion::Pose6Dof& inputPose, const ArmMotion::Joint6Dof& lastJoint,
                          ArmMotion::IKSolves& outputSolves) {
-  bool ok = false;
-  if (ikMode_ == IKMode::SphericalWrist) {
-    ok = IK_SphericalWrist(inputPose, lastJoint, outputSolves);
-  } else if (ikMode_ == IKMode::ParallelWrist) {
-    ok = IK_ParallelWrist(inputPose, lastJoint, outputSolves);
+  if (ikMode_ == IKMode::ParallelWrist) {
+    IK_ParallelWrist(inputPose, lastJoint, outputSolves);
   } else {
-    return false;
+    IK_SphericalWrist(inputPose, lastJoint, outputSolves);
   }
-
-  if (!ok) {
-    return false;
-  }
-
-  return true;
 }
 
 KinematicSolver::~KinematicSolver() = default;

@@ -41,7 +41,7 @@ class GripperController {
   double GetSampleFrequency() const { return sample_frequency_; }
   void WaitForCompletion();
   bool PosControl(double position, double velocity, double accel, double effort);
-  bool ForceControl(const ForceControlParams& params);
+  int ForceControl(const ForceControlParams& params);
 
   void SetForceControlConfig(const ForceControlConfig& config) { force_config_ = config; }
   const ForceControlConfig& GetForceControlConfig() const { return force_config_; }

@@ -119,7 +119,7 @@ bool GripperController::PosControl(double position, double velocity, double acce
   return true;
 }
 
-bool GripperController::ForceControl(const ForceControlParams& params) {
+int GripperController::ForceControl(const ForceControlParams& params) {
   if (params.target_torque <= 0.0 || params.target_torque > force_config_.max_target_torque ||
       params.switch_velocity <= 0.0 || params.approach_velocity <= 0.0 ||
       params.approach_accel <= 0.0) {
@@ -128,7 +128,7 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
         "v={:.3f}, a={:.3f}",
         params.target_torque, force_config_.max_target_torque, params.switch_velocity,
         params.approach_velocity, params.approach_accel);
-    return false;
+    return -1;
   }
 
   force_stop_.store(false);
@@ -139,12 +139,12 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
   auto read_state = [this](double& x, double& v, double& tau) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     if (!current_position_.has_value() || !current_velocity_.has_value() || !current_effort_.has_value()) {
-      return false;
+      return -1;
     }
     x = *current_position_;
     v = *current_velocity_;
     tau = *current_effort_;
-    return true;
+    return 0;
   };
   auto push = [this](double position, double velocity, double effort, double stiffness, double damping) {
     GripperCommand cmd;
@@ -165,7 +165,7 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
   double x = 0.0, v = 0.0, tau = 0.0;
   if (!read_state(x, v, tau)) {
     ARM_LOG_ERROR("[Gripper] 力控启动失败：读不到夹爪状态");
-    return false;
+    return -1;
   }
 
   // ---------------- 第 1 步：合，直到碰到物体 ----------------
@@ -198,7 +198,7 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
       if (params.closed_release) {
         release();
         ARM_LOG_WARN("[Gripper] 夹空（超时）");
-        return true;
+        return -2;
       } else {
         break;
       }
@@ -227,7 +227,7 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
     if (x <= release_pos) {
       release();
       ARM_LOG_WARN("[Gripper] 夹空（限位）");
-      return true;
+      return -2;
     }
 
     t += dt;
@@ -249,5 +249,5 @@ bool GripperController::ForceControl(const ForceControlParams& params) {
 
   ARM_LOG_INFO("[Gripper] 力控完成，位置 {:.4f} rad, 反馈力矩 {:.4f} N·m", x, tau);
 
-  return true;
+  return 0;
 }

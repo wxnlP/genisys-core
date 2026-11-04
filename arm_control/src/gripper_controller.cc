@@ -139,12 +139,12 @@ int GripperController::ForceControl(const ForceControlParams& params) {
   auto read_state = [this](double& x, double& v, double& tau) {
     std::lock_guard<std::mutex> lock(state_mutex_);
     if (!current_position_.has_value() || !current_velocity_.has_value() || !current_effort_.has_value()) {
-      return -1;
+      return false;
     }
     x = *current_position_;
     v = *current_velocity_;
     tau = *current_effort_;
-    return 0;
+    return true;
   };
   auto push = [this](double position, double velocity, double effort, double stiffness, double damping) {
     GripperCommand cmd;

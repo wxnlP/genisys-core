@@ -184,7 +184,7 @@ int GripperController::ForceControl(const ForceControlParams& params) {
     config.T = std::max(1.875 / config.v_max, std::sqrt(5.7735 / config.a_max));
     if (!scaler.Plan(config)) {
       ARM_LOG_ERROR("[Gripper] 接近段多项式时间标定失败");
-      return false;
+      return -1;
     }
     duration = scaler.GetDuration();
   }

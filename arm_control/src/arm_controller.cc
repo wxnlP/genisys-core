@@ -26,6 +26,8 @@ constexpr double kJointArriveTolRad = 0.02;
 constexpr double kBumplessTolRad = 0.05;
 // 位置容差（m）
 constexpr double kPosTolM = 0.01;
+constexpr double kMinSegLenRad = 1e-9;       // 关节线段长度下限（rad）
+constexpr double kMinTcpSpeedPerRad = 1e-6;  // 单位关节弧长的 TCP 位移下限（m/rad）
 
 constexpr size_t kMaxTaskContexts = 10;
 
@@ -991,7 +993,61 @@ int ArmController::MoveJMulti(const std::vector<ArmMotion::Joint6Dof>& points, d
   path_points.push_back(current_joint);
   path_points.insert(path_points.end(), points.begin(), points.end());
 
-  auto path = std::make_shared<MultiPointJointPath>(std::move(path_points), r);
+  // r 为 TCP 侧切点退让距离[m]，逐点换算成关节空间切点退让距离 ρ[rad]：
+  //   ρ_j = r / max(||J_v(q_j)·d_in||, ||J_v(q_j)·d_out||)
+  std::vector<double> blend_radii(path_points.size(), 0.0);
+  if (r > 0.0) {
+    const ArmMotion::Vector3d p_tool = tool_frame_.LocalPoint();
+    for (size_t j = 1; j + 1 < path_points.size(); ++j) {
+      jacobian_->Update(path_points[j], 0.0, p_tool);
+
+      double tcp_speed_max = 0.0;  // max(|v_in|, |v_out|)[m/rad]
+      double len_min = 0.0;        // 两侧线段长度的较小值
+      bool degenerate = false;     // 相邻路径点重合
+      for (size_t side = 0; side < 2; ++side) {
+        // side = 0：入射段 [j-1, j]；side = 1：出射段 [j, j+1]
+        const ArmMotion::Joint6Dof& from = path_points[j + side - 1];
+        const ArmMotion::Joint6Dof& to = path_points[j + side];
+
+        ArmMotion::Joint6Dof dir{};
+        double len_sq = 0.0;
+        for (int i = 0; i < 6; ++i) {
+          dir[i] = to[i] - from[i];
+          len_sq += dir[i] * dir[i];
+        }
+        const double len = std::sqrt(len_sq);
+        if (len < kMinSegLenRad) {
+          degenerate = true;
+          break;
+        }
+        len_min = (side == 0) ? len : std::min(len_min, len);
+        for (int i = 0; i < 6; ++i) dir[i] /= len;
+
+        ArmMotion::CartesianTwist tcp_vel{};
+        jacobian_->ForwardVelocity(dir, tcp_vel);
+        const double tcp_speed = std::sqrt(tcp_vel.linear.x * tcp_vel.linear.x +
+                                           tcp_vel.linear.y * tcp_vel.linear.y +
+                                           tcp_vel.linear.z * tcp_vel.linear.z);
+        tcp_speed_max = std::max(tcp_speed_max, tcp_speed);
+      }
+
+      if (degenerate || tcp_speed_max < kMinTcpSpeedPerRad) continue;
+
+      // ρ 超过相邻段长的一半时会被 MultiPointJointPath 裁剪，有效退让距离随之减小
+      double rho = r / tcp_speed_max;
+      const double rho_limit = 0.5 * len_min;
+      if (rho > rho_limit) {
+        ARM_LOG_WARN(
+            "[MoveJMulti] corner {}: r={:.4f} m exceeds the adjacent joint segment, "
+            "effective TCP retreat reduced to {:.4f} m",
+            j, r, rho_limit * tcp_speed_max);
+        rho = rho_limit;
+      }
+      blend_radii[j] = rho;
+    }
+  }
+
+  auto path = std::make_shared<MultiPointJointPath>(std::move(path_points), std::move(blend_radii));
   const double path_length = path->GetTotalLength();
   if (path_length <= 1e-7) {
     ARM_LOG_ERROR("[MoveJMulti] failed: invalid path total length");

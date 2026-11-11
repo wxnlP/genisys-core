@@ -18,8 +18,9 @@ double MultiPointJointPath::JointDistance(const ArmMotion::Joint6Dof& p1,
 // 构造 & 预计算
 // ─────────────────────────────────────────────────────────────────────────────
 
-MultiPointJointPath::MultiPointJointPath(std::vector<ArmMotion::Joint6Dof> points, double r)
-    : points_(std::move(points)), r_(r) {
+MultiPointJointPath::MultiPointJointPath(std::vector<ArmMotion::Joint6Dof> points,
+                                         std::vector<double> blend_radii)
+    : points_(std::move(points)), blend_radii_(std::move(blend_radii)) {
   Precompute();
 }
 
@@ -32,7 +33,6 @@ void MultiPointJointPath::Precompute() {
 
   seg_lengths_.resize(n - 1);
   cum_lengths_.resize(n, 0.0);
-  blend_radii_.resize(n, 0.0);
 
   // 各线段长度及各路径点累计弧长
   for (int i = 0; i < n - 1; ++i) {
@@ -41,10 +41,10 @@ void MultiPointJointPath::Precompute() {
   }
   total_length_ = cum_lengths_[n - 1];
 
-  // 中间路径点的有效融合半径（端点保持 0）
+  // 中间路径点裁剪到相邻段长的一半，避免融合区重叠
   for (int j = 1; j < n - 1; ++j) {
-    double max_r = std::min(seg_lengths_[j - 1] * 0.5, seg_lengths_[j] * 0.5);
-    blend_radii_[j] = std::min(r_, max_r);
+    const double max_r = std::min(seg_lengths_[j - 1] * 0.5, seg_lengths_[j] * 0.5);
+    blend_radii_[j] = std::max(0.0, std::min(blend_radii_[j], max_r));
   }
 }
 

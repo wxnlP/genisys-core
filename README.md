@@ -235,8 +235,8 @@ robot:
     MDH:
       alpha: [0, -90, 0, 0, -90, 90]
       a: [0, 0.02, 0.26, 0.24668, 0.075, 0]
-      d: [0.1207, 0, 0, 0, 0, 0.0265]
-      offset: [0, -180, 166.64, 13.36, 90, 0]
+      d: [0.1459, 0, 0, 0, 0, 0.0335]
+      offset: [0, -180, 166.64, 13.36, 90, 180]
   dynamics: "dynamics.yaml"    # 可选，相对于 ./cfg/
   joints:
     - name: "joint1"
@@ -245,7 +245,7 @@ robot:
   tool:                        # 可选
     frame: "default"
     xyz: [0, 0, 0]
-    rpy: [0, 0, 0]
+    rpy: [-90, -90, 0]
 ```
 
 完整字段与动力学配置见 [ADAPTATION.md](./ADAPTATION.md)。

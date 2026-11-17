@@ -213,7 +213,7 @@ robot:
       alpha: [0.0, -90.0, 0.0, 0.0, -90.0, 90.0]   # 度
       a: [0.0, 0.02, 0.26, 0.24668, 0.075, 0.0]    # m
       d: [0.1459, 0.0, 0.0, 0.0, 0.0, 0.0335]      # m
-      offset: [0.0, -180.0, 166.64, 13.36, 90.0, 0.0]  # 度
+      offset: [0.0, -180.0, 166.64, 13.36, 90.0, 180.0]  # 度
   dynamics: "dynamics/my_robot_dynamics.yaml"
   joints:
     - name: "joint1"
@@ -231,7 +231,7 @@ robot:
   tool:
     frame: "default"
     xyz: [0.0, 0.0, 0.0]        # TCP 相对法兰的位置，m
-    rpy: [0.0, 0.0, 0.0]        # ZYX 欧拉角，度
+    rpy: [-90.0, -90.0, 0.0]    # ZYX 欧拉角，度
   # gripper:                     # 可选，需要夹爪时填写
   #   name: "my_gripper"
   #   max_range: 1.95

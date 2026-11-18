@@ -1,10 +1,7 @@
 #include "arm_controller.h"
 
 #include <Eigen/Dense>
-#include <Eigen/Geometry>
-#include <algorithm>
 #include <cmath>
-#include <cstring>
 #include <thread>
 #include "arm_logger.h"
 #include "cartesian_linear_path.h"
@@ -104,7 +101,7 @@ std::unique_ptr<TimeScalerBase> ArmController::CreateTimeScaler(
 
 bool ArmController::SelectBestIKSolve(const ArmMotion::IKSolves& ik_solves,
                                       const ArmMotion::Joint6Dof& reference_joint,
-                                      ArmMotion::Joint6Dof& selected_joint, bool log=true) const {
+                                      ArmMotion::Joint6Dof& selected_joint, bool log = true) const {
   constexpr double kPi = M_PI;
   constexpr double kTwoPi = 2.0 * kPi;
 
@@ -633,15 +630,20 @@ int ArmController::MoveL(ArmMotion::Pose6Dof target_pose, double v, double a) {
   kinematic_solver_->FK(current_joint, flange);
   const ArmMotion::Pose6Dof current_tcp = tool_frame_.Compose(flange);
 
-  const double path_length = CartesianPosDistance(current_tcp, target_pose);
-  if (path_length <= 1e-7) {
-    ARM_LOG_WARN("[MoveL] skip: path length too small");
+  const double dp = CartesianPosDistance(current_tcp, target_pose);
+  auto to_quat = [](const ArmMotion::Pose6Dof& p) {
+    return Eigen::Quaterniond(p.quat.w, p.quat.x, p.quat.y, p.quat.z).normalized();
+  };
+  const double dtheta = to_quat(current_tcp).angularDistance(to_quat(target_pose));
+
+  if (dp <= 1e-7 && dtheta <= 1e-6) {
+    ARM_LOG_WARN("[MoveL] skip: TCP pose unchanged");
     return -1;
   }
 
   // 单位归一化
-  double normalized_v = v / path_length;
-  double normalized_a = a / path_length;
+  const double normalized_v = 1.0 / std::max(dp / v, dtheta / v);
+  const double normalized_a = 1.0 / std::max(dp / a, dtheta / a);
 
   TimeScalerBase::PlanConfig config;
   auto time_scaler = CreateTimeScaler(normalized_v, normalized_a, config);

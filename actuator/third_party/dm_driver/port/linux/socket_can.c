@@ -173,6 +173,26 @@ int SocketCANFD_Receive(int sock_fd, uint32_t* id, uint8_t* dlc, uint8_t* data) 
   return nbytes;
 }
 
+int SocketCAN_Flush(int sock_fd, int timeout_ms) {
+  if (sock_fd < 0) {
+    return -1;
+  }
+  const int step_us = 100;
+  int waited_us = 0;
+  while (waited_us <= timeout_ms * 1000) {
+    int pending = 0;
+    if (ioctl(sock_fd, TIOCOUTQ, &pending) == -1) {
+      return -1;
+    }
+    if (pending == 0) {
+      return 0;
+    }
+    usleep(step_us);
+    waited_us += step_us;
+  }
+  return -1;
+}
+
 void SocketCAN_Close(int sock_fd) {
   if (sock_fd != -1) {
     close(sock_fd);

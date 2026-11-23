@@ -13,6 +13,7 @@ int SocketCAN_Receive(int sock_fd, uint32_t* id, uint8_t* dlc, uint8_t* data);
 int SocketCANFD_Send(int sock_fd, uint32_t id, uint8_t dlc, bool brs, const uint8_t* data);
 int SocketCANFD_Receive(int sock_fd, uint32_t* id, uint8_t* dlc, uint8_t* data);
 int SocketCAN_SetFilters(int sock_fd, const uint32_t* ids, int count);
+int SocketCAN_Flush(int sock_fd, int timeout_ms);
 void SocketCAN_Close(int sock_fd);
 
 #ifdef __cplusplus

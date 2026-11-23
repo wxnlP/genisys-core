@@ -35,10 +35,10 @@ void SocketCANBus::Start() {
 
 void SocketCANBus::Shutdown() {
   sample_thread_.request_stop();
-  // 等线程退出，read()有超时兜底，最坏100ms
   if (sample_thread_.joinable()) {
     sample_thread_.join();
   }
+  SocketCAN_Flush(socket_fd_, 20);
 }
 
 void SocketCANBus::SetReceiverId(uint32_t *id, uint8_t len) {

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <limits>
 #include <mutex>
 #include <optional>
 #include "spsc_ring_buffer.h"
@@ -57,10 +58,9 @@ class GripperController {
   std::optional<double> current_velocity_{};
   std::optional<double> current_effort_{};
 
-  std::optional<double> last_cmd_position_{};
+  std::atomic<double> last_cmd_position_{std::numeric_limits<double>::quiet_NaN()};
 
   std::mutex state_mutex_;
-  std::mutex last_cmd_mutex_;
   SPSCRingBuffer<GripperCommand> command_queue_{4096};
 
   std::atomic<bool> force_stop_{false};

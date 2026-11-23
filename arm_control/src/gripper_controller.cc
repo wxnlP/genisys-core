@@ -30,10 +30,7 @@ int GripperController::GetCurrentPosition(double& position) {
 
 int GripperController::GetGripperCommand(GripperCommand& command) {
   if (command_queue_.Pop(command)) {
-    {
-      std::lock_guard<std::mutex> lock(last_cmd_mutex_);
-      last_cmd_position_ = command.position;
-    }
+    last_cmd_position_.store(command.position, std::memory_order_relaxed);
     return 0;
   }
   command.damping = damping_;
@@ -59,14 +56,14 @@ bool GripperController::PosControl(double position, double velocity, double acce
   }
 
   double start_position = current_position;
-  {
-    std::lock_guard<std::mutex> lock(last_cmd_mutex_);
-    if (last_cmd_position_.has_value() &&
-        std::abs(*last_cmd_position_ - current_position) <= kBumplessTolRad) {
-      start_position = *last_cmd_position_;
-    } else if (last_cmd_position_.has_value()) {
+  const double last_position = last_cmd_position_.load();
+  if (!std::isnan(last_position)) {
+    const double delta = std::abs(last_position - current_position);
+    if (delta <= kBumplessTolRad) {
+      start_position = last_position;
+    } else {
       ARM_LOG_WARN("[Gripper] fallback to measured: delta={:.4f} rad > {:.3f} rad",
-                   std::abs(*last_cmd_position_ - current_position), kBumplessTolRad);
+                   delta, kBumplessTolRad);
     }
   }
 

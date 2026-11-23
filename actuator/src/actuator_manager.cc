@@ -129,6 +129,7 @@ ActuatorManager::ActuatorManager(std::string file) {
   // 注册所有反馈帧 ID
   if (can_bus_) {
     can_bus_->SetReceiverId(feedback_ids.data(), static_cast<uint8_t>(feedback_ids.size()));
+    can_bus_->Start();
   }
 }
 

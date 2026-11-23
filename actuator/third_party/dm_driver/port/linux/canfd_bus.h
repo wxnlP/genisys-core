@@ -2,7 +2,6 @@
 
 #include "canfd_bus_base.h"
 #include <string>
-#include <atomic>
 #include <chrono>
 #include <mutex>
 #include <thread>
@@ -26,6 +25,7 @@ public:
   ~SocketCANBus() override;
 
   int Init();
+  void Start();
   void Shutdown();
   void SetReceiverId(uint32_t *id, uint8_t len);
   void Sample();

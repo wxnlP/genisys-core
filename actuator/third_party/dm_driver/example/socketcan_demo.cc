@@ -11,6 +11,7 @@ int main() {
 
   uint32_t recv_data[8] = {0x11, 0x12, 0x13, 0x14, 0x15, 0x16, 0x17, 0x18};
   can_bus.SetReceiverId(recv_data, 7);
+  can_bus.Start();
 
   std::jthread send_thread([&can_bus]() {
     std::cout << "Sending data to CAN bus..." << std::endl;

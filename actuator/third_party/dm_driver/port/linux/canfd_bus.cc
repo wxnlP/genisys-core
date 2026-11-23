@@ -22,12 +22,15 @@ int SocketCANBus::Init() {
   if (socket_fd_ < 0) {
     return -1;
   }
+  return socket_fd_;
+}
+
+void SocketCANBus::Start() {
   sample_thread_ = std::jthread([this](std::stop_token st) {
     while (!st.stop_requested()) {
       Sample();
     }
   });
-  return socket_fd_;
 }
 
 void SocketCANBus::Shutdown() {

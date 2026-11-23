@@ -12,6 +12,7 @@ int main()
     int sock_fd = socketcan0.Init();
     uint32_t ids = 0x11;
     socketcan0.SetReceiverId(&ids, 1);
+    socketcan0.Start();
     // std::cout << "socket fd: " << sock_fd << std::endl;
     // uint8_t frame[4] = { 0x01, 0x02, 0x03, 0x04 };
     // int ret = socketcan0.Send(0x01, frame, 4);
